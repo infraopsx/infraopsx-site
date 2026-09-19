@@ -3,15 +3,28 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 
-const posts = [
-  {
-    title: 'Kubernetes Pod Stuck in Pending: A Practical Troubleshooting Workflow',
-    description: 'A systematic way to diagnose Pending pods using scheduler events, resource requests, affinity rules, taints and storage.',
-    date: 'Sep 18, 2026',
-    href: '/blog/kubernetes-pod-pending/',
-    tags: ['Kubernetes', 'Troubleshooting', 'Linux']
-  }
-];
+const modules = import.meta.glob('./*.md', { eager: true }) as Record<string, any>;
+
+const posts = Object.values(modules)
+  .map((post) => {
+    const fm = post.frontmatter ?? {};
+    return {
+      title: fm.title,
+      description: fm.description,
+      date: new Date(fm.pubDate),
+      href: fm.enPath,
+      tags: fm.tags ?? []
+    };
+  })
+  .filter((post) => post.title && post.href && !Number.isNaN(post.date.getTime()))
+  .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+const formatDate = (date: Date) =>
+  date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
 ---
 
 <BaseLayout
@@ -49,12 +62,12 @@ const posts = [
       <div class="container post-list">
         {posts.map((post) => (
           <a class="post-card" href={post.href}>
-            <div class="post-meta">{post.date}</div>
+            <div class="post-meta">{formatDate(post.date)}</div>
             <h2>{post.title}</h2>
             <p>{post.description}</p>
 
             <div class="post-tags">
-              {post.tags.map((tag) => <span>{tag}</span>)}
+              {post.tags.map((tag: string) => <span>{tag}</span>)}
             </div>
           </a>
         ))}
