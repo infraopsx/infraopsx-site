@@ -1,6 +1,6 @@
 import rss from '@astrojs/rss';
 
-const modules = import.meta.glob('./blog/*.md', { eager: true });
+const modules = import.meta.glob('./blog/*/index.md', { eager: true });
 
 export function GET(context) {
   const items = Object.values(modules)

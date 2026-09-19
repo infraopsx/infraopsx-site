@@ -1,8 +1,9 @@
 ---
-layout: ../../../layouts/ArticleLayout.astro
+layout: ../../../../layouts/ArticleLayout.astro
 title: "Kubernetes Pod 一直 Pending：一套实用的排查流程"
 description: "从调度事件、资源请求、Affinity、Taint 和存储几个方向系统定位 Kubernetes Pending Pod。"
 pubDate: 2026-09-18
+category: Kubernetes
 locale: zh-CN
 tags:
   - Kubernetes

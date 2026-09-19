@@ -1,8 +1,9 @@
 ---
-layout: ../../layouts/ArticleLayout.astro
+layout: ../../../layouts/ArticleLayout.astro
 title: "Why Does an Evicted Kubernetes Pod Show Error or ContainerStatusUnknown?"
 description: "A practical Kubernetes troubleshooting case: why a Pod evicted for exceeding ephemeral-storage can still appear as Error or ContainerStatusUnknown, why the old Pod remains after a replacement starts, and how to identify the real root cause."
 pubDate: "2026-09-19"
+category: Kubernetes
 tags:
   - Kubernetes
   - Troubleshooting
