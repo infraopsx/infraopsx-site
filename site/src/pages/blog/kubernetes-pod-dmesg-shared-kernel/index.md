@@ -1,8 +1,9 @@
 ---
-layout: ../../layouts/ArticleLayout.astro
+layout: ../../../layouts/ArticleLayout.astro
 title: "Why Does dmesg Inside a Kubernetes Pod Show the Host Kernel Log?"
 description: "Understand why dmesg inside a Kubernetes Pod can expose host kernel messages, and how kernel.dmesg_restrict, CAP_SYSLOG, CAP_SYS_ADMIN, and container isolation interact."
 pubDate: "2026-09-19"
+category: Kubernetes
 tags:
   - Kubernetes
   - Linux

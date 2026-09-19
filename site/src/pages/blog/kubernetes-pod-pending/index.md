@@ -1,8 +1,9 @@
 ---
-layout: ../../layouts/ArticleLayout.astro
+layout: ../../../layouts/ArticleLayout.astro
 title: "Kubernetes Pod Stuck in Pending: A Practical Troubleshooting Workflow"
 description: "A systematic way to diagnose Pending pods using scheduler events, resource requests, affinity rules, taints and storage."
 pubDate: 2026-09-18
+category: Kubernetes
 locale: en
 tags:
   - Kubernetes

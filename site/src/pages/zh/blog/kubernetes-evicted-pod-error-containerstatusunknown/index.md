@@ -1,8 +1,9 @@
 ---
-layout: ../../../layouts/ArticleLayout.astro
+layout: ../../../../layouts/ArticleLayout.astro
 title: "Kubernetes Pod 被 Evicted 后为什么仍显示 Error 或 ContainerStatusUnknown？"
 description: "一次真实 Kubernetes 故障排查：Pod 因 ephemeral-storage 超限被驱逐后，为什么 kubectl get pods 仍可能显示 Error 或 ContainerStatusUnknown，以及如何确认根因、清理残留 Pod 并避免再次发生。"
 pubDate: "2026-09-19"
+category: Kubernetes
 tags:
   - Kubernetes
   - Troubleshooting

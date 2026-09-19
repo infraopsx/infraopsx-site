@@ -1,8 +1,9 @@
 ---
-layout: ../../../layouts/ArticleLayout.astro
+layout: ../../../../layouts/ArticleLayout.astro
 title: "Kubernetes Pod 里的 dmesg 为什么和宿主机一样？理解容器共享内核与 dmesg_restrict"
 description: "解释为什么 Kubernetes Pod 中执行 dmesg 会看到宿主机内核日志，以及 kernel.dmesg_restrict、CAP_SYSLOG、CAP_SYS_ADMIN 与容器隔离之间的关系。"
 pubDate: "2026-09-19"
+category: Kubernetes
 tags:
   - Kubernetes
   - Linux
