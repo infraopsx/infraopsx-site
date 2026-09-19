@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to Netcup
@@ -30,13 +34,88 @@ jobs:
           printf '%s\n' "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Deploy latest image
+      - name: Deploy and verify
+        env:
+          FULL_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
+          NEW_TAG="${FULL_SHA:0:7}"
+
+          echo "Deploying image tag: ${NEW_TAG}"
+
           ssh \
             -i ~/.ssh/deploy_key \
             -p "${{ secrets.VPS_PORT }}" \
             "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
-            'cd /opt/compose/infraopsx &&
-             docker compose pull &&
-             docker compose up -d &&
-             docker compose ps'
+            "NEW_TAG='${NEW_TAG}' sh -s" <<'REMOTE'
+          set -u
+
+          cd /opt/compose/infraopsx
+
+          OLD_TAG="$(sed -n 's/^IMAGE_TAG=//p' .env | tail -n 1)"
+
+          if [ -z "${OLD_TAG}" ]; then
+            echo "ERROR: Current IMAGE_TAG not found."
+            exit 1
+          fi
+
+          echo "Current tag: ${OLD_TAG}"
+          echo "New tag:     ${NEW_TAG}"
+
+          rollback() {
+            echo "Rolling back to ${OLD_TAG}..."
+
+            printf 'IMAGE_TAG=%s\n' "${OLD_TAG}" > .env
+
+            docker compose pull || true
+
+            if docker compose up -d --wait --wait-timeout 60; then
+              if curl -fsS --max-time 3 \
+                -H 'Host: infra.oeax.de' \
+                http://127.0.0.1/healthz >/dev/null; then
+
+                echo "Rollback successful. Production restored to ${OLD_TAG}."
+              else
+                echo "ERROR: Rollback container is healthy, but origin check failed."
+                docker compose ps
+                docker logs --tail 100 infraopsx || true
+              fi
+            else
+              echo "ERROR: Rollback failed."
+              docker compose ps
+              docker logs --tail 100 infraopsx || true
+            fi
+
+            # New deployment failed, so Action must remain failed
+            exit 1
+          }
+
+          printf 'IMAGE_TAG=%s\n' "${NEW_TAG}" > .env
+
+          echo "Pulling ${NEW_TAG}..."
+
+          if ! docker compose pull; then
+            echo "ERROR: Unable to pull ${NEW_TAG}."
+            printf 'IMAGE_TAG=%s\n' "${OLD_TAG}" > .env
+            exit 1
+          fi
+
+          echo "Starting ${NEW_TAG}..."
+
+          if ! docker compose up -d --wait --wait-timeout 60; then
+            echo "ERROR: Container did not become healthy within 60 seconds."
+            rollback
+          fi
+
+          echo "Checking service through host port..."
+
+          if ! curl -fsS --max-time 3 \
+            -H 'Host: infra.oeax.de' \
+            http://127.0.0.1/healthz >/dev/null; then
+
+            echo "ERROR: Origin health check failed."
+            rollback
+          fi
+
+          echo "Deployment successful: ${NEW_TAG}"
+          docker compose ps
+          REMOTE
