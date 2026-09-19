@@ -23,6 +23,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout deployed revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
@@ -33,6 +38,20 @@ jobs:
 
           printf '%s\n' "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload production config
+        run: |
+          scp \
+            -i ~/.ssh/deploy_key \
+            -P "${{ secrets.VPS_PORT }}" \
+            docker-compose.yml \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/compose/infraopsx/.docker-compose.yml.new"
+
+          scp \
+            -i ~/.ssh/deploy_key \
+            -P "${{ secrets.VPS_PORT }}" \
+            nginx.conf \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/compose/infraopsx/.nginx.conf.new"
 
       - name: Deploy and verify
         env:
@@ -51,6 +70,8 @@ jobs:
 
           cd /opt/compose/infraopsx
 
+          IMAGE="ghcr.io/infraopsx/infraopsx-site:${NEW_TAG}"
+
           OLD_TAG="$(sed -n 's/^IMAGE_TAG=//p' .env | tail -n 1)"
 
           if [ -z "${OLD_TAG}" ]; then
@@ -61,9 +82,60 @@ jobs:
           echo "Current tag: ${OLD_TAG}"
           echo "New tag:     ${NEW_TAG}"
 
+          #
+          # Validate incoming Docker Compose configuration.
+          #
+          echo "Validating docker-compose.yml..."
+
+          if ! IMAGE_TAG="${NEW_TAG}" \
+            docker compose \
+              -f .docker-compose.yml.new \
+              config -q; then
+
+            echo "ERROR: New docker-compose.yml is invalid."
+            rm -f .docker-compose.yml.new .nginx.conf.new
+            exit 1
+          fi
+
+          #
+          # Pull the exact image before changing production.
+          #
+          echo "Pulling ${IMAGE}..."
+
+          if ! docker pull "${IMAGE}"; then
+            echo "ERROR: Unable to pull ${IMAGE}."
+            rm -f .docker-compose.yml.new .nginx.conf.new
+            exit 1
+          fi
+
+          #
+          # Validate incoming Nginx configuration using the new image.
+          #
+          echo "Validating nginx.conf..."
+
+          if ! docker run --rm \
+            --entrypoint nginx \
+            -v "$PWD/.nginx.conf.new:/etc/nginx/conf.d/default.conf:ro" \
+            -v "$PWD/ssl:/etc/nginx/ssl:ro" \
+            "${IMAGE}" \
+            -t; then
+
+            echo "ERROR: New nginx.conf is invalid."
+            rm -f .docker-compose.yml.new .nginx.conf.new
+            exit 1
+          fi
+
+          #
+          # Save current production configuration for rollback.
+          #
+          cp -a docker-compose.yml .docker-compose.yml.rollback
+          cp -a nginx.conf .nginx.conf.rollback
+
           rollback() {
             echo "Rolling back to ${OLD_TAG}..."
 
+            cp -f .docker-compose.yml.rollback docker-compose.yml
+            cp -f .nginx.conf.rollback nginx.conf
             printf 'IMAGE_TAG=%s\n' "${OLD_TAG}" > .env
 
             docker compose pull || true
@@ -74,39 +146,43 @@ jobs:
                 http://127.0.0.1/healthz >/dev/null; then
 
                 echo "Rollback successful. Production restored to ${OLD_TAG}."
+
+                rm -f \
+                  .docker-compose.yml.rollback \
+                  .nginx.conf.rollback \
+                  .docker-compose.yml.new \
+                  .nginx.conf.new
               else
-                echo "ERROR: Rollback container is healthy, but origin check failed."
-                docker compose ps
+                echo "ERROR: Rollback container is healthy but /healthz failed."
+                docker compose ps || true
                 docker logs --tail 100 infraopsx || true
               fi
             else
               echo "ERROR: Rollback failed."
-              docker compose ps
+              docker compose ps || true
               docker logs --tail 100 infraopsx || true
             fi
 
-            # New deployment failed, so Action must remain failed
+            # New deployment failed, even if rollback succeeded.
             exit 1
           }
 
+          #
+          # Activate the validated configuration.
+          #
+          mv .docker-compose.yml.new docker-compose.yml
+          mv .nginx.conf.new nginx.conf
+
           printf 'IMAGE_TAG=%s\n' "${NEW_TAG}" > .env
-
-          echo "Pulling ${NEW_TAG}..."
-
-          if ! docker compose pull; then
-            echo "ERROR: Unable to pull ${NEW_TAG}."
-            printf 'IMAGE_TAG=%s\n' "${OLD_TAG}" > .env
-            exit 1
-          fi
 
           echo "Starting ${NEW_TAG}..."
 
           if ! docker compose up -d --wait --wait-timeout 60; then
-            echo "ERROR: Container did not become healthy within 60 seconds."
+            echo "ERROR: Container did not become healthy."
             rollback
           fi
 
-          echo "Checking service through host port..."
+          echo "Checking origin health..."
 
           if ! curl -fsS --max-time 3 \
             -H 'Host: infra.oeax.de' \
@@ -117,5 +193,10 @@ jobs:
           fi
 
           echo "Deployment successful: ${NEW_TAG}"
+
           docker compose ps
+
+          rm -f \
+            .docker-compose.yml.rollback \
+            .nginx.conf.rollback
           REMOTE
