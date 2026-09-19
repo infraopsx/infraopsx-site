@@ -1,0 +1,120 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+---
+
+<BaseLayout
+  title="Contact | InfraOpsX"
+  description="Contact InfraOpsX for Linux, Docker, Kubernetes, self-hosted deployment and infrastructure troubleshooting."
+  lang="en"
+  canonicalPath="/contact/"
+  enPath="/contact/"
+  zhPath="/zh/contact/"
+>
+  <Header locale="en" switchHref="/zh/contact/" />
+
+  <main>
+    <section class="contact-hero">
+      <div class="container contact-hero-inner">
+        <div>
+          <span class="section-label">CONTACT</span>
+          <h1>Need help with infrastructure?</h1>
+          <p>
+            If you are trying to deploy, migrate or troubleshoot a Linux,
+            Docker or Kubernetes environment, email me with the context and
+            symptoms. Clear technical information makes it much easier to
+            understand the problem quickly.
+          </p>
+        </div>
+
+        <aside class="contact-email-card">
+          <span class="contact-card-label">BEST WAY TO REACH ME</span>
+          <a class="contact-email" href="mailto:hello@oeax.de">
+            hello@oeax.de
+          </a>
+          <p>
+            For project inquiries, deployment work and infrastructure
+            troubleshooting.
+          </p>
+          <a class="button primary contact-email-button" href="mailto:hello@oeax.de">
+            Send an email
+          </a>
+        </aside>
+      </div>
+    </section>
+
+    <section class="contact-section">
+      <div class="container">
+        <div class="contact-grid">
+          <article class="contact-panel">
+            <span class="contact-number">01</span>
+            <h2>What I can help with</h2>
+            <ul class="contact-list">
+              <li>Linux server troubleshooting</li>
+              <li>Docker and Docker Compose deployment</li>
+              <li>Self-hosted application deployment</li>
+              <li>Kubernetes troubleshooting and deployment</li>
+              <li>Nginx, reverse proxy and HTTPS</li>
+              <li>Prometheus and Grafana monitoring</li>
+              <li>Storage, networking and infrastructure diagnostics</li>
+            </ul>
+          </article>
+
+          <article class="contact-panel">
+            <span class="contact-number">02</span>
+            <h2>What to include in your message</h2>
+            <ol class="contact-list">
+              <li>What are you trying to deploy, migrate or fix?</li>
+              <li>What environment are you using?</li>
+              <li>What error, symptom or unexpected behavior are you seeing?</li>
+              <li>What have you already tried?</li>
+              <li>Is this a production environment or a test environment?</li>
+            </ol>
+          </article>
+        </div>
+
+        <div class="contact-example">
+          <span class="section-label">GOOD FIRST MESSAGE</span>
+          <pre><code>Subject: Kubernetes Pod scheduling issue
+
+Environment:
+- Kubernetes cluster
+- 6 worker nodes
+- Container runtime: containerd
+
+Problem:
+One workload remains Pending.
+
+What I checked:
+kubectl describe pod shows scheduler errors related to
+affinity and CPU requests.
+
+Goal:
+Identify the actual scheduling blocker and the safest fix.</code></pre>
+        </div>
+
+        <div class="contact-safety">
+          <h2>Before sending logs or configuration</h2>
+          <p>
+            Please remove passwords, API keys, tokens, private keys and other
+            secrets. Hostnames, IP addresses and company-specific identifiers
+            can also be anonymized when they are not needed for diagnosis.
+          </p>
+        </div>
+
+        <div class="contact-bottom">
+          <div>
+            <span class="section-label">READY?</span>
+            <h2>Tell me what you are working on.</h2>
+          </div>
+          <a class="button primary" href="mailto:hello@oeax.de">
+            hello@oeax.de
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer locale="en" />
+</BaseLayout>

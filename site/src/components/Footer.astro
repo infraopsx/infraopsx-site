@@ -1,0 +1,16 @@
+---
+const { locale = 'en' } = Astro.props;
+const isZh = locale === 'zh';
+---
+
+<footer>
+  <div class="container footer-content">
+    <span>© 2026 InfraOpsX</span>
+
+    <span>
+      {isZh
+        ? 'Linux · Docker · Kubernetes · 基础设施'
+        : 'Linux · Docker · Kubernetes · Infrastructure'}
+    </span>
+  </div>
+</footer>

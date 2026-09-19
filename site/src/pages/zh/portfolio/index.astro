@@ -1,0 +1,56 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+
+const areas = [
+  ['Linux 基础设施', '系统管理、服务、存储、网络以及生产环境故障诊断。'],
+  ['Docker 与自托管', '容器化部署、Docker Compose、数据持久化、反向代理和 HTTPS。'],
+  ['Kubernetes', '工作负载、调度、Service、Ingress、存储以及故障排查。'],
+  ['监控', 'Prometheus、Grafana 以及面向基础设施的实用监控能力。']
+];
+---
+
+<BaseLayout
+  title="作品集 | InfraOpsX"
+  description="InfraOpsX 在 Linux、Docker、Kubernetes、监控和故障排查方向的技术能力与公开作品。"
+  lang="zh-CN"
+  canonicalPath="/zh/portfolio/"
+  enPath="/portfolio/"
+  zhPath="/zh/portfolio/"
+>
+  <Header locale="zh" switchHref="/portfolio/" />
+
+  <main>
+    <section class="showcase-hero">
+      <div class="container">
+        <span class="section-label">作品集</span>
+        <h1>基础设施工作的方向与公开成果。</h1>
+        <p>
+          这里展示我主要处理的系统和问题类型，并通过技术文章和匿名化案例
+          提供更具体的能力证明。
+        </p>
+      </div>
+    </section>
+
+    <section class="showcase-section">
+      <div class="container">
+        <div class="portfolio-grid">
+          {areas.map(([title, text]) => (
+            <article class="portfolio-card">
+              <h2>{title}</h2>
+              <p>{text}</p>
+            </article>
+          ))}
+        </div>
+
+        <div class="portfolio-links">
+          <a class="button primary" href="/zh/case-studies/">查看案例</a>
+          <a class="button secondary" href="/zh/blog/">阅读技术文章</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer locale="zh" />
+</BaseLayout>

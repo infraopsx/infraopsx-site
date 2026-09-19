@@ -1,0 +1,24 @@
+# Secrets
+ssl/
+.env
+.env.*
+
+# Dependencies / build output
+node_modules/
+site/node_modules/
+site/dist/
+dist/
+
+# Old manual backups
+*.bak
+*.bak.*
+*.backup
+site.backup.*
+
+# Editor / OS
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+site-test/

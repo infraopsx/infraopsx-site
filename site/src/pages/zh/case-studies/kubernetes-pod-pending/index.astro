@@ -1,0 +1,263 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import Header from '../../../../components/Header.astro';
+import Footer from '../../../../components/Footer.astro';
+---
+
+<BaseLayout
+  title="案例：Kubernetes Pod 调度失败定位 | InfraOpsX"
+  description="一个匿名化 Kubernetes 实战案例：通过 Scheduler Events 定位 Affinity 与 CPU Request 导致的 Pending Pod。"
+  lang="zh-CN"
+  canonicalPath="/zh/case-studies/kubernetes-pod-pending/"
+  enPath="/case-studies/kubernetes-pod-pending/"
+  zhPath="/zh/case-studies/kubernetes-pod-pending/"
+>
+  <Header
+    locale="zh"
+    switchHref="/case-studies/kubernetes-pod-pending/"
+  />
+
+  <main class="case-detail-shell">
+    <div class="container case-detail-container">
+
+      <div class="article-breadcrumb">
+        <a href="/zh/">首页</a>
+        <span>/</span>
+        <a href="/zh/case-studies/">案例</a>
+        <span>/</span>
+        <span>Kubernetes 调度失败</span>
+      </div>
+
+      <header class="case-detail-header">
+        <span class="section-label">案例 · KUBERNETES</span>
+
+        <h1>
+          一个 Kubernetes Pod 无法完成调度的定位过程
+        </h1>
+
+        <p class="case-lead">
+          某个工作负载长期处于 <code>Pending</code>。排查没有把它当成一个
+          笼统的“Kubernetes 故障”，而是从 Scheduler Events 入手，把问题
+          缩小成几个可以验证的调度约束。
+        </p>
+
+        <div class="case-facts">
+          <div>
+            <span>环境</span>
+            <strong>6 节点 Kubernetes 集群</strong>
+          </div>
+          <div>
+            <span>主要证据</span>
+            <strong>Scheduler Events</strong>
+          </div>
+          <div>
+            <span>涉及方向</span>
+            <strong>Affinity · CPU Request</strong>
+          </div>
+          <div>
+            <span>结果</span>
+            <strong>明确调度阻塞原因</strong>
+          </div>
+        </div>
+      </header>
+
+      <article class="case-detail-content">
+
+        <section>
+          <span class="case-step">01 · 问题</span>
+          <h2>表面现象只有一个：Pending</h2>
+
+          <p>
+            Pod 长时间处于 <code>Pending</code>，并且始终没有被分配到 Node。
+            仅仅看到这个状态，并不能说明究竟是 CPU、内存、Affinity、Taint、
+            存储还是其他调度约束造成的。
+          </p>
+
+          <p>
+            如果只是不断删除 Pod，Controller 仍然会按照相同的 Pod Spec
+            重新创建，最终还是撞上同样的约束。因此第一步不是重启，而是读取
+            Scheduler 已经给出的证据。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">02 · 证据</span>
+          <h2>Scheduler 实际上已经解释了失败原因</h2>
+
+          <p>关键命令：</p>
+
+          <pre><code>kubectl describe pod -n &lt;namespace&gt; &lt;pod-name&gt;</code></pre>
+
+          <p>Events 中出现：</p>
+
+          <pre><code>0/6 nodes are available:
+2 node(s) didn't match pod affinity rules,
+4 Insufficient cpu.
+
+preemption:
+0/6 nodes are available:
+2 Preemption is not helpful for scheduling,
+4 No preemption victims found for incoming pod.</code></pre>
+
+          <p>
+            这几行信息已经把排查范围压缩得非常小：集群一共 6 个候选节点，
+            但每一个都因为明确的约束被排除了。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">03 · 诊断</span>
+          <h2>把 Event 转换成约束表</h2>
+
+          <div class="case-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>约束</th>
+                  <th>被排除节点</th>
+                  <th>含义</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Affinity 不匹配</td>
+                  <td>2</td>
+                  <td>工作负载的放置规则不允许使用这些节点。</td>
+                </tr>
+                <tr>
+                  <td>CPU 不足</td>
+                  <td>4</td>
+                  <td>其余节点无法满足 Pod 声明的 CPU Request。</td>
+                </tr>
+                <tr>
+                  <td>最终候选节点</td>
+                  <td>0</td>
+                  <td>没有节点能够同时满足所有约束。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            这里最容易产生误解的是 CPU。Kubernetes Scheduler 主要依据的是
+            Resource <strong>Request</strong>，而不是某一时刻的实时 CPU 使用率。
+          </p>
+
+          <p>
+            所以即使 <code>kubectl top</code> 看起来节点 CPU 并不高，也可能因为
+            已有工作负载预留了大量 Request 而出现 <code>Insufficient cpu</code>。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">04 · 验证路径</span>
+          <h2>分别验证两个真正的阻塞方向</h2>
+
+          <h3>CPU Request 与节点可分配资源</h3>
+
+          <pre><code>kubectl describe pod -n &lt;namespace&gt; &lt;pod-name&gt;
+kubectl describe node &lt;node-name&gt;
+kubectl top nodes
+kubectl top pods -A</code></pre>
+
+          <p>
+            需要同时关注 Pod 的 CPU Request、Node 的 Allocatable，以及其他
+            工作负载已经预留的资源，而不能只看实时利用率。
+          </p>
+
+          <h3>Affinity 规则</h3>
+
+          <pre><code>kubectl get pod -n &lt;namespace&gt; &lt;pod-name&gt; -o yaml
+kubectl get nodes --show-labels</code></pre>
+
+          <p>
+            排查 Affinity 的目的也不是看到规则就删除。它可能承担着高可用、
+            故障域隔离或者业务隔离作用。真正需要确认的是：当前规则是否仍然
+            符合原本的架构设计。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">05 · Preemption</span>
+          <h2>“Preemption is not helpful” 也是一个有效线索</h2>
+
+          <p>
+            Scheduler 还判断过：如果驱逐一些低优先级 Pod，是否能够让当前
+            工作负载找到合法节点。结论是不行。
+          </p>
+
+          <p>
+            这并不代表 Preemption 异常。比如驱逐其他 Pod 无法解决 Affinity
+            不匹配；如果不存在能够释放足够 CPU 且同时满足 Affinity 的节点，
+            抢占同样没有意义。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">06 · 修复方向</span>
+          <h2>真正的修复取决于原始设计意图</h2>
+
+          <p>
+            根因明确以后，后续可选动作也变得清晰，但应该选择哪一种，需要根据
+            业务和集群设计判断：
+          </p>
+
+          <ul>
+            <li>修正比预期更严格的 Affinity 规则。</li>
+            <li>降低不合理的 CPU Request。</li>
+            <li>调整其他 Workload 的资源与位置。</li>
+            <li>增加集群容量。</li>
+            <li>在合理前提下调整 Node Label 或拓扑。</li>
+          </ul>
+
+          <blockquote>
+            这个案例只记录已经能够确认的诊断结果，不会为了展示效果而虚构
+            未被独立确认过的生产变更。
+          </blockquote>
+        </section>
+
+        <section>
+          <span class="case-step">07 · 结果</span>
+          <h2>问题不再是“Kubernetes 坏了”</h2>
+
+          <p>
+            最终能够明确解释这个 Pending：
+            2 个节点因 Affinity 被排除，另外 4 个节点无法满足 CPU Request，
+            因此有效候选节点数量为 0。
+          </p>
+
+          <p>
+            后续工作也因此从“不断尝试命令”变成了一个明确的架构决策：
+            调整放置策略、资源 Request、工作负载分布，或者扩展集群容量。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">08 · 总结</span>
+          <h2>先定位，再修改。</h2>
+
+          <p>
+            对于还没有被分配 Node 的 Pending Pod，
+            <code>kubectl describe pod</code> 往往是最快的入口。
+          </p>
+
+          <p>
+            Scheduler Events 不是无关紧要的背景日志。很多调度故障里，
+            它本身就是距离根因最近的证据。
+          </p>
+        </section>
+
+      </article>
+
+      <div class="case-detail-actions">
+        <a class="button primary" href="/zh/case-studies/">← 返回全部案例</a>
+        <a class="button secondary" href="/zh/blog/kubernetes-pod-pending/">
+          阅读完整排查指南
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <Footer locale="zh" />
+</BaseLayout>

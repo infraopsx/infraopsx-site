@@ -1,0 +1,88 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+
+const cases = [
+  {
+    title: 'Kubernetes 调度失败定位',
+    area: 'Kubernetes · 调度',
+    problem: '某个工作负载长时间处于 Pending，在一个 6 节点集群中始终无法完成调度。',
+    diagnosis: 'Scheduler Events 显示：2 个节点因 Affinity 规则被排除，另外 4 个节点因 CPU Request 无法满足而被排除。',
+    outcome: '把一个笼统的 Pending 问题缩小成了几个明确的调度约束，从而能够针对真正原因采取措施。',
+    href: '/zh/case-studies/kubernetes-pod-pending/'
+  },
+  {
+    title: 'PostgreSQL WAL 空间增长排查',
+    area: 'PostgreSQL · 存储',
+    problem: 'PostgreSQL 数据目录的磁盘占用异常增长，主要空间集中在 pg_wal。',
+    diagnosis: '围绕 WAL 保留、复制状态以及可能阻止 WAL 回收的因素进行分析。',
+    outcome: '问题被定位到 WAL 生命周期，而不是简单地把它当成磁盘容量不足来处理。'
+  },
+  {
+    title: 'Ceph Recovery 瓶颈分析',
+    area: 'Ceph · 存储',
+    problem: 'Ceph 集群存在 Recovery 任务排队，恢复进度看起来低于预期。',
+    diagnosis: '检查 Recovery Reservations、OSD 状态以及恢复队列行为，确认真正限制恢复速度的位置。',
+    outcome: '将问题缩小到具体的恢复预留和调度行为，而不是盲目提高 Recovery 参数。'
+  }
+];
+---
+
+<BaseLayout
+  title="案例 | InfraOpsX"
+  description="Kubernetes、PostgreSQL、Ceph、Docker 与 Linux 基础设施故障排查的匿名化真实案例。"
+  lang="zh-CN"
+  canonicalPath="/zh/case-studies/"
+  enPath="/case-studies/"
+  zhPath="/zh/case-studies/"
+>
+  <Header locale="zh" switchHref="/case-studies/" />
+
+  <main>
+    <section class="showcase-hero">
+      <div class="container">
+        <span class="section-label">案例</span>
+        <h1>问题是如何被一步步缩小并解决的。</h1>
+        <p>
+          这些内容来自真实基础设施工作的匿名化整理。重点不是公司名或环境名称，
+          而是排查过程、根因定位以及最终技术结果。
+        </p>
+      </div>
+    </section>
+
+    <section class="showcase-section">
+      <div class="container showcase-grid">
+        {cases.map((item, index) => (
+          <article class={`showcase-card ${item.href ? 'showcase-card-linked' : ''}`}>
+            <div class="showcase-kicker">0{index + 1} · {item.area}</div>
+            <h2>{item.title}</h2>
+
+            <div class="case-block">
+              <span>问题</span>
+              <p>{item.problem}</p>
+            </div>
+
+            <div class="case-block">
+              <span>排查</span>
+              <p>{item.diagnosis}</p>
+            </div>
+
+            <div class="case-block">
+              <span>结果</span>
+              <p>{item.outcome}</p>
+            </div>
+
+            {item.href && (
+              <a class="case-read-more" href={item.href}>
+                查看完整案例 →
+              </a>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  </main>
+
+  <Footer locale="zh" />
+</BaseLayout>

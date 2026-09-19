@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://infra.oeax.de/sitemap-index.xml

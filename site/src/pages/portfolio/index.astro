@@ -1,0 +1,56 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+
+const areas = [
+  ['Linux Infrastructure', 'System administration, services, storage, networking and production diagnostics.'],
+  ['Docker & Self-hosted', 'Containerized deployment, Docker Compose, persistence, reverse proxy and HTTPS.'],
+  ['Kubernetes', 'Workloads, scheduling, services, ingress, storage and troubleshooting.'],
+  ['Monitoring', 'Prometheus, Grafana and practical infrastructure visibility.']
+];
+---
+
+<BaseLayout
+  title="Portfolio | InfraOpsX"
+  description="Selected InfraOpsX infrastructure work across Linux, Docker, Kubernetes, monitoring and troubleshooting."
+  lang="en"
+  canonicalPath="/portfolio/"
+  enPath="/portfolio/"
+  zhPath="/zh/portfolio/"
+>
+  <Header locale="en" switchHref="/zh/portfolio/" />
+
+  <main>
+    <section class="showcase-hero">
+      <div class="container">
+        <span class="section-label">PORTFOLIO</span>
+        <h1>Selected infrastructure work and technical focus.</h1>
+        <p>
+          A concise view of the systems and problem areas I work with, backed by
+          technical articles and anonymized case studies.
+        </p>
+      </div>
+    </section>
+
+    <section class="showcase-section">
+      <div class="container">
+        <div class="portfolio-grid">
+          {areas.map(([title, text]) => (
+            <article class="portfolio-card">
+              <h2>{title}</h2>
+              <p>{text}</p>
+            </article>
+          ))}
+        </div>
+
+        <div class="portfolio-links">
+          <a class="button primary" href="/case-studies/">View case studies</a>
+          <a class="button secondary" href="/blog/">Read technical articles</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer locale="en" />
+</BaseLayout>

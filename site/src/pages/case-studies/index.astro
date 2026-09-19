@@ -1,0 +1,89 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+
+const cases = [
+  {
+    title: 'Kubernetes Scheduling Failure',
+    area: 'Kubernetes · Scheduling',
+    problem: 'A workload remained Pending and could not be scheduled across a six-node cluster.',
+    diagnosis: 'Scheduler events showed two nodes excluded by affinity rules and four nodes rejected because of CPU requests.',
+    outcome: 'The problem was reduced from a generic Pending state to a concrete set of scheduling constraints, making the corrective path clear.',
+    href: '/case-studies/kubernetes-pod-pending/'
+  },
+  {
+    title: 'PostgreSQL WAL Growth Investigation',
+    area: 'PostgreSQL · Storage',
+    problem: 'The PostgreSQL data directory showed unexpectedly high disk consumption concentrated in pg_wal.',
+    diagnosis: 'The investigation focused on WAL retention, replication state and the factors that can prevent WAL recycling.',
+    outcome: 'The storage problem was isolated to the WAL lifecycle instead of being treated as a generic disk-capacity issue.'
+  },
+  {
+    title: 'Ceph Recovery Bottleneck Analysis',
+    area: 'Ceph · Storage',
+    problem: 'Recovery work was queued while cluster recovery progress appeared slower than expected.',
+    diagnosis: 'Recovery reservations, OSD state and queue behavior were inspected to understand where recovery was constrained.',
+    outcome: 'The recovery path was narrowed to specific reservation and scheduling behavior instead of blindly increasing recovery parameters.'
+  }
+];
+---
+
+<BaseLayout
+  title="Case Studies | InfraOpsX"
+  description="Anonymized infrastructure troubleshooting case studies across Kubernetes, PostgreSQL, Ceph, Docker and Linux."
+  lang="en"
+  canonicalPath="/case-studies/"
+  enPath="/case-studies/"
+  zhPath="/zh/case-studies/"
+>
+  <Header locale="en" switchHref="/zh/case-studies/" />
+
+  <main>
+    <section class="showcase-hero">
+      <div class="container">
+        <span class="section-label">CASE STUDIES</span>
+        <h1>How problems were narrowed down and solved.</h1>
+        <p>
+          Anonymized examples from real infrastructure work. The focus is not on
+          the company or environment name, but on the diagnosis process, root cause
+          and technical outcome.
+        </p>
+      </div>
+    </section>
+
+    <section class="showcase-section">
+      <div class="container showcase-grid">
+        {cases.map((item, index) => (
+          <article class={`showcase-card ${item.href ? 'showcase-card-linked' : ''}`}>
+            <div class="showcase-kicker">0{index + 1} · {item.area}</div>
+            <h2>{item.title}</h2>
+
+            <div class="case-block">
+              <span>Problem</span>
+              <p>{item.problem}</p>
+            </div>
+
+            <div class="case-block">
+              <span>Diagnosis</span>
+              <p>{item.diagnosis}</p>
+            </div>
+
+            <div class="case-block">
+              <span>Outcome</span>
+              <p>{item.outcome}</p>
+            </div>
+
+            {item.href && (
+              <a class="case-read-more" href={item.href}>
+                Read full case study →
+              </a>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  </main>
+
+  <Footer locale="en" />
+</BaseLayout>

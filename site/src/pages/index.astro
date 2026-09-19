@@ -1,0 +1,206 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+
+const services = [
+  {
+    title: 'Docker & Self-hosted',
+    text: 'Deploy and configure containerized and self-hosted applications with Docker, persistent storage, reverse proxy and HTTPS.'
+  },
+  {
+    title: 'Kubernetes',
+    text: 'Application deployment, workloads, services, ingress, storage and practical Kubernetes infrastructure.'
+  },
+  {
+    title: 'Monitoring',
+    text: 'Build practical monitoring and observability stacks with Prometheus, Grafana and infrastructure metrics.'
+  },
+  {
+    title: 'Troubleshooting',
+    text: 'Root-cause analysis for Linux, Docker, Kubernetes, networking, storage and infrastructure problems.'
+  }
+];
+
+const skills = [
+  'Linux',
+  'Docker',
+  'Docker Compose',
+  'Kubernetes',
+  'Nginx',
+  'Networking',
+  'Storage',
+  'Prometheus',
+  'Grafana',
+  'Infrastructure'
+];
+---
+
+<BaseLayout
+  title="InfraOpsX | Linux, Docker & Kubernetes Infrastructure"
+  description="Practical Linux, Docker, Kubernetes, deployment and infrastructure engineering."
+  lang="en"
+  canonicalPath="/"
+  enPath="/"
+  zhPath="/zh/"
+>
+  <Header locale="en" />
+
+  <main>
+    <section class="hero">
+      <div class="hero-glow"></div>
+
+      <div class="container hero-content">
+        <div class="eyebrow">
+          Linux · Docker · Kubernetes · Infrastructure
+        </div>
+
+        <h1>
+          Infrastructure that stays
+          <span>understandable.</span>
+        </h1>
+
+        <p class="hero-text">
+          Practical deployment, troubleshooting and infrastructure solutions
+          for Linux servers, containers, Kubernetes and self-hosted systems.
+        </p>
+
+        <div class="hero-actions">
+          <a class="button primary" href="#services">View services</a>
+          <a class="button secondary" href="#articles">Technical articles</a>
+        </div>
+
+        <div class="stack">
+          <span>Linux</span>
+          <span>Docker</span>
+          <span>Kubernetes</span>
+          <span>Nginx</span>
+          <span>Prometheus</span>
+          <span>Grafana</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="services" class="section">
+      <div class="container">
+        <div class="section-heading">
+          <span class="section-label">SERVICES</span>
+          <h2>Infrastructure work with a clear outcome.</h2>
+          <p>
+            Focused on practical deployment and operations rather than unnecessary complexity.
+          </p>
+        </div>
+
+        <div class="cards">
+          {services.map((service, index) => (
+            <article class="card">
+              <div class="card-number">0{index + 1}</div>
+              <h3>{service.title}</h3>
+              <p>{service.text}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section id="expertise" class="section section-dark">
+      <div class="container split">
+        <div>
+          <span class="section-label">EXPERTISE</span>
+          <h2>Built around real infrastructure.</h2>
+
+          <p class="large-copy">
+            I work across Linux systems, containers, networking, storage and
+            orchestration, with a strong focus on diagnosing problems and
+            getting services reliably into production.
+          </p>
+        </div>
+
+        <div class="skill-grid">
+          {skills.map((skill) => (
+            <div class="skill">{skill}</div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section id="work" class="section">
+      <div class="container">
+        <div class="section-heading">
+          <span class="section-label">HOW I WORK</span>
+          <h2>Diagnose first. Change second.</h2>
+        </div>
+
+        <div class="workflow">
+          <div>
+            <strong>01</strong>
+            <h3>Understand</h3>
+            <p>Start from the actual requirement, environment and constraints.</p>
+          </div>
+
+          <div>
+            <strong>02</strong>
+            <h3>Diagnose</h3>
+            <p>Use logs, metrics and system state to identify the real cause.</p>
+          </div>
+
+          <div>
+            <strong>03</strong>
+            <h3>Implement</h3>
+            <p>Apply the smallest reliable solution with clear configuration.</p>
+          </div>
+
+          <div>
+            <strong>04</strong>
+            <h3>Verify</h3>
+            <p>Validate the result and leave the environment understandable.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="articles" class="section section-accent">
+      <div class="container articles-intro">
+        <div>
+          <span class="section-label">TECHNICAL NOTES</span>
+          <h2>Real problems. Practical notes.</h2>
+
+          <p>
+            Technical articles and anonymized case studies covering Kubernetes,
+            Docker, Linux, storage, networking and production troubleshooting
+            are being prepared.
+          </p>
+        </div>
+
+        <div class="article-preview">
+          <span>COMING NEXT</span>
+
+          <ul>
+            <li>Kubernetes Pods Stuck in Pending</li>
+            <li>Docker Containers That Keep Restarting</li>
+            <li>Finding Linux Disk Space Problems</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta">
+      <div class="container">
+        <div class="cta-box">
+          <div>
+            <span class="section-label">INFRAOPSX</span>
+            <h2>Deployment should be boring.</h2>
+            <p>Reliable systems, clear configuration and practical operations.</p>
+          </div>
+
+          <div class="status">
+            <span class="status-dot"></span>
+            Project-based work
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer locale="en" />
+</BaseLayout>

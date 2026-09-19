@@ -1,0 +1,66 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+
+const posts = [
+  {
+    title: 'Kubernetes Pod Stuck in Pending: A Practical Troubleshooting Workflow',
+    description: 'A systematic way to diagnose Pending pods using scheduler events, resource requests, affinity rules, taints and storage.',
+    date: 'Sep 18, 2026',
+    href: '/blog/kubernetes-pod-pending/',
+    tags: ['Kubernetes', 'Troubleshooting', 'Linux']
+  }
+];
+---
+
+<BaseLayout
+  title="Technical Articles | InfraOpsX"
+  description="Practical technical notes about Linux, Docker, Kubernetes and infrastructure troubleshooting."
+  lang="en"
+  canonicalPath="/blog/"
+  enPath="/blog/"
+  zhPath="/zh/blog/"
+>
+  <Header locale="en" switchHref="/zh/blog/" />
+
+  <main>
+    <section class="blog-hero">
+      <div class="container">
+        <div class="blog-title-row">
+          <div>
+            <span class="section-label">TECHNICAL ARTICLES</span>
+            <h1>Real problems. Practical notes.</h1>
+          </div>
+
+          <a class="rss-link" href="/rss.xml">
+            RSS Feed ↗
+          </a>
+        </div>
+
+        <p>
+          Troubleshooting notes, deployment guides and anonymized infrastructure
+          case studies from Linux, Docker, Kubernetes, networking and storage.
+        </p>
+      </div>
+    </section>
+
+    <section class="posts">
+      <div class="container post-list">
+        {posts.map((post) => (
+          <a class="post-card" href={post.href}>
+            <div class="post-meta">{post.date}</div>
+            <h2>{post.title}</h2>
+            <p>{post.description}</p>
+
+            <div class="post-tags">
+              {post.tags.map((tag) => <span>{tag}</span>)}
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  </main>
+
+  <Footer locale="en" />
+</BaseLayout>

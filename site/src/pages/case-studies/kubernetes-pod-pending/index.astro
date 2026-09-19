@@ -1,0 +1,270 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+---
+
+<BaseLayout
+  title="Case Study: Kubernetes Pod Scheduling Failure | InfraOpsX"
+  description="An anonymized Kubernetes case study showing how scheduler events exposed affinity and CPU constraints behind a Pending Pod."
+  lang="en"
+  canonicalPath="/case-studies/kubernetes-pod-pending/"
+  enPath="/case-studies/kubernetes-pod-pending/"
+  zhPath="/zh/case-studies/kubernetes-pod-pending/"
+>
+  <Header
+    locale="en"
+    switchHref="/zh/case-studies/kubernetes-pod-pending/"
+  />
+
+  <main class="case-detail-shell">
+    <div class="container case-detail-container">
+
+      <div class="article-breadcrumb">
+        <a href="/">Home</a>
+        <span>/</span>
+        <a href="/case-studies/">Case Studies</a>
+        <span>/</span>
+        <span>Kubernetes Scheduling Failure</span>
+      </div>
+
+      <header class="case-detail-header">
+        <span class="section-label">CASE STUDY · KUBERNETES</span>
+
+        <h1>
+          Diagnosing a Kubernetes Pod that could not be scheduled
+        </h1>
+
+        <p class="case-lead">
+          A workload remained in <code>Pending</code>. Instead of treating it as
+          a generic Kubernetes failure, scheduler events were used to turn the
+          problem into a small set of concrete scheduling constraints.
+        </p>
+
+        <div class="case-facts">
+          <div>
+            <span>Environment</span>
+            <strong>6-node Kubernetes cluster</strong>
+          </div>
+          <div>
+            <span>Primary signal</span>
+            <strong>Scheduler Events</strong>
+          </div>
+          <div>
+            <span>Areas involved</span>
+            <strong>Affinity · CPU requests</strong>
+          </div>
+          <div>
+            <span>Outcome</span>
+            <strong>Scheduling blockers identified</strong>
+          </div>
+        </div>
+      </header>
+
+      <article class="case-detail-content">
+
+        <section>
+          <span class="case-step">01 · Problem</span>
+          <h2>The visible symptom was only “Pending”</h2>
+
+          <p>
+            A Pod stayed in <code>Pending</code> and was not assigned to any
+            node. At that point the status itself did not explain whether the
+            cause was CPU, memory, affinity, taints, storage or another
+            scheduling restriction.
+          </p>
+
+          <p>
+            Repeatedly deleting the Pod would simply recreate the same
+            specification and hit the same constraints again, so the first goal
+            was to read the scheduler's own evidence.
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">02 · Evidence</span>
+          <h2>The scheduler had already explained the failure</h2>
+
+          <p>The key command was:</p>
+
+          <pre><code>kubectl describe pod -n &lt;namespace&gt; &lt;pod-name&gt;</code></pre>
+
+          <p>The Events section reported:</p>
+
+          <pre><code>0/6 nodes are available:
+2 node(s) didn't match pod affinity rules,
+4 Insufficient cpu.
+
+preemption:
+0/6 nodes are available:
+2 Preemption is not helpful for scheduling,
+4 No preemption victims found for incoming pod.</code></pre>
+
+          <p>
+            That message reduced the investigation dramatically. There were six
+            possible nodes, but every one of them was excluded by a known
+            constraint.
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">03 · Diagnosis</span>
+          <h2>Translate the event into a constraint table</h2>
+
+          <div class="case-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Constraint</th>
+                  <th>Nodes excluded</th>
+                  <th>Meaning</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Affinity mismatch</td>
+                  <td>2</td>
+                  <td>The workload's placement rules rejected those nodes.</td>
+                </tr>
+                <tr>
+                  <td>Insufficient CPU</td>
+                  <td>4</td>
+                  <td>The remaining nodes could not satisfy the Pod's CPU request.</td>
+                </tr>
+                <tr>
+                  <td>Remaining candidates</td>
+                  <td>0</td>
+                  <td>No node satisfied all constraints at the same time.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            The important distinction is that Kubernetes scheduling uses
+            resource <strong>requests</strong>, not just live utilization.
+            A node can look lightly loaded in <code>top</code> or
+            <code>kubectl top</code> and still be unavailable because its
+            allocatable CPU is already reserved by existing requests.
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">04 · Validation path</span>
+          <h2>Check the two blocking dimensions independently</h2>
+
+          <h3>CPU reservation</h3>
+
+          <pre><code>kubectl describe pod -n &lt;namespace&gt; &lt;pod-name&gt;
+kubectl describe node &lt;node-name&gt;
+kubectl top nodes
+kubectl top pods -A</code></pre>
+
+          <p>
+            The relevant values are the Pod's CPU request, each node's
+            allocatable resources, and the resources already reserved by other
+            workloads.
+          </p>
+
+          <h3>Affinity rules</h3>
+
+          <pre><code>kubectl get pod -n &lt;namespace&gt; &lt;pod-name&gt; -o yaml
+kubectl get nodes --show-labels</code></pre>
+
+          <p>
+            The goal is not to remove affinity blindly. The rule may exist for
+            availability, topology or workload isolation. The correct question
+            is whether the current rule still matches the intended deployment
+            design.
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">05 · Preemption</span>
+          <h2>“Preemption is not helpful” was another useful clue</h2>
+
+          <p>
+            The scheduler also evaluated whether evicting lower-priority Pods
+            could create a valid placement and concluded that it would not.
+          </p>
+
+          <p>
+            This makes sense: evicting another Pod cannot fix an affinity
+            mismatch. It also cannot help if there is no suitable victim whose
+            removal creates enough allocatable CPU on an otherwise valid node.
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">06 · Corrective options</span>
+          <h2>The fix depends on the original design intent</h2>
+
+          <p>
+            Once the constraints were clear, the possible corrective actions
+            were also clear. The right choice depends on the workload and
+            cluster design:
+          </p>
+
+          <ul>
+            <li>Correct an affinity rule that is stricter than intended.</li>
+            <li>Reduce an unnecessarily high CPU request.</li>
+            <li>Move or resize other workloads.</li>
+            <li>Add cluster capacity.</li>
+            <li>Adjust node labels or topology where appropriate.</li>
+          </ul>
+
+          <blockquote>
+            The case study intentionally stops at the verified diagnosis rather
+            than claiming a production change that was not independently
+            documented.
+          </blockquote>
+        </section>
+
+        <section>
+          <span class="case-step">07 · Result</span>
+          <h2>The problem was no longer “Kubernetes is broken”</h2>
+
+          <p>
+            The useful outcome of the investigation was a precise explanation:
+            two nodes were disqualified by affinity and the other four could
+            not satisfy CPU requests. There were zero valid scheduling
+            candidates.
+          </p>
+
+          <p>
+            That changed the next step from trial-and-error into an
+            architecture decision: adjust placement policy, resource requests,
+            workload distribution or cluster capacity.
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">08 · Takeaway</span>
+          <h2>Diagnose first. Change second.</h2>
+
+          <p>
+            For an unscheduled Pod, <code>kubectl describe pod</code> is often
+            the fastest way to turn a vague <code>Pending</code> state into a
+            concrete list of constraints.
+          </p>
+
+          <p>
+            Scheduler events are not background noise. In many cases, they are
+            already the shortest path to the root cause.
+          </p>
+        </section>
+
+      </article>
+
+      <div class="case-detail-actions">
+        <a class="button primary" href="/case-studies/">← All case studies</a>
+        <a class="button secondary" href="/blog/kubernetes-pod-pending/">
+          Read the troubleshooting guide
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <Footer locale="en" />
+</BaseLayout>

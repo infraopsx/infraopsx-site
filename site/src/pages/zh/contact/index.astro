@@ -1,0 +1,117 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+---
+
+<BaseLayout
+  title="联系 | InfraOpsX"
+  description="联系 InfraOpsX，处理 Linux、Docker、Kubernetes、自托管应用部署和基础设施故障排查。"
+  lang="zh-CN"
+  canonicalPath="/zh/contact/"
+  enPath="/contact/"
+  zhPath="/zh/contact/"
+>
+  <Header locale="zh" switchHref="/contact/" />
+
+  <main>
+    <section class="contact-hero">
+      <div class="container contact-hero-inner">
+        <div>
+          <span class="section-label">联系</span>
+          <h1>有基础设施问题需要处理？</h1>
+          <p>
+            如果你正在部署、迁移或者排查 Linux、Docker、Kubernetes 环境，
+            可以直接通过邮件说明环境、现象和目标。信息越清晰，越容易快速理解
+            真正的问题所在。
+          </p>
+        </div>
+
+        <aside class="contact-email-card">
+          <span class="contact-card-label">推荐联系方式</span>
+          <a class="contact-email" href="mailto:hello@oeax.de">
+            hello@oeax.de
+          </a>
+          <p>
+            适用于项目咨询、部署工作以及基础设施故障排查。
+          </p>
+          <a class="button primary contact-email-button" href="mailto:hello@oeax.de">
+            发送邮件
+          </a>
+        </aside>
+      </div>
+    </section>
+
+    <section class="contact-section">
+      <div class="container">
+        <div class="contact-grid">
+          <article class="contact-panel">
+            <span class="contact-number">01</span>
+            <h2>可以协助的方向</h2>
+            <ul class="contact-list">
+              <li>Linux 服务器故障排查</li>
+              <li>Docker / Docker Compose 部署</li>
+              <li>自托管应用部署</li>
+              <li>Kubernetes 部署与故障排查</li>
+              <li>Nginx、反向代理和 HTTPS</li>
+              <li>Prometheus / Grafana 监控</li>
+              <li>存储、网络与基础设施问题诊断</li>
+            </ul>
+          </article>
+
+          <article class="contact-panel">
+            <span class="contact-number">02</span>
+            <h2>邮件里最好包含这些信息</h2>
+            <ol class="contact-list">
+              <li>你正在部署、迁移或者修复什么？</li>
+              <li>当前使用的环境是什么？</li>
+              <li>具体报错、现象或者异常行为是什么？</li>
+              <li>已经尝试过哪些操作？</li>
+              <li>这是生产环境还是测试环境？</li>
+            </ol>
+          </article>
+        </div>
+
+        <div class="contact-example">
+          <span class="section-label">一个清晰的首次联系示例</span>
+          <pre><code>主题：Kubernetes Pod 调度异常
+
+环境：
+- Kubernetes 集群
+- 6 个工作节点
+- Container Runtime: containerd
+
+问题：
+某个工作负载持续处于 Pending。
+
+已经检查：
+kubectl describe pod 显示与 Affinity 和 CPU Request
+有关的 Scheduler 错误。
+
+目标：
+确认真正阻止调度的原因，并找到安全的处理方式。</code></pre>
+        </div>
+
+        <div class="contact-safety">
+          <h2>发送日志和配置前</h2>
+          <p>
+            请先删除密码、API Key、Token、私钥等敏感信息。如果主机名、
+            IP 地址、公司名称等信息与故障定位无关，也建议先进行匿名化处理。
+          </p>
+        </div>
+
+        <div class="contact-bottom">
+          <div>
+            <span class="section-label">开始沟通</span>
+            <h2>告诉我你正在处理什么问题。</h2>
+          </div>
+          <a class="button primary" href="mailto:hello@oeax.de">
+            hello@oeax.de
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer locale="zh" />
+</BaseLayout>

@@ -1,0 +1,102 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+
+const { frontmatter } = Astro.props;
+
+const {
+  title,
+  description,
+  pubDate,
+  tags = [],
+  locale = 'en',
+  enPath,
+  zhPath
+} = frontmatter;
+
+const isZh = locale === 'zh-CN';
+
+const currentPath = Astro.url.pathname;
+
+const formattedDate = new Intl.DateTimeFormat(
+  isZh ? 'zh-CN' : 'en-US',
+  {
+    year: 'numeric',
+    month: isZh ? 'long' : 'short',
+    day: 'numeric'
+  }
+).format(new Date(pubDate));
+
+const switchHref = isZh ? enPath : zhPath;
+---
+
+<BaseLayout
+  title={`${title} | InfraOpsX`}
+  description={description}
+  lang={locale}
+  canonicalPath={currentPath}
+  enPath={enPath}
+  zhPath={zhPath}
+>
+  <Header
+    locale={isZh ? 'zh' : 'en'}
+    switchHref={switchHref}
+  />
+
+  <main class="article-shell">
+    <div class="container article-container">
+
+      <div class="article-breadcrumb">
+        <a href={isZh ? '/zh/' : '/'}>
+          {isZh ? '首页' : 'Home'}
+        </a>
+
+        <span>/</span>
+
+        <a href={isZh ? '/zh/blog/' : '/blog/'}>
+          {isZh ? '技术文章' : 'Articles'}
+        </a>
+      </div>
+
+      <header class="article-header">
+        <div class="article-meta">
+          <span>{formattedDate}</span>
+          <span>·</span>
+          <span>
+            {isZh ? 'InfraOpsX 技术记录' : 'InfraOpsX Technical Notes'}
+          </span>
+        </div>
+
+        <h1>{title}</h1>
+
+        <p>{description}</p>
+
+        <div class="article-tags">
+          {tags.map((tag) => (
+            <span>{tag}</span>
+          ))}
+        </div>
+
+        {switchHref && (
+          <a class="article-language" href={switchHref}>
+            {isZh ? 'Read in English →' : '阅读中文版 →'}
+          </a>
+        )}
+      </header>
+
+      <article class="article-content">
+        <slot />
+      </article>
+
+      <div class="article-footer-nav">
+        <a href={isZh ? '/zh/blog/' : '/blog/'}>
+          ← {isZh ? '返回技术文章' : 'Back to articles'}
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <Footer locale={isZh ? 'zh' : 'en'} />
+</BaseLayout>

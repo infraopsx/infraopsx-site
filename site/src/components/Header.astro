@@ -1,0 +1,58 @@
+---
+const {
+  locale = 'en',
+  switchHref
+} = Astro.props;
+
+const isZh = locale === 'zh';
+const home = isZh ? '/zh/' : '/';
+
+const navItems = isZh
+  ? [
+      { label: '服务', href: `${home}#services` },
+      { label: '技术能力', href: `${home}#expertise` },
+      { label: '案例', href: '/zh/case-studies/' },
+      { label: '作品集', href: '/zh/portfolio/' },
+      { label: '技术文章', href: '/zh/blog/' },
+      { label: '联系', href: '/zh/contact/' }
+    ]
+  : [
+      { label: 'Services', href: `${home}#services` },
+      { label: 'Expertise', href: `${home}#expertise` },
+      { label: 'Case Studies', href: '/case-studies/' },
+      { label: 'Portfolio', href: '/portfolio/' },
+      { label: 'Articles', href: '/blog/' },
+      { label: 'Contact', href: '/contact/' }
+    ];
+
+const defaultSwitchHref = isZh ? '/' : '/zh/';
+const languageHref = switchHref || defaultSwitchHref;
+const switchLabel = isZh ? 'English' : '中文';
+---
+
+<header class="header">
+  <div class="container nav">
+    <a class="brand" href={home}>
+      <span class="brand-mark">IOX</span>
+      <span>InfraOpsX</span>
+    </a>
+
+    <nav class="desktop-nav">
+      {navItems.map((item) => (
+        <a href={item.href}>{item.label}</a>
+      ))}
+
+      <span class="nav-divider"></span>
+
+      <a class="language-switch" href={languageHref}>
+        {switchLabel}
+      </a>
+    </nav>
+
+    <div class="mobile-actions">
+      <a class="language-switch mobile-language" href={languageHref}>
+        {switchLabel}
+      </a>
+    </div>
+  </div>
+</header>
