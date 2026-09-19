@@ -1,0 +1,11 @@
+services:
+  website:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: infraopsx-site:dev
+    container_name: infraopsx-dev
+
+    ports:
+      - "8080:80"
