@@ -9,6 +9,16 @@ const areas = [
   ['Kubernetes', '工作负载、调度、Service、Ingress、存储以及故障排查。'],
   ['监控', 'Prometheus、Grafana 以及面向基础设施的实用监控能力。']
 ];
+
+const pipeline = [
+  '功能分支',
+  'Pull Request',
+  'CI Docker 构建',
+  '合并到 main',
+  '发布到 GHCR',
+  '部署到 Netcup',
+  'Cloudflare 边缘'
+];
 ---
 
 <BaseLayout
@@ -27,15 +37,68 @@ const areas = [
         <span class="section-label">作品集</span>
         <h1>基础设施工作的方向与公开成果。</h1>
         <p>
-          这里展示我主要处理的系统和问题类型，并通过技术文章和匿名化案例
-          提供更具体的能力证明。
+          这里展示我主要处理的系统和问题类型，并通过技术文章、公开源码和
+          匿名化案例提供更具体的能力证明。
         </p>
       </div>
     </section>
 
     <section class="showcase-section">
       <div class="container">
-        <div class="portfolio-grid">
+
+        <article class="featured-project">
+          <div class="featured-project-copy">
+            <span class="section-label">精选项目</span>
+            <h2>InfraOpsX 网站与 CI/CD</h2>
+            <p>
+              这个网站本身也是一个真实运行的基础设施项目。源码通过 Git 管理，
+              变更通过 Pull Request 审核，CI 会验证 Docker 构建，生产镜像发布
+              到 GitHub Container Registry，并在构建成功后自动部署到 Netcup VPS。
+            </p>
+
+            <div class="project-stack">
+              <span>Astro</span>
+              <span>Docker</span>
+              <span>Nginx</span>
+              <span>GitHub Actions</span>
+              <span>GHCR</span>
+              <span>Netcup</span>
+              <span>Cloudflare</span>
+            </div>
+
+            <div class="project-actions">
+              <a
+                class="button primary"
+                href="https://github.com/infraopsx/infraopsx-site"
+                target="_blank"
+                rel="noreferrer"
+              >
+                查看 GitHub 源码
+              </a>
+
+              <a class="button secondary" href="/zh/case-studies/">
+                查看案例
+              </a>
+            </div>
+          </div>
+
+          <div class="pipeline-card">
+            <span class="pipeline-title">生产发布流程</span>
+            <div class="pipeline">
+              {pipeline.map((step, index) => (
+                <>
+                  <div class="pipeline-step">
+                    <span>{String(index + 1).padStart(2, '0')}</span>
+                    <strong>{step}</strong>
+                  </div>
+                  {index < pipeline.length - 1 && <div class="pipeline-arrow">↓</div>}
+                </>
+              ))}
+            </div>
+          </div>
+        </article>
+
+        <div class="portfolio-grid portfolio-grid-spaced">
           {areas.map(([title, text]) => (
             <article class="portfolio-card">
               <h2>{title}</h2>

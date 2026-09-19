@@ -9,6 +9,16 @@ const areas = [
   ['Kubernetes', 'Workloads, scheduling, services, ingress, storage and troubleshooting.'],
   ['Monitoring', 'Prometheus, Grafana and practical infrastructure visibility.']
 ];
+
+const pipeline = [
+  'Feature branch',
+  'Pull Request',
+  'CI Docker build',
+  'Merge to main',
+  'Publish to GHCR',
+  'Deploy to Netcup',
+  'Cloudflare edge'
+];
 ---
 
 <BaseLayout
@@ -28,14 +38,69 @@ const areas = [
         <h1>Selected infrastructure work and technical focus.</h1>
         <p>
           A concise view of the systems and problem areas I work with, backed by
-          technical articles and anonymized case studies.
+          technical articles, public source code and anonymized case studies.
         </p>
       </div>
     </section>
 
     <section class="showcase-section">
       <div class="container">
-        <div class="portfolio-grid">
+
+        <article class="featured-project">
+          <div class="featured-project-copy">
+            <span class="section-label">FEATURED PROJECT</span>
+            <h2>InfraOpsX Website & CI/CD</h2>
+            <p>
+              This website is also a live infrastructure project. The source is
+              managed in Git, changes are reviewed through pull requests, Docker
+              builds are validated in CI, production images are published to
+              GitHub Container Registry, and successful builds are deployed
+              automatically to a Netcup VPS.
+            </p>
+
+            <div class="project-stack">
+              <span>Astro</span>
+              <span>Docker</span>
+              <span>Nginx</span>
+              <span>GitHub Actions</span>
+              <span>GHCR</span>
+              <span>Netcup</span>
+              <span>Cloudflare</span>
+            </div>
+
+            <div class="project-actions">
+              <a
+                class="button primary"
+                href="https://github.com/infraopsx/infraopsx-site"
+                target="_blank"
+                rel="noreferrer"
+              >
+                View source on GitHub
+              </a>
+
+              <a class="button secondary" href="/case-studies/">
+                View case studies
+              </a>
+            </div>
+          </div>
+
+          <div class="pipeline-card">
+            <span class="pipeline-title">Production delivery flow</span>
+            <div class="pipeline">
+              {pipeline.map((step, index) => (
+                <>
+                  <div class="pipeline-step">
+                    <span>{String(index + 1).padStart(2, '0')}</span>
+                    <strong>{step}</strong>
+                  </div>
+                  {index < pipeline.length - 1 && <div class="pipeline-arrow">↓</div>}
+                </>
+              ))}
+            </div>
+          </div>
+        </article>
+
+        <div class="portfolio-grid portfolio-grid-spaced">
           {areas.map(([title, text]) => (
             <article class="portfolio-card">
               <h2>{title}</h2>
