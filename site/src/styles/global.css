@@ -1306,3 +1306,134 @@ html[lang="zh-CN"] body {
     justify-content: center;
   }
 }
+
+
+/* ===== Featured CI/CD portfolio project ===== */
+
+.featured-project {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, .75fr);
+  gap: 22px;
+  margin-bottom: 28px;
+}
+
+.featured-project-copy,
+.pipeline-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(50,215,244,.055), rgba(255,255,255,.018));
+}
+
+.featured-project-copy {
+  padding: 36px;
+}
+
+.featured-project-copy h2 {
+  margin: 14px 0 18px;
+  font-size: clamp(32px, 4vw, 46px);
+  line-height: 1.08;
+  letter-spacing: -.04em;
+}
+
+.featured-project-copy p {
+  max-width: 720px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.project-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 26px;
+}
+
+.project-stack span {
+  padding: 7px 10px;
+  border: 1px solid rgba(50,215,244,.18);
+  border-radius: 999px;
+  background: rgba(50,215,244,.045);
+  color: #bfeef7;
+  font-size: 12px;
+}
+
+.project-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.pipeline-card {
+  padding: 28px;
+}
+
+.pipeline-title {
+  display: block;
+  margin-bottom: 18px;
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.pipeline {
+  display: grid;
+  gap: 7px;
+}
+
+.pipeline-step {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255,255,255,.018);
+}
+
+.pipeline-step span {
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pipeline-step strong {
+  font-size: 13px;
+}
+
+.pipeline-arrow {
+  padding-left: 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.portfolio-grid-spaced {
+  margin-top: 22px;
+}
+
+@media (max-width: 900px) {
+  .featured-project {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .featured-project-copy,
+  .pipeline-card {
+    padding: 24px;
+  }
+
+  .project-actions {
+    flex-direction: column;
+  }
+
+  .project-actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+}
