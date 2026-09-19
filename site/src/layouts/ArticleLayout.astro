@@ -10,14 +10,18 @@ const {
   description,
   pubDate,
   tags = [],
-  locale = 'en',
+  locale: frontmatterLocale,
   enPath,
   zhPath
 } = frontmatter;
 
-const isZh = locale === 'zh-CN';
-
 const currentPath = Astro.url.pathname;
+
+const locale =
+  frontmatterLocale ??
+  (currentPath.startsWith('/zh/') ? 'zh-CN' : 'en');
+
+const isZh = locale === 'zh-CN';
 
 const formattedDate = new Intl.DateTimeFormat(
   isZh ? 'zh-CN' : 'en-US',
