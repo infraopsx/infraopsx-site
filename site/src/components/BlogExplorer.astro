@@ -1,0 +1,427 @@
+---
+import '../styles/blog-explorer.css';
+
+type Post = {
+  title: string;
+  description: string;
+  date: Date;
+  href: string;
+  tags: string[];
+  category: string;
+};
+
+const {
+  posts = [],
+  locale = 'en'
+} = Astro.props as {
+  posts: Post[];
+  locale: 'en' | 'zh';
+};
+
+const isZh = locale === 'zh';
+
+const categoryLabels: Record<string, string> = isZh
+  ? {
+      Kubernetes: 'Kubernetes',
+      Databases: '数据库',
+      Storage: '存储',
+      Linux: 'Linux',
+      Networking: '网络',
+      Observability: '可观测性',
+      'Docker & Containers': 'Docker / 容器',
+      Uncategorized: '未分类'
+    }
+  : {};
+
+const categoryLabel = (category: string) =>
+  categoryLabels[category] ?? category;
+
+const categories = [...new Set(posts.map((post) => post.category))]
+  .filter(Boolean)
+  .sort((a, b) =>
+    categoryLabel(a).localeCompare(
+      categoryLabel(b),
+      isZh ? 'zh-CN' : 'en'
+    )
+  );
+
+const categoryCounts = new Map(
+  categories.map((category) => [
+    category,
+    posts.filter((post) => post.category === category).length
+  ])
+);
+
+const formatDate = (date: Date) =>
+  date.toLocaleDateString(isZh ? 'zh-CN' : 'en-US', {
+    year: 'numeric',
+    month: isZh ? 'long' : 'short',
+    day: 'numeric'
+  });
+
+const searchLabel = isZh ? '搜索技术文章' : 'Search technical articles';
+const searchPlaceholder = isZh
+  ? '搜索文章、错误信息、命令，例如 NOSPACE、pg_wal、CephFS...'
+  : 'Search articles, errors, or commands, e.g. NOSPACE, pg_wal, CephFS...';
+---
+
+<section
+  class="posts blog-explorer"
+  data-blog-explorer
+  data-locale={locale}
+>
+  <div class="container">
+    <div class="blog-tools">
+      <label class="blog-search-label" for={`blog-search-${locale}`}>
+        {searchLabel}
+      </label>
+
+      <div class="blog-search-box">
+        <svg
+          class="blog-search-icon"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            d="m21 21-4.35-4.35m2.35-5.15a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+
+        <input
+          id={`blog-search-${locale}`}
+          class="blog-search-input"
+          data-blog-search
+          type="search"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder={searchPlaceholder}
+        />
+      </div>
+
+      <div
+        class="category-filter"
+        role="group"
+        aria-label={isZh ? '按分类筛选文章' : 'Filter articles by category'}
+      >
+        <button
+          class="category-chip is-active"
+          type="button"
+          data-category="all"
+          aria-pressed="true"
+        >
+          <span>{isZh ? '全部' : 'All'}</span>
+          <span class="category-chip-count">{posts.length}</span>
+        </button>
+
+        {categories.map((category) => (
+          <button
+            class="category-chip"
+            type="button"
+            data-category={category}
+            aria-pressed="false"
+          >
+            <span>{categoryLabel(category)}</span>
+            <span class="category-chip-count">
+              {categoryCounts.get(category)}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <p
+        class="blog-results-summary"
+        data-results-summary
+        aria-live="polite"
+      >
+        {isZh ? `共 ${posts.length} 篇文章` : `${posts.length} articles`}
+      </p>
+    </div>
+
+    <div class="post-list" data-default-results>
+      {posts.map((post) => (
+        <a
+          class="post-card"
+          href={post.href}
+          data-category={post.category}
+          data-search={[
+            post.title,
+            post.description,
+            post.category,
+            ...post.tags
+          ].join(' ').toLocaleLowerCase(isZh ? 'zh-CN' : 'en-US')}
+        >
+          <div class="post-meta">
+            <span>{formatDate(post.date)}</span>
+            <span>·</span>
+            <span>{categoryLabel(post.category)}</span>
+          </div>
+
+          <h2>{post.title}</h2>
+          <p>{post.description}</p>
+
+          <div class="post-tags">
+            {post.tags.map((tag) => <span>{tag}</span>)}
+          </div>
+        </a>
+      ))}
+    </div>
+
+    <div
+      class="post-list blog-search-results"
+      data-search-results
+      hidden
+    ></div>
+
+    <div class="blog-empty-state" data-empty-state hidden>
+      <strong>{isZh ? '没有找到匹配的文章。' : 'No matching articles found.'}</strong>
+      <span>
+        {isZh
+          ? '可以换一个关键词，或者切换到“全部”分类再试。'
+          : 'Try another keyword or switch back to the All category.'}
+      </span>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector('[data-blog-explorer]');
+    if (!root) return;
+
+    const locale = root.dataset.locale || 'en';
+    const isZh = locale === 'zh';
+
+    const input = root.querySelector('[data-blog-search]');
+    const defaultResults = root.querySelector('[data-default-results]');
+    const searchResults = root.querySelector('[data-search-results]');
+    const summary = root.querySelector('[data-results-summary]');
+    const emptyState = root.querySelector('[data-empty-state]');
+    const cards = [...root.querySelectorAll('[data-default-results] .post-card')];
+    const chips = [...root.querySelectorAll('[data-category]')];
+
+    const categoryLabels = isZh
+      ? {
+          Kubernetes: 'Kubernetes',
+          Databases: '数据库',
+          Storage: '存储',
+          Linux: 'Linux',
+          Networking: '网络',
+          Observability: '可观测性',
+          'Docker & Containers': 'Docker / 容器',
+          Uncategorized: '未分类'
+        }
+      : {};
+
+    const labelFor = (category) =>
+      categoryLabels[category] || category;
+
+    let selectedCategory = 'all';
+    let pagefindPromise = null;
+    let pagefindUnavailable = false;
+    let searchSequence = 0;
+    let debounceTimer = null;
+
+    const setSummary = (count, searching = false) => {
+      const categoryText =
+        selectedCategory === 'all'
+          ? ''
+          : `${labelFor(selectedCategory)} · `;
+
+      if (isZh) {
+        summary.textContent = searching
+          ? `${categoryText}找到 ${count} 篇`
+          : `${categoryText}共 ${count} 篇文章`;
+      } else {
+        summary.textContent = searching
+          ? `${categoryText}${count} result${count === 1 ? '' : 's'}`
+          : `${categoryText}${count} article${count === 1 ? '' : 's'}`;
+      }
+    };
+
+    const showEmpty = (show) => {
+      emptyState.hidden = !show;
+    };
+
+    const showDefaultCards = (query = '') => {
+      const needle = query.trim().toLocaleLowerCase(
+        isZh ? 'zh-CN' : 'en-US'
+      );
+
+      let visible = 0;
+
+      for (const card of cards) {
+        const categoryMatch =
+          selectedCategory === 'all' ||
+          card.dataset.category === selectedCategory;
+
+        const textMatch =
+          !needle ||
+          (card.dataset.search || '').includes(needle);
+
+        const show = categoryMatch && textMatch;
+        card.hidden = !show;
+
+        if (show) visible += 1;
+      }
+
+      defaultResults.hidden = false;
+      searchResults.hidden = true;
+      searchResults.replaceChildren();
+      showEmpty(visible === 0);
+      setSummary(visible, Boolean(needle));
+    };
+
+    const loadPagefind = async () => {
+      if (pagefindUnavailable) {
+        throw new Error('Pagefind unavailable');
+      }
+
+      if (!pagefindPromise) {
+        pagefindPromise = import('/pagefind/pagefind.js').catch((error) => {
+          pagefindUnavailable = true;
+          throw error;
+        });
+      }
+
+      return pagefindPromise;
+    };
+
+    const renderSearchResult = (result) => {
+      const card = document.createElement('a');
+      card.className = 'post-card search-result-card';
+      card.href = result.url;
+
+      const meta = document.createElement('div');
+      meta.className = 'post-meta';
+
+      const date = result.meta?.date || '';
+      const category = result.meta?.category || '';
+
+      if (date) {
+        const dateNode = document.createElement('span');
+        dateNode.textContent = date;
+        meta.append(dateNode);
+      }
+
+      if (date && category) {
+        const separator = document.createElement('span');
+        separator.textContent = '·';
+        meta.append(separator);
+      }
+
+      if (category) {
+        const categoryNode = document.createElement('span');
+        categoryNode.textContent = labelFor(category);
+        meta.append(categoryNode);
+      }
+
+      const title = document.createElement('h2');
+      title.textContent = result.meta?.title || result.url;
+
+      const excerpt = document.createElement('p');
+      excerpt.className = 'search-result-excerpt';
+
+      if (result.excerpt) {
+        excerpt.innerHTML = result.excerpt;
+      } else {
+        excerpt.textContent = result.meta?.description || '';
+      }
+
+      if (meta.childNodes.length) {
+        card.append(meta);
+      }
+
+      card.append(title, excerpt);
+      return card;
+    };
+
+    const runSearch = async () => {
+      const query = input.value.trim();
+      const sequence = ++searchSequence;
+
+      if (!query) {
+        showDefaultCards();
+        return;
+      }
+
+      summary.textContent = isZh ? '正在搜索…' : 'Searching…';
+      showEmpty(false);
+
+      try {
+        const pagefind = await loadPagefind();
+
+        const options =
+          selectedCategory === 'all'
+            ? {}
+            : {
+                filters: {
+                  category: selectedCategory
+                }
+              };
+
+        const response = await pagefind.search(query, options);
+
+        if (sequence !== searchSequence) return;
+
+        const total = response.results.length;
+        const visibleResults = response.results.slice(0, 20);
+
+        const loaded = await Promise.all(
+          visibleResults.map((item) => item.data())
+        );
+
+        if (sequence !== searchSequence) return;
+
+        searchResults.replaceChildren(
+          ...loaded.map(renderSearchResult)
+        );
+
+        defaultResults.hidden = true;
+        searchResults.hidden = false;
+
+        showEmpty(total === 0);
+        setSummary(total, true);
+      } catch (error) {
+        if (sequence !== searchSequence) return;
+
+        /*
+         * `astro dev` does not generate the Pagefind bundle because
+         * Pagefind runs after `astro build`. Fall back to title /
+         * description / tag filtering so the blog page is still usable.
+         */
+        showDefaultCards(query);
+      }
+    };
+
+    for (const chip of chips) {
+      chip.addEventListener('click', () => {
+        selectedCategory = chip.dataset.category || 'all';
+
+        for (const item of chips) {
+          const active = item === chip;
+          item.classList.toggle('is-active', active);
+          item.setAttribute('aria-pressed', String(active));
+        }
+
+        if (input.value.trim()) {
+          runSearch();
+        } else {
+          showDefaultCards();
+        }
+      });
+    }
+
+    input.addEventListener('input', () => {
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(runSearch, 160);
+    });
+
+    input.addEventListener('search', runSearch);
+
+    showDefaultCards();
+  })();
+</script>

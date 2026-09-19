@@ -9,6 +9,7 @@ const {
   title,
   description,
   pubDate,
+  category = 'Uncategorized',
   tags = [],
   locale: frontmatterLocale,
   enPath,
@@ -32,6 +33,20 @@ const formattedDate = new Intl.DateTimeFormat(
   }
 ).format(new Date(pubDate));
 
+const categoryLabels: Record<string, string> = isZh
+  ? {
+      Kubernetes: 'Kubernetes',
+      Databases: '数据库',
+      Storage: '存储',
+      Linux: 'Linux',
+      Networking: '网络',
+      Observability: '可观测性',
+      'Docker & Containers': 'Docker / 容器',
+      Uncategorized: '未分类'
+    }
+  : {};
+
+const displayCategory = categoryLabels[category] ?? category;
 const switchHref = isZh ? enPath : zhPath;
 ---
 
@@ -48,10 +63,10 @@ const switchHref = isZh ? enPath : zhPath;
     switchHref={switchHref}
   />
 
-  <main class="article-shell">
+  <main class="article-shell" data-pagefind-body>
     <div class="container article-container">
 
-      <div class="article-breadcrumb">
+      <div class="article-breadcrumb" data-pagefind-ignore>
         <a href={isZh ? '/zh/' : '/'}>
           {isZh ? '首页' : 'Home'}
         </a>
@@ -65,25 +80,32 @@ const switchHref = isZh ? enPath : zhPath;
 
       <header class="article-header">
         <div class="article-meta">
-          <span>{formattedDate}</span>
+          <span data-pagefind-meta="date">{formattedDate}</span>
           <span>·</span>
-          <span>
-            {isZh ? 'InfraOpsX 技术记录' : 'InfraOpsX Technical Notes'}
+          <span
+            data-pagefind-filter={`category:${category}`}
+            data-pagefind-meta={`category:${category}`}
+          >
+            {displayCategory}
           </span>
         </div>
 
-        <h1>{title}</h1>
+        <h1 data-pagefind-meta="title">{title}</h1>
 
-        <p>{description}</p>
+        <p data-pagefind-meta="description">{description}</p>
 
         <div class="article-tags">
           {tags.map((tag) => (
-            <span>{tag}</span>
+            <span data-pagefind-filter="tag">{tag}</span>
           ))}
         </div>
 
         {switchHref && (
-          <a class="article-language" href={switchHref}>
+          <a
+            class="article-language"
+            href={switchHref}
+            data-pagefind-ignore
+          >
             {isZh ? 'Read in English →' : '阅读中文版 →'}
           </a>
         )}
@@ -93,7 +115,7 @@ const switchHref = isZh ? enPath : zhPath;
         <slot />
       </article>
 
-      <div class="article-footer-nav">
+      <div class="article-footer-nav" data-pagefind-ignore>
         <a href={isZh ? '/zh/blog/' : '/blog/'}>
           ← {isZh ? '返回技术文章' : 'Back to articles'}
         </a>
