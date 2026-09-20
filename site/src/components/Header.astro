@@ -28,6 +28,7 @@ const navItems = isZh
 const defaultSwitchHref = isZh ? '/' : '/zh/';
 const languageHref = switchHref || defaultSwitchHref;
 const switchLabel = isZh ? 'English' : '中文';
+const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
 ---
 
 <header class="header">
@@ -53,6 +54,116 @@ const switchLabel = isZh ? 'English' : '中文';
       <a class="language-switch mobile-language" href={languageHref}>
         {switchLabel}
       </a>
+
+      <details class="mobile-menu">
+        <summary class="mobile-menu-toggle" aria-label={menuLabel}>
+          <span></span>
+          <span></span>
+          <span></span>
+        </summary>
+
+        <nav class="mobile-nav">
+          {navItems.map((item) => (
+            <a href={item.href}>{item.label}</a>
+          ))}
+        </nav>
+      </details>
     </div>
   </div>
 </header>
+
+<style>
+  .mobile-actions {
+    gap: 8px;
+  }
+
+  .mobile-menu {
+    position: relative;
+  }
+
+  .mobile-menu-toggle {
+    display: grid;
+    place-content: center;
+    width: 38px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .03);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .mobile-menu-toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobile-menu-toggle span {
+    display: block;
+    width: 17px;
+    height: 2px;
+    margin: 2px 0;
+    border-radius: 2px;
+    background: var(--text);
+    transition: .2s ease;
+  }
+
+  .mobile-menu[open] .mobile-menu-toggle {
+    border-color: rgba(50, 215, 244, .4);
+    background: rgba(50, 215, 244, .08);
+  }
+
+  .mobile-menu[open] .mobile-menu-toggle span:nth-child(1) {
+    transform: translateY(6px) rotate(45deg);
+  }
+
+  .mobile-menu[open] .mobile-menu-toggle span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .mobile-menu[open] .mobile-menu-toggle span:nth-child(3) {
+    transform: translateY(-6px) rotate(-45deg);
+  }
+
+  .mobile-nav {
+    position: absolute;
+    top: 46px;
+    right: 0;
+    z-index: 20;
+    display: none;
+    flex-direction: column;
+    width: min(280px, calc(100vw - 28px));
+    gap: 0;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(7, 17, 31, .98);
+    box-shadow: 0 18px 45px rgba(0, 0, 0, .35);
+    backdrop-filter: blur(18px);
+  }
+
+  .mobile-menu[open] .mobile-nav {
+    display: flex;
+  }
+
+  .mobile-nav a {
+    display: block;
+    padding: 13px 14px;
+    border-radius: 7px;
+    color: #c7d4e0;
+    font-size: 14px;
+  }
+
+  .mobile-nav a:hover,
+  .mobile-nav a:focus-visible {
+    background: rgba(50, 215, 244, .07);
+    color: white;
+  }
+
+  @media (min-width: 821px) {
+    .mobile-menu {
+      display: none;
+    }
+  }
+</style>
+
