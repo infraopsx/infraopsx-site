@@ -1,0 +1,89 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+---
+
+<BaseLayout
+  title="About | InfraOpsX"
+  description="About InfraOpsX — practical infrastructure engineering focused on Linux, Docker, Kubernetes, storage, networking and production troubleshooting."
+  lang="en"
+  canonicalPath="/about/"
+  enPath="/about/"
+  zhPath="/zh/about/"
+>
+  <Header locale="en" switchHref="/zh/about/" />
+
+  <main>
+    <section class="showcase-hero">
+      <div class="container">
+        <span class="section-label">ABOUT INFRAOPSX</span>
+        <h1>Infrastructure work grounded in real systems.</h1>
+
+        <p>
+          InfraOpsX focuses on practical infrastructure engineering:
+          deploying services, diagnosing failures and keeping systems
+          understandable after the work is finished.
+        </p>
+      </div>
+    </section>
+
+    <section class="showcase-section">
+      <div class="container">
+        <div class="showcase-grid">
+          <article class="showcase-card">
+            <span class="showcase-kicker">What I work with</span>
+            <h2>Linux, containers and production infrastructure</h2>
+
+            <p>
+              My work covers Linux servers, Docker and Docker Compose,
+              Kubernetes, Nginx, networking, storage, Prometheus, Grafana
+              and the systems around them.
+            </p>
+          </article>
+
+          <article class="showcase-card">
+            <span class="showcase-kicker">How I approach problems</span>
+            <h2>Diagnose before changing things</h2>
+
+            <p>
+              Infrastructure failures rarely exist in isolation. I prefer to
+              start with logs, metrics, system state and actual constraints,
+              then make the smallest change that safely solves the problem.
+            </p>
+          </article>
+
+          <article class="showcase-card">
+            <span class="showcase-kicker">Why this site exists</span>
+            <h2>Real incidents become useful technical notes</h2>
+
+            <p>
+              InfraOpsX documents practical troubleshooting and deployment
+              work. Sensitive details are removed, but the technical reasoning,
+              commands and lessons are kept useful for people facing similar
+              problems.
+            </p>
+          </article>
+
+          <article class="showcase-card">
+            <span class="showcase-kicker">Working together</span>
+            <h2>Clear context leads to better solutions</h2>
+
+            <p>
+              If you need help with a deployment, migration or infrastructure
+              problem, include the environment, symptoms, relevant logs and
+              what has already been tried.
+            </p>
+
+            <div class="portfolio-links">
+              <a class="button primary" href="/contact/">Contact InfraOpsX</a>
+              <a class="button secondary" href="/case-studies/">Case Studies</a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer locale="en" />
+</BaseLayout>
