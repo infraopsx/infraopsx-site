@@ -1,0 +1,123 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+---
+
+<BaseLayout
+  title="Privacy Policy | InfraOpsX"
+  description="Privacy Policy for InfraOpsX, including website analytics, technical data and contact information."
+  lang="en"
+  canonicalPath="/privacy/"
+  enPath="/privacy/"
+  zhPath="/zh/privacy/"
+>
+  <Header locale="en" switchHref="/zh/privacy/" />
+
+  <main class="article-shell">
+    <div class="container article-container">
+      <header class="article-header">
+        <span class="section-label">PRIVACY</span>
+        <h1>Privacy Policy</h1>
+        <p>
+          This page explains what information may be processed when you visit
+          InfraOpsX or contact me.
+        </p>
+        <div class="article-meta">
+          <span>Last updated: September 21, 2026</span>
+        </div>
+      </header>
+
+      <div class="article-content">
+        <h2>Website analytics</h2>
+
+        <p>
+          InfraOpsX uses Cloudflare Web Analytics to understand aggregate
+          website usage and performance, such as page views, traffic sources
+          and page performance.
+        </p>
+
+        <p>
+          Cloudflare Web Analytics is designed as a privacy-focused analytics
+          service. It does not use cookies or localStorage to collect usage
+          metrics and does not fingerprint individual visitors for analytics.
+        </p>
+
+        <h2>Technical data</h2>
+
+        <p>
+          Like most websites, the infrastructure used to deliver and protect
+          this site may process technical request information such as IP
+          addresses, requested URLs, browser information, timestamps and
+          security-related metadata.
+        </p>
+
+        <p>
+          This information may be processed by hosting and network providers
+          where necessary to deliver the website, diagnose technical problems
+          and protect the service from abuse.
+        </p>
+
+        <h2>Cookies</h2>
+
+        <p>
+          InfraOpsX does not currently use advertising cookies or
+          analytics cookies for visitor tracking.
+        </p>
+
+        <p>
+          Cloudflare Web Analytics itself is cookie-free. Cloudflare may,
+          depending on the security and network services in use, set cookies
+          that are necessary for security or service operation.
+        </p>
+
+        <h2>Contact by email</h2>
+
+        <p>
+          If you contact InfraOpsX by email, the information you provide,
+          including your email address and the contents of your message, is
+          used to read and respond to your inquiry.
+        </p>
+
+        <p>
+          Please do not send passwords, private keys, API tokens or other
+          secrets by email.
+        </p>
+
+        <h2>Third-party services</h2>
+
+        <p>
+          InfraOpsX currently relies on third-party infrastructure and services
+          such as Cloudflare and hosting providers to operate this website.
+          Those providers may process technical information according to their
+          own privacy policies and service terms.
+        </p>
+
+        <h2>Advertising</h2>
+
+        <p>
+          InfraOpsX does not currently display third-party advertising.
+          If advertising or additional analytics services are introduced in
+          the future, this Privacy Policy will be updated accordingly.
+        </p>
+
+        <h2>Changes to this policy</h2>
+
+        <p>
+          This policy may be updated when the website, analytics setup or
+          services change. The latest revision date will be shown at the top
+          of this page.
+        </p>
+
+        <h2>Contact</h2>
+
+        <p>
+          For questions about this Privacy Policy, contact
+          <a href="mailto:hello@oeax.de">hello@oeax.de</a>.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <Footer locale="en" />
+</BaseLayout>

@@ -1437,3 +1437,46 @@ html[lang="zh-CN"] body {
     justify-content: center;
   }
 }
+
+
+/* ===== Footer navigation ===== */
+
+.footer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.footer-links a {
+  color: var(--muted);
+  font-size: 13px;
+  transition: .2s ease;
+}
+
+.footer-links a:hover {
+  color: var(--cyan);
+}
+
+@media (max-width: 600px) {
+  .footer-content {
+    padding: 24px 0;
+    gap: 18px;
+    text-align: center;
+  }
+
+  .footer-meta {
+    align-items: center;
+  }
+
+  .footer-links {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 20px;
+  }
+}

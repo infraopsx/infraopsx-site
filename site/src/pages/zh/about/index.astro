@@ -1,0 +1,84 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+---
+
+<BaseLayout
+  title="关于 InfraOpsX"
+  description="了解 InfraOpsX：专注 Linux、Docker、Kubernetes、存储、网络及生产环境故障排查的基础设施技术实践。"
+  lang="zh-CN"
+  canonicalPath="/zh/about/"
+  enPath="/about/"
+  zhPath="/zh/about/"
+>
+  <Header locale="zh" switchHref="/about/" />
+
+  <main>
+    <section class="showcase-hero">
+      <div class="container">
+        <span class="section-label">关于 INFRAOPSX</span>
+        <h1>从真实环境出发的基础设施技术实践。</h1>
+
+        <p>
+          InfraOpsX 专注于实际的基础设施工作：部署服务、定位故障，
+          并尽可能让处理后的系统保持清晰、可靠和可维护。
+        </p>
+      </div>
+    </section>
+
+    <section class="showcase-section">
+      <div class="container">
+        <div class="showcase-grid">
+          <article class="showcase-card">
+            <span class="showcase-kicker">技术方向</span>
+            <h2>Linux、容器与生产基础设施</h2>
+
+            <p>
+              实际工作涉及 Linux 服务器、Docker、Docker Compose、
+              Kubernetes、Nginx、网络、存储、Prometheus、Grafana
+              以及与这些系统相关的基础设施问题。
+            </p>
+          </article>
+
+          <article class="showcase-card">
+            <span class="showcase-kicker">处理方式</span>
+            <h2>先诊断，再修改</h2>
+
+            <p>
+              基础设施故障通常不是孤立问题。我更倾向于先从日志、监控指标、
+              系统状态和实际限制条件入手，再寻找风险较低、范围尽可能小的处理方案。
+            </p>
+          </article>
+
+          <article class="showcase-card">
+            <span class="showcase-kicker">为什么建立这个网站</span>
+            <h2>把真实问题整理成可复用的技术记录</h2>
+
+            <p>
+              InfraOpsX 会持续记录实际部署和故障排查过程。涉及隐私和环境的信息
+              会进行匿名化，但会尽量保留有价值的判断过程、命令和经验。
+            </p>
+          </article>
+
+          <article class="showcase-card">
+            <span class="showcase-kicker">技术协作</span>
+            <h2>清晰的信息能够更快找到问题</h2>
+
+            <p>
+              如果需要协助处理部署、迁移或基础设施故障，可以提供环境信息、
+              具体现象、相关日志，以及已经尝试过的操作。
+            </p>
+
+            <div class="portfolio-links">
+              <a class="button primary" href="/zh/contact/">联系 InfraOpsX</a>
+              <a class="button secondary" href="/zh/case-studies/">查看案例</a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer locale="zh" />
+</BaseLayout>

@@ -1,16 +1,35 @@
 ---
 const { locale = 'en' } = Astro.props;
 const isZh = locale === 'zh';
+
+const links = isZh
+  ? [
+      { label: '关于', href: '/zh/about/' },
+      { label: '联系', href: '/zh/contact/' },
+      { label: '隐私政策', href: '/zh/privacy/' }
+    ]
+  : [
+      { label: 'About', href: '/about/' },
+      { label: 'Contact', href: '/contact/' },
+      { label: 'Privacy', href: '/privacy/' }
+    ];
 ---
 
 <footer>
   <div class="container footer-content">
-    <span>© 2026 InfraOpsX</span>
+    <div class="footer-meta">
+      <span>© 2026 InfraOpsX</span>
+      <span>
+        {isZh
+          ? 'Linux · Docker · Kubernetes · 基础设施'
+          : 'Linux · Docker · Kubernetes · Infrastructure'}
+      </span>
+    </div>
 
-    <span>
-      {isZh
-        ? 'Linux · Docker · Kubernetes · 基础设施'
-        : 'Linux · Docker · Kubernetes · Infrastructure'}
-    </span>
+    <div class="footer-links">
+      {links.map((item) => (
+        <a href={item.href}>{item.label}</a>
+      ))}
+    </div>
   </div>
 </footer>
