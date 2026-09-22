@@ -27,6 +27,14 @@ const cpuUnitMilli = {
   cores: 1000
 } as const;
 
+const cpuMilliEpsilon = 1e-9;
+
+const normalizeCpuMilli = (value: number) => {
+  if (!Number.isFinite(value)) return value;
+  const rounded = Math.round(value);
+  return Math.abs(value - rounded) <= cpuMilliEpsilon ? rounded : value;
+};
+
 const memoryUnitBytes = {
   MB: 10 ** 6,
   MiB: 2 ** 20,
@@ -77,11 +85,10 @@ const formatMemory = (bytes: number) => ({
 const formatMemoryLimit = (bytes: number, configured = true) =>
   configured ? formatMemory(bytes) : notSetValue;
 
-const formatCpuQuantity = (value: number, unit: string) => {
-  if (unit === 'mCPU') return `${formatQuantityNumber(value)}m`;
-  if (Number.isInteger(value)) return formatQuantityNumber(value);
-  return `${formatQuantityNumber(value * 1000)}m`;
-};
+const formatCpuQuantity = (milli: number, unit: string) =>
+  unit === 'cores' && Number.isInteger(milli) && milli % 1000 === 0
+    ? formatQuantityNumber(milli / 1000)
+    : `${formatQuantityNumber(milli)}m`;
 
 const formatMemoryQuantity = (value: number, unit: string) =>
   `${formatQuantityNumber(value)}${({ MB: 'M', MiB: 'Mi', GB: 'G', GiB: 'Gi' } as Record<string, string>)[unit]}`;
@@ -166,8 +173,8 @@ const initialPodsPerNodeLabel = initialPodsPerNode === null
   ? (isZh ? '无 requests 约束' : 'No request constraint')
   : initialPodsPerNode;
 const initialResourceValues = {
-  cpuRequest: { configured: defaults.cpuRequestConfigured, value: defaults.cpuRequest, unit: defaults.cpuRequestUnit },
-  cpuLimit: { configured: defaults.cpuLimitConfigured, value: defaults.cpuLimit, unit: defaults.cpuLimitUnit },
+  cpuRequest: { configured: defaults.cpuRequestConfigured, value: normalizeCpuMilli(defaults.cpuRequest * cpuUnitMilli[defaults.cpuRequestUnit]), unit: defaults.cpuRequestUnit },
+  cpuLimit: { configured: defaults.cpuLimitConfigured, value: normalizeCpuMilli(defaults.cpuLimit * cpuUnitMilli[defaults.cpuLimitUnit]), unit: defaults.cpuLimitUnit },
   memoryRequest: { configured: defaults.memoryRequestConfigured, value: defaults.memoryRequest, unit: defaults.memoryRequestUnit },
   memoryLimit: { configured: defaults.memoryLimitConfigured, value: defaults.memoryLimit, unit: defaults.memoryLimitUnit }
 };
@@ -516,8 +523,8 @@ const initialSummary = isZh
         <pre class="resource-yaml"><code data-yaml>{initialYaml}</code></pre>
         <p class="resource-result-note">
           {isZh
-            ? 'YAML 仅反映已配置的值；本次计算使用的 effective requests 显示在上方。对于多 Container Pod，请先分别确定各 Container 的 effective requests，再将其合计用于容量规划。生成的 YAML 仍仅作为单 Container 配置参考。'
-            : 'This YAML reflects configured values only; the effective requests used for this calculation are shown above. For multi-container Pods, resolve the effective request for each container first, then use the summed effective requests for capacity planning. The generated YAML remains a single-container reference.'}
+            ? 'YAML 仅反映已配置的值；本次计算使用的 effective requests 显示在上方。对于多 Container Pod，请先分别确定各 Container 的 effective requests，再将其合计用于容量规划。生成的 YAML 仍仅作为单 Container 配置参考。包含 init containers 或 Pod overhead 的 Pod 还存在额外的调度资源计算规则，请先确定其 effective Pod request，再填写到本工具中。'
+            : 'This YAML reflects configured values only; the effective requests used for this calculation are shown above. For multi-container Pods, resolve the effective request for each container first, then use the summed effective requests for capacity planning. The generated YAML remains a single-container reference. Pods with init containers or Pod overhead can have additional scheduling rules; model their effective Pod request before entering the value here.'}
         </p>
         <p class="resource-copy-status" data-copy-status aria-live="polite"></p>
       </div>
@@ -556,6 +563,14 @@ const initialSummary = isZh
       mCPU: 1,
       cores: 1000
     });
+
+    const cpuMilliEpsilon = 1e-9;
+
+    const normalizeCpuMilli = (value) => {
+      if (!Number.isFinite(value)) return value;
+      const rounded = Math.round(value);
+      return Math.abs(value - rounded) <= cpuMilliEpsilon ? rounded : value;
+    };
 
     const memoryUnitBytes = Object.freeze({
       MB: 10 ** 6,
@@ -616,11 +631,10 @@ const initialSummary = isZh
     const formatQuantityNumber = (value) =>
       value.toFixed(6).replace(/\.?0+$/, '');
 
-    const formatCpuQuantity = (value, unit) => {
-      if (unit === 'mCPU') return `${formatQuantityNumber(value)}m`;
-      if (Number.isInteger(value)) return formatQuantityNumber(value);
-      return `${formatQuantityNumber(value * 1000)}m`;
-    };
+    const formatCpuQuantity = (milli, unit) =>
+      unit === 'cores' && Number.isInteger(milli) && milli % 1000 === 0
+        ? formatQuantityNumber(milli / 1000)
+        : `${formatQuantityNumber(milli)}m`;
 
     const formatMemoryQuantity = (value, unit) =>
       `${formatQuantityNumber(value)}${({ MB: 'M', MiB: 'Mi', GB: 'G', GiB: 'Gi' })[unit]}`;
@@ -630,13 +644,13 @@ const initialSummary = isZh
       const limitLines = [];
 
       if (values.cpuRequest.configured) {
-        requestLines.push(`    cpu: "${formatCpuQuantity(values.cpuRequest.rawValue, values.cpuRequest.unit)}"`);
+        requestLines.push(`    cpu: "${formatCpuQuantity(values.cpuRequest.value, values.cpuRequest.unit)}"`);
       }
       if (values.memoryRequest.configured) {
         requestLines.push(`    memory: "${formatMemoryQuantity(values.memoryRequest.rawValue, values.memoryRequest.unit)}"`);
       }
       if (values.cpuLimit.configured) {
-        limitLines.push(`    cpu: "${formatCpuQuantity(values.cpuLimit.rawValue, values.cpuLimit.unit)}"`);
+        limitLines.push(`    cpu: "${formatCpuQuantity(values.cpuLimit.value, values.cpuLimit.unit)}"`);
       }
       if (values.memoryLimit.configured) {
         limitLines.push(`    memory: "${formatMemoryQuantity(values.memoryLimit.rawValue, values.memoryLimit.unit)}"`);
@@ -668,7 +682,7 @@ const initialSummary = isZh
       names.forEach((name) => input(name).setAttribute('aria-invalid', 'true'));
     };
 
-    const readResource = (name, unitMap) => {
+    const readResource = (name, unitMap, normalize = (value) => value) => {
       const configured = enabled(name);
       const raw = input(name).value.trim();
       const rawValue = raw === '' ? Number.NaN : Number(raw);
@@ -678,15 +692,15 @@ const initialSummary = isZh
         configured,
         rawValue,
         unit,
-        value: configured ? rawValue * unitMap[unit] : 0
+        value: configured ? normalize(rawValue * unitMap[unit]) : 0
       };
     };
 
     const readValues = () => {
       return {
         replicas: numberValue('replicas'),
-        cpuRequest: readResource('cpuRequest', cpuUnitMilli),
-        cpuLimit: readResource('cpuLimit', cpuUnitMilli),
+        cpuRequest: readResource('cpuRequest', cpuUnitMilli, normalizeCpuMilli),
+        cpuLimit: readResource('cpuLimit', cpuUnitMilli, normalizeCpuMilli),
         memoryRequest: readResource('memoryRequest', memoryUnitBytes),
         memoryLimit: readResource('memoryLimit', memoryUnitBytes),
         nodeCount: numberValue('nodeCount'),
