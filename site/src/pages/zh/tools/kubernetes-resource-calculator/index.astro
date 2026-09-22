@@ -43,7 +43,7 @@ import KubernetesResourceCalculator from '../../../../components/tools/Kubernete
         <article class="tool-info-card">
           <span class="section-label">HOW IT WORKS</span>
           <h2>将 requests 与可调度容量进行比较。</h2>
-          <p>Kubernetes 调度通常依据 resource requests，而不是 limits。这个计算器会将 CPU 统一为 mCPU、Memory 统一为 bytes，在每个节点上应用规划预留，再将工作负载 requests 与计算后的可调度容量进行比较。15% 是 InfraOpsX Calculator 的容量规划默认值，不是 Kubernetes 或 kubelet 的默认 systemReserved。该值仅用于容量规划，不代表 kubelet 的 systemReserved、kubeReserved 或实际 Node Allocatable。limits 会作为规划和 overcommit 信息展示，但不会决定 Pod 是否能够放入节点。</p>
+          <p>Kubernetes 调度通常依据 effective resource requests。这个计算器使用已配置的 requests；如果没有配置 request 但配置了 limit，本次计算会将该 limit 作为 effective request。计算器会将 CPU 统一为 mCPU、Memory 统一为 bytes，在每个节点上应用规划预留，再将 effective workload requests 与计算后的可调度容量进行比较。15% 是 InfraOpsX Calculator 的容量规划默认值，不是 Kubernetes 或 kubelet 的默认 systemReserved。该值仅用于容量规划，不代表 kubelet 的 systemReserved、kubeReserved 或实际 Node Allocatable。已配置的 limits 也会作为规划和 overcommit 信息展示，但不会额外增加容量约束。</p>
         </article>
 
         <article class="tool-info-card">
@@ -57,8 +57,8 @@ import KubernetesResourceCalculator from '../../../../components/tools/Kubernete
         <span class="section-label">FAQ</span>
         <h2 id="faq-heading">常见问题</h2>
         <details open>
-          <summary>为什么判断容量时不使用 limits？</summary>
-          <p>Kubernetes 调度通常在判断 Pod 是否能放入节点时使用 resource requests。这里显示 limits 是为了帮助了解工作负载的规划和 overcommit 情况，但 limits 不会决定容量状态。</p>
+          <summary>requests 和 limits 如何参与容量判断？</summary>
+          <p>Kubernetes 调度在判断 Pod 是否能放入节点时使用 effective resource requests。已配置 request 时，本计算器使用该 request 判断容量；如果只配置了 limit，则使用该 limit 作为 effective request。除此之外，已配置的 limits 仅用于展示工作负载的规划和 overcommit 情况，不会额外增加容量约束。</p>
         </details>
         <details>
           <summary>规划预留代表什么？</summary>

@@ -85,7 +85,7 @@ Current capabilities:
 - CPU and memory request/limit planning
 - decimal and binary memory units
 - homogeneous node-pool capacity planning
-- System Reserved planning reserve
+- Planning Reserve
 - request-based fit status and node requirements
 - Pod density and CPU / memory bottleneck analysis
 - client-side input validation

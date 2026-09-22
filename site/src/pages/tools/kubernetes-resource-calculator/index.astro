@@ -43,7 +43,7 @@ import KubernetesResourceCalculator from '../../../components/tools/KubernetesRe
         <article class="tool-info-card">
           <span class="section-label">HOW IT WORKS</span>
           <h2>Compare requests with schedulable capacity.</h2>
-          <p>Kubernetes scheduling normally considers resource requests, not limits. This calculator normalizes CPU to mCPU and memory to bytes, applies the Planning Reserve to each node, and compares workload requests with the resulting schedulable capacity. The default value of 15% is an InfraOpsX Calculator capacity-planning default, not a Kubernetes or kubelet default systemReserved value. This estimate does not represent kubelet systemReserved, kubeReserved, or the actual Node Allocatable value. Limits are shown as planning and overcommit information, but they do not determine whether Pods fit.</p>
+          <p>Kubernetes scheduling normally considers effective resource requests. This calculator uses configured requests; when a request is omitted and a limit is configured, that limit becomes the effective request for this calculation. It normalizes CPU to mCPU and memory to bytes, applies the Planning Reserve to each node, and compares effective workload requests with the resulting schedulable capacity. The default value of 15% is an InfraOpsX Calculator capacity-planning default, not a Kubernetes or kubelet default systemReserved value. This estimate does not represent kubelet systemReserved, kubeReserved, or the actual Node Allocatable value. Configured limits are also shown as planning and overcommit information, but they do not add a separate fit constraint.</p>
         </article>
 
         <article class="tool-info-card">
@@ -57,8 +57,8 @@ import KubernetesResourceCalculator from '../../../components/tools/KubernetesRe
         <span class="section-label">FAQ</span>
         <h2 id="faq-heading">Common questions</h2>
         <details open>
-          <summary>Why are limits not used to determine fit?</summary>
-          <p>Kubernetes scheduling normally uses resource requests when deciding whether a Pod can fit on a node. Limits are displayed to show the workload's planning and overcommit profile, but they do not determine the fit status here.</p>
+          <summary>How are requests and limits used to determine fit?</summary>
+          <p>Kubernetes scheduling uses effective resource requests when deciding whether a Pod can fit on a node. When a request is configured, this calculator uses it for fit; when only a limit is configured, it uses that limit as the effective request. Configured limits are otherwise displayed to show the workload's planning and overcommit profile, but they do not add a separate fit constraint.</p>
         </details>
         <details>
           <summary>What does Planning Reserve represent?</summary>
