@@ -191,10 +191,20 @@ Do not rewrite unrelated history.
 
 ## Validation Before Completion
 
-For code changes, run at minimum:
+For uncommitted changes:
 
 ```bash
 git diff --check
+git diff --stat
+git status --short
+```
+
+For committed changes, review the complete branch diff against `main`:
+
+```bash
+git diff --check main...HEAD
+git diff --stat main...HEAD
+git status --short
 ```
 
 For site changes, also run:
@@ -205,13 +215,6 @@ npm run build
 ```
 
 If Node/npm is unavailable on the host, use the repository's existing Docker build workflow.
-
-Before reporting completion, inspect:
-
-```bash
-git status
-git diff --stat
-```
 
 For user-facing tools, also verify default values, formulas, invalid inputs, language switch, English and Chinese routes, desktop layout, mobile layout, console errors, and links.
 
