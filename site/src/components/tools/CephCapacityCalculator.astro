@@ -149,7 +149,7 @@ const initialSummary = isZh
           </div>
 
           <div class="result-row">
-            <dt>Theoretical Usable</dt>
+            <dt>Theoretical Usable Capacity</dt>
             <dd>
               <strong data-result="theoretical">{capacityText(initialTheoreticalBytes, initialUnit)}</strong>
               <small data-result-secondary="theoretical">≈ {capacityText(initialTheoreticalBytes, initialSecondaryUnit)}</small>
@@ -157,7 +157,7 @@ const initialSummary = isZh
           </div>
 
           <div class="result-row result-row-recommended">
-            <dt>Recommended Usable</dt>
+            <dt>Recommended Usable Capacity</dt>
             <dd>
               <strong data-result="recommended">{capacityText(initialRecommendedBytes, initialUnit)}</strong>
               <small data-result-secondary="recommended">≈ {capacityText(initialRecommendedBytes, initialSecondaryUnit)}</small>
@@ -373,6 +373,14 @@ const initialSummary = isZh
     }));
 
     input('unit').addEventListener('change', () => {
+      const message = validate(selectedMode(), readValues());
+
+      if (message) {
+        setError(message);
+        return;
+      }
+
+      setError('');
       updateResults();
     });
 
