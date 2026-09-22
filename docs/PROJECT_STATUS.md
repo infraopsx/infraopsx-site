@@ -1,0 +1,150 @@
+# InfraOpsX Project Status
+
+Last updated: 2026-09-22
+
+## Production Site
+
+Primary site:
+
+`https://infra.oeax.de`
+
+The site is currently deployed as a static Astro website.
+
+Current infrastructure includes:
+
+- Astro
+- Docker
+- Nginx
+- GitHub Actions
+- GHCR
+- Cloudflare
+- Pagefind
+
+The site supports both English and Chinese.
+
+English routes use the root path.
+
+Chinese routes use `/zh/`.
+
+## Current Site Sections
+
+Available sections include:
+
+- Home
+- Services
+- Case Studies
+- Portfolio
+- Blog
+- Tools
+- About
+- Contact
+- Privacy
+
+## Tools
+
+### Completed
+
+#### Ceph Capacity Calculator
+
+Routes:
+
+- `/tools/ceph-capacity-calculator/`
+- `/zh/tools/ceph-capacity-calculator/`
+
+Current capabilities:
+
+- Replicated layouts
+- Erasure Coding layouts
+- GB
+- GiB
+- TB
+- TiB
+- Raw Capacity
+- Theoretical Usable Capacity
+- Recommended Usable Capacity
+- Data Efficiency
+- Redundancy Overhead
+- configurable Reserve
+- client-side input validation
+- bilingual interface
+- local browser calculation
+
+All calculator inputs are processed locally in the browser.
+
+No calculator input is uploaded to a server.
+
+## Planned Tools
+
+Near-term priorities:
+
+1. Kubernetes Resource Calculator
+2. Kubernetes Quantity Converter
+
+Possible later tools:
+
+- Nginx Reverse Proxy Generator
+- Docker Compose Inspector
+- Kubernetes YAML Inspector
+
+The exact order may change based on usefulness and implementation cost.
+
+## Tool Development Direction
+
+Preferred categories:
+
+- Calculator
+- Converter
+- Validator
+- Generator
+- Inspector
+
+Simple tools should remain static and client-side whenever practical.
+
+Backend services should only be introduced when a feature cannot reasonably run in the browser.
+
+## Localization
+
+English is the primary version.
+
+Chinese pages mirror important English pages under `/zh/`.
+
+Shared components should be used whenever possible.
+
+Technical terminology should remain accurate and should not be translated merely for the sake of translation.
+
+## SEO
+
+Current pages use:
+
+- canonical URLs
+- English / Chinese hreflang
+- x-default
+- sitemap
+- robots.txt
+- RSS
+- Pagefind
+
+Google Search Console verification has been completed.
+
+SEO work should focus on useful technical content and tools rather than large volumes of low-value pages.
+
+## Current Development Focus
+
+The first InfraOpsX tool, Ceph Capacity Calculator, is complete and deployed.
+
+The next planned tool is:
+
+`Kubernetes Resource Calculator`
+
+Before starting it, reuse the layout and development conventions established by the Ceph Capacity Calculator.
+
+## Maintenance Notes
+
+After a significant feature is merged:
+
+1. Update the Completed section if necessary.
+2. Update Current Development Focus.
+3. Move planned items when their status changes.
+4. Keep this file concise.
+
+This file is a current-state document, not a changelog.
