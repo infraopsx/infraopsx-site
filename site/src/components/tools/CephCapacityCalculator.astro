@@ -1,0 +1,403 @@
+---
+const { locale = 'en' } = Astro.props;
+const isZh = locale === 'zh';
+
+const defaults = {
+  osdCount: 6,
+  capacity: 4,
+  unit: 'TB',
+  replication: 3,
+  k: 4,
+  m: 2,
+  reserve: 15
+};
+
+const unitBytes = {
+  GB: 10 ** 9,
+  GiB: 2 ** 30,
+  TB: 10 ** 12,
+  TiB: 2 ** 40
+} as const;
+
+const formatCapacity = (bytes: number, unit: keyof typeof unitBytes) =>
+  (bytes / unitBytes[unit]).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+
+const capacityText = (bytes: number, unit: keyof typeof unitBytes) =>
+  `${formatCapacity(bytes, unit)} ${unit}`;
+
+const secondaryUnit = (unit: keyof typeof unitBytes) =>
+  ({ GB: 'GiB', GiB: 'GB', TB: 'TiB', TiB: 'TB' } as const)[unit];
+
+const initialRawBytes = defaults.osdCount * defaults.capacity * unitBytes[defaults.unit as keyof typeof unitBytes];
+const initialTheoreticalBytes = initialRawBytes / defaults.replication;
+const initialRecommendedBytes = initialTheoreticalBytes * (1 - defaults.reserve / 100);
+const initialOverheadBytes = initialRawBytes - initialTheoreticalBytes;
+const initialUnit = defaults.unit as keyof typeof unitBytes;
+const initialSecondaryUnit = secondaryUnit(initialUnit);
+
+const initialSummary = isZh
+  ? `这个集群提供 ${capacityText(initialRawBytes, initialUnit)} 的 Raw Capacity。采用 Replication Size ${defaults.replication} 时，Theoretical Usable Capacity 为 ${capacityText(initialTheoreticalBytes, initialUnit)}。保留 ${defaults.reserve}% Reserve 后，Recommended Usable 约为 ${capacityText(initialRecommendedBytes, initialUnit)}。`
+  : `This configuration provides ${capacityText(initialRawBytes, initialUnit)} of raw capacity. With a replication size of ${defaults.replication}, the theoretical usable capacity is ${capacityText(initialTheoreticalBytes, initialUnit)}. Reserving ${defaults.reserve}% leaves approximately ${capacityText(initialRecommendedBytes, initialUnit)} of recommended usable capacity.`;
+---
+
+<section
+  class="ceph-calculator"
+  data-ceph-calculator
+  data-locale={locale}
+>
+  <div class="calculator-grid">
+    <form class="calculator-form" data-calculator-form novalidate>
+      <div class="calculator-mode" role="radiogroup" aria-label={isZh ? '容量模式' : 'Capacity mode'}>
+        <label class="mode-option is-active" data-mode-option="replicated">
+          <input
+            type="radio"
+            name={`ceph-mode-${locale}`}
+            value="replicated"
+            checked
+          />
+          <span>Replicated</span>
+        </label>
+
+        <label class="mode-option" data-mode-option="ec">
+          <input
+            type="radio"
+            name={`ceph-mode-${locale}`}
+            value="ec"
+          />
+          <span>Erasure Coding</span>
+        </label>
+      </div>
+
+      <div class="form-fields">
+        <label class="field">
+          <span>{isZh ? 'OSD 数量' : 'OSD Count'}</span>
+          <input data-input="osdCount" type="number" min="1" step="1" value={defaults.osdCount} />
+        </label>
+
+        <label class="field">
+          <span>{isZh ? '单个 OSD 容量' : 'Capacity per OSD'}</span>
+          <input data-input="capacity" type="number" min="0.01" step="any" value={defaults.capacity} />
+        </label>
+
+        <label class="field">
+          <span>{isZh ? '容量单位' : 'Capacity Unit'}</span>
+          <select data-input="unit">
+            <option value="GB">GB — {isZh ? '十进制' : 'Decimal'}</option>
+            <option value="GiB">GiB — {isZh ? '二进制' : 'Binary'}</option>
+            <option value="TB" selected={defaults.unit === 'TB'}>TB — {isZh ? '十进制，硬盘厂商常用' : 'Decimal, commonly used by disk vendors'}</option>
+            <option value="TiB">TiB — {isZh ? '二进制，Linux/Ceph 常用' : 'Binary, commonly used by Linux/Ceph'}</option>
+          </select>
+        </label>
+
+        <div class="field-group" data-field-group="replicated">
+          <label class="field">
+            <span>Replication Size</span>
+            <input data-input="replication" type="number" min="1" step="1" value={defaults.replication} />
+          </label>
+        </div>
+
+        <div class="field-group" data-field-group="ec" hidden>
+          <div class="field-row">
+            <label class="field">
+              <span>k</span>
+              <input data-input="k" type="number" min="1" step="1" value={defaults.k} />
+            </label>
+
+            <label class="field">
+              <span>m</span>
+              <input data-input="m" type="number" min="1" step="1" value={defaults.m} />
+            </label>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Reserve (%)</span>
+          <input data-input="reserve" type="number" min="0" max="99.99" step="any" value={defaults.reserve} />
+        </label>
+      </div>
+
+      <div class="calculator-error" data-calculator-error role="alert" hidden></div>
+
+      <button class="button primary calculator-submit" type="submit">
+        {isZh ? '计算容量' : 'Calculate capacity'}
+      </button>
+    </form>
+
+    <div class="calculator-output" aria-live="polite">
+      <div class="summary-block">
+        <span class="section-label">{isZh ? '容量分析' : 'CAPACITY ANALYSIS'}</span>
+        <h2>{isZh ? '分析摘要' : 'Analysis Summary'}</h2>
+        <p data-summary>{initialSummary}</p>
+      </div>
+
+      <div class="results-block">
+        <div class="results-heading">
+          <div>
+            <span class="section-label">{isZh ? '容量结果' : 'CAPACITY RESULTS'}</span>
+            <h2>{isZh ? '计算结果' : 'Results'}</h2>
+          </div>
+          <span class="result-mode" data-result-mode>Replicated</span>
+        </div>
+
+        <dl class="result-list">
+          <div class="result-row result-row-primary">
+            <dt>Raw Capacity</dt>
+            <dd>
+              <strong data-result="raw">{capacityText(initialRawBytes, initialUnit)}</strong>
+              <small data-result-secondary="raw">≈ {capacityText(initialRawBytes, initialSecondaryUnit)}</small>
+            </dd>
+          </div>
+
+          <div class="result-row">
+            <dt>Theoretical Usable Capacity</dt>
+            <dd>
+              <strong data-result="theoretical">{capacityText(initialTheoreticalBytes, initialUnit)}</strong>
+              <small data-result-secondary="theoretical">≈ {capacityText(initialTheoreticalBytes, initialSecondaryUnit)}</small>
+            </dd>
+          </div>
+
+          <div class="result-row result-row-recommended">
+            <dt>Recommended Usable Capacity</dt>
+            <dd>
+              <strong data-result="recommended">{capacityText(initialRecommendedBytes, initialUnit)}</strong>
+              <small data-result-secondary="recommended">≈ {capacityText(initialRecommendedBytes, initialSecondaryUnit)}</small>
+            </dd>
+          </div>
+
+          <div class="result-row">
+            <dt>Data Efficiency</dt>
+            <dd><strong data-result="efficiency">33.33%</strong></dd>
+          </div>
+
+          <div class="result-row">
+            <dt>Redundancy Overhead</dt>
+            <dd>
+              <strong data-result="overhead">{capacityText(initialOverheadBytes, initialUnit)}</strong>
+              <small data-result-secondary="overhead">≈ {capacityText(initialOverheadBytes, initialSecondaryUnit)}</small>
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <p class="calculator-privacy">
+    {isZh
+      ? '所有计算均在浏览器本地完成，不会上传配置或输入数据。'
+      : 'All calculations run locally in your browser. No configuration or input data is uploaded.'}
+  </p>
+</section>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector('[data-ceph-calculator]');
+    if (!root) return;
+
+    const isZh = root.dataset.locale === 'zh';
+    const form = root.querySelector('[data-calculator-form]');
+    const error = root.querySelector('[data-calculator-error]');
+    const modeInputs = [...root.querySelectorAll('input[name^="ceph-mode-"]')];
+    const modeOptions = [...root.querySelectorAll('[data-mode-option]')];
+    const fields = [...root.querySelectorAll('[data-input]')];
+    const replicatedGroup = root.querySelector('[data-field-group="replicated"]');
+    const ecGroup = root.querySelector('[data-field-group="ec"]');
+    const resultMode = root.querySelector('[data-result-mode]');
+    const resultNodes = Object.fromEntries(
+      [...root.querySelectorAll('[data-result]')].map((node) => [node.dataset.result, node])
+    );
+    const secondaryNodes = Object.fromEntries(
+      [...root.querySelectorAll('[data-result-secondary]')].map((node) => [node.dataset.resultSecondary, node])
+    );
+
+    const input = (name) => root.querySelector(`[data-input="${name}"]`);
+
+    const numberValue = (name) => Number(input(name).value);
+
+    const formatNumber = (value, decimals = 2) => {
+      if (!Number.isFinite(value)) return '—';
+      return value
+        .toFixed(decimals)
+        .replace(/\.00$/, '')
+        .replace(/(\.\d)0$/, '$1');
+    };
+
+    const unitBytes = Object.freeze({
+      GB: 10 ** 9,
+      GiB: 2 ** 30,
+      TB: 10 ** 12,
+      TiB: 2 ** 40
+    });
+
+    const secondaryUnit = (unit) => ({
+      GB: 'GiB',
+      GiB: 'GB',
+      TB: 'TiB',
+      TiB: 'TB'
+    })[unit];
+
+    const capacityText = (bytes, unit) =>
+      `${formatNumber(bytes / unitBytes[unit])} ${unit}`;
+
+    const secondaryCapacityText = (bytes, unit) =>
+      `≈ ${capacityText(bytes, secondaryUnit(unit))}`;
+
+    const setError = (message = '') => {
+      error.textContent = message;
+      error.hidden = !message;
+    };
+
+    const clearInvalid = () => {
+      fields.forEach((field) => field.removeAttribute('aria-invalid'));
+    };
+
+    const validate = (mode, values) => {
+      clearInvalid();
+
+      if (!Number.isInteger(values.osdCount) || values.osdCount <= 0) {
+        input('osdCount').setAttribute('aria-invalid', 'true');
+        return isZh ? 'OSD 数量必须是大于 0 的整数。' : 'OSD Count must be a positive integer.';
+      }
+
+      if (!Number.isFinite(values.capacity) || values.capacity <= 0) {
+        input('capacity').setAttribute('aria-invalid', 'true');
+        return isZh ? 'Capacity per OSD 必须大于 0。' : 'Capacity per OSD must be positive.';
+      }
+
+      if (mode === 'replicated') {
+        if (!Number.isInteger(values.replication) || values.replication < 1) {
+          input('replication').setAttribute('aria-invalid', 'true');
+          return isZh ? 'Replication Size 必须是至少为 1 的整数。' : 'Replication Size must be a positive integer.';
+        }
+
+        if (values.replication > values.osdCount) {
+          input('replication').setAttribute('aria-invalid', 'true');
+          return isZh ? 'Replication Size 不能大于 OSD 数量。' : 'Replication Size cannot exceed the OSD Count.';
+        }
+      } else {
+        if (!Number.isInteger(values.k) || values.k <= 0) {
+          input('k').setAttribute('aria-invalid', 'true');
+          return isZh ? 'k 必须是大于 0 的整数。' : 'k must be a positive integer.';
+        }
+
+        if (!Number.isInteger(values.m) || values.m <= 0) {
+          input('m').setAttribute('aria-invalid', 'true');
+          return isZh ? 'm 必须是大于 0 的整数。' : 'm must be a positive integer.';
+        }
+
+        if (values.k + values.m > values.osdCount) {
+          input('m').setAttribute('aria-invalid', 'true');
+          return isZh ? 'k + m 不能大于 OSD 数量。' : 'k + m cannot exceed the OSD Count.';
+        }
+      }
+
+      if (!Number.isFinite(values.reserve) || values.reserve < 0 || values.reserve >= 100) {
+        input('reserve').setAttribute('aria-invalid', 'true');
+        return isZh ? 'Reserve 必须大于等于 0 且小于 100。' : 'Reserve must be at least 0 and less than 100.';
+      }
+
+      return '';
+    };
+
+    const readValues = () => ({
+      osdCount: numberValue('osdCount'),
+      capacity: numberValue('capacity'),
+      unit: input('unit').value,
+      replication: numberValue('replication'),
+      k: numberValue('k'),
+      m: numberValue('m'),
+      reserve: numberValue('reserve')
+    });
+
+    const selectedMode = () => modeInputs.find((item) => item.checked)?.value || 'replicated';
+
+    const updateMode = () => {
+      const mode = selectedMode();
+      const isReplicated = mode === 'replicated';
+      replicatedGroup.hidden = !isReplicated;
+      ecGroup.hidden = isReplicated;
+      modeOptions.forEach((option) => option.classList.toggle('is-active', option.dataset.modeOption === mode));
+    };
+
+    const updateResults = () => {
+      const mode = selectedMode();
+      const values = readValues();
+      const rawBytes = values.osdCount * values.capacity * unitBytes[values.unit];
+      const theoreticalBytes = mode === 'replicated'
+        ? rawBytes / values.replication
+        : rawBytes * values.k / (values.k + values.m);
+      const recommendedBytes = theoreticalBytes * (1 - values.reserve / 100);
+      const efficiency = mode === 'replicated'
+        ? 1 / values.replication
+        : values.k / (values.k + values.m);
+      const overheadBytes = rawBytes - theoreticalBytes;
+
+      resultMode.textContent = mode === 'replicated'
+        ? 'Replicated'
+        : `EC ${values.k}+${values.m}`;
+
+      [
+        ['raw', rawBytes],
+        ['theoretical', theoreticalBytes],
+        ['recommended', recommendedBytes],
+        ['overhead', overheadBytes]
+      ].forEach(([name, bytes]) => {
+        resultNodes[name].textContent = capacityText(bytes, values.unit);
+        secondaryNodes[name].textContent = secondaryCapacityText(bytes, values.unit);
+      });
+
+      resultNodes.efficiency.textContent = `${formatNumber(efficiency * 100)}%`;
+
+      const summary = root.querySelector('[data-summary]');
+      summary.textContent = isZh
+        ? `这个集群提供 ${capacityText(rawBytes, values.unit)} 的 Raw Capacity。采用 ${mode === 'replicated' ? `Replication Size ${formatNumber(values.replication, 0)}` : `EC ${formatNumber(values.k, 0)}+${formatNumber(values.m, 0)}`} 时，Theoretical Usable Capacity 为 ${capacityText(theoreticalBytes, values.unit)}。保留 ${formatNumber(values.reserve)}% Reserve 后，Recommended Usable 约为 ${capacityText(recommendedBytes, values.unit)}。`
+        : `This configuration provides ${capacityText(rawBytes, values.unit)} of raw capacity. With ${mode === 'replicated' ? `a replication size of ${formatNumber(values.replication, 0)}` : `an EC ${formatNumber(values.k, 0)}+${formatNumber(values.m, 0)} profile`}, the theoretical usable capacity is ${capacityText(theoreticalBytes, values.unit)}. Reserving ${formatNumber(values.reserve)}% leaves approximately ${capacityText(recommendedBytes, values.unit)} of recommended usable capacity.`;
+    };
+
+    modeInputs.forEach((modeInput) => modeInput.addEventListener('change', () => {
+      updateMode();
+
+      const message = validate(selectedMode(), readValues());
+
+      if (message) {
+        setError(message);
+        return;
+      }
+
+      setError('');
+      updateResults();
+    }));
+
+    fields.forEach((field) => field.addEventListener('input', () => {
+      setError('');
+      if (field.getAttribute('aria-invalid')) field.removeAttribute('aria-invalid');
+    }));
+
+    input('unit').addEventListener('change', () => {
+      const message = validate(selectedMode(), readValues());
+
+      if (message) {
+        setError(message);
+        return;
+      }
+
+      setError('');
+      updateResults();
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const mode = selectedMode();
+      const message = validate(mode, readValues());
+
+      if (message) {
+        setError(message);
+        return;
+      }
+
+      setError('');
+      updateResults();
+    });
+
+    updateMode();
+  })();
+</script>

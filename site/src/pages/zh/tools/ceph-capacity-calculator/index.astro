@@ -1,0 +1,91 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import Header from '../../../../components/Header.astro';
+import Footer from '../../../../components/Footer.astro';
+import CephCapacityCalculator from '../../../../components/tools/CephCapacityCalculator.astro';
+---
+
+<BaseLayout
+  title="Ceph Capacity Calculator | InfraOpsX"
+  description="用于估算 Ceph Replicated 和 Erasure Coding 布局下 Raw Capacity、Usable Capacity、Data Efficiency 与 Reserve headroom。"
+  lang="zh-CN"
+  canonicalPath="/zh/tools/ceph-capacity-calculator/"
+  enPath="/tools/ceph-capacity-calculator/"
+  zhPath="/zh/tools/ceph-capacity-calculator/"
+>
+  <Header locale="zh" switchHref="/tools/ceph-capacity-calculator/" />
+
+  <main class="tool-detail-shell">
+    <div class="container tool-detail-container">
+      <div class="tools-breadcrumb">
+        <a href="/zh/">首页</a>
+        <span>/</span>
+        <a href="/zh/tools/">工具</a>
+        <span>/</span>
+        <span>Ceph Capacity Calculator</span>
+      </div>
+
+      <header class="tool-detail-header">
+        <span class="section-label">CEPH · 容量规划</span>
+        <h1>Ceph Capacity Calculator</h1>
+        <p>估算 Ceph 集群的 Raw Capacity、Usable Capacity 和实际规划中需要保留的容量余量。</p>
+      </header>
+
+      <section class="tool-section" aria-labelledby="calculator-heading">
+        <div class="tool-section-heading">
+          <span class="section-label">计算器</span>
+          <h2 id="calculator-heading">在部署前规划容量。</h2>
+        </div>
+        <CephCapacityCalculator locale="zh" />
+      </section>
+
+      <section class="tool-info-grid">
+        <article class="tool-info-card">
+          <span class="section-label">HOW IT WORKS</span>
+          <h2>选择与数据保护方式对应的布局。</h2>
+          <p>Replicated 布局会用 Raw Capacity 除以 Replication Size。Erasure Coding 使用数据 shard 比例 <code>k / (k + m)</code>。Recommended Usable 则是在计算 Theoretical Usable 后，再应用 Reserve 百分比。</p>
+        </article>
+
+        <article class="tool-info-card">
+          <span class="section-label">IMPORTANT CONSIDERATIONS</span>
+          <h2>计算结果属于容量规划估算。</h2>
+          <p>实际可用空间还可能受到 BlueStore、metadata、不同 OSD 容量、CRUSH / failure domain、recovery / backfill headroom 以及集群利用率等因素影响。这个结果不等同于实际 Ceph <code>df</code> 输出。</p>
+        </article>
+      </section>
+
+      <section class="tool-faq" aria-labelledby="faq-heading">
+        <span class="section-label">FAQ</span>
+        <h2 id="faq-heading">常见问题</h2>
+        <details open>
+          <summary>TB 和 TiB 有什么区别？</summary>
+          <p>TB 使用十进制单位：1 TB = 10<sup>12</sup> bytes。TiB 使用二进制单位：1 TiB = 2<sup>40</sup> bytes。计算器会把用户选择的单位作为主显示，同时显示另一种单位作为参考。</p>
+        </details>
+        <details>
+          <summary>Recommended Usable 是否等于 Ceph 的实际可用容量？</summary>
+          <p>不是。它是在 Theoretical Usable 基础上应用 Reserve 百分比得到的规划估算。BlueStore、metadata、拓扑、recovery 行为和集群利用率都可能使实际 Ceph 结果不同。</p>
+        </details>
+      </section>
+
+      <section class="related-tools">
+        <div>
+          <span class="section-label">RELATED TOOLS</span>
+          <h2>更多基础设施工具正在准备中。</h2>
+        </div>
+        <a class="button secondary" href="/zh/tools/">查看全部工具</a>
+      </section>
+
+      <section class="tool-cta">
+        <div class="cta-box">
+          <div>
+            <span class="section-label">INFRAOPSX</span>
+            <h2>需要 Ceph 或 Kubernetes storage 方面的帮助？</h2>
+            <p>联系 InfraOpsX，获取面向实际环境的基础设施建议。</p>
+          </div>
+          <a class="button primary" href="/zh/contact/">联系 InfraOpsX</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <Footer locale="zh" />
+</BaseLayout>
