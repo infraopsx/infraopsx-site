@@ -1,0 +1,95 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import Header from '../../../../components/Header.astro';
+import Footer from '../../../../components/Footer.astro';
+import KubernetesResourceCalculator from '../../../../components/tools/KubernetesResourceCalculator.astro';
+---
+
+<BaseLayout
+  title="Kubernetes Resource Calculator | InfraOpsX"
+  description="用于规划 Kubernetes 工作负载 requests、limits、可调度节点容量和 Pod 密度的浏览器工具。"
+  lang="zh-CN"
+  canonicalPath="/zh/tools/kubernetes-resource-calculator/"
+  enPath="/tools/kubernetes-resource-calculator/"
+  zhPath="/zh/tools/kubernetes-resource-calculator/"
+>
+  <Header locale="zh" switchHref="/tools/kubernetes-resource-calculator/" />
+
+  <main class="tool-detail-shell">
+    <div class="container tool-detail-container">
+      <div class="tools-breadcrumb">
+        <a href="/zh/">首页</a>
+        <span>/</span>
+        <a href="/zh/tools/">工具</a>
+        <span>/</span>
+        <span>Kubernetes Resource Calculator</span>
+      </div>
+
+      <header class="tool-detail-header">
+        <span class="section-label">KUBERNETES · 资源规划</span>
+        <h1>Kubernetes Resource Calculator</h1>
+        <p>为同构 Kubernetes 节点池规划工作负载 requests 和节点容量。</p>
+      </header>
+
+      <section class="tool-section" aria-labelledby="calculator-heading">
+        <div class="tool-section-heading">
+          <span class="section-label">计算器</span>
+          <h2 id="calculator-heading">在部署前规划 requests。</h2>
+        </div>
+        <KubernetesResourceCalculator locale="zh" />
+      </section>
+
+      <section class="tool-info-grid">
+        <article class="tool-info-card">
+          <span class="section-label">HOW IT WORKS</span>
+          <h2>将 requests 与可调度容量进行比较。</h2>
+          <p>Kubernetes 调度通常依据 resource requests，而不是 limits。这个计算器会将 CPU 统一为 mCPU、Memory 统一为 bytes，在每个节点上应用规划预留，再将工作负载 requests 与计算后的可调度容量进行比较。15% 是 InfraOpsX Calculator 的容量规划默认值，不是 Kubernetes 或 kubelet 的默认 systemReserved。该值仅用于容量规划，不代表 kubelet 的 systemReserved、kubeReserved 或实际 Node Allocatable。limits 会作为规划和 overcommit 信息展示，但不会决定 Pod 是否能够放入节点。</p>
+        </article>
+
+        <article class="tool-info-card">
+          <span class="section-label">IMPORTANT CONSIDERATIONS</span>
+          <h2>这是容量规划估算。</h2>
+          <p>实际调度还可能受到 node allocatable、kube-system 工作负载、DaemonSets、taints 和 tolerations、node affinity / anti-affinity、topology spread constraints、Pod max limits、hugepages、GPU 或其他 extended resources、ephemeral storage、不同节点规格以及剩余资源碎片等因素影响。结果不等同于 kube-scheduler 的精确行为。</p>
+        </article>
+      </section>
+
+      <section class="tool-faq" aria-labelledby="faq-heading">
+        <span class="section-label">FAQ</span>
+        <h2 id="faq-heading">常见问题</h2>
+        <details open>
+          <summary>为什么判断容量时不使用 limits？</summary>
+          <p>Kubernetes 调度通常在判断 Pod 是否能放入节点时使用 resource requests。这里显示 limits 是为了帮助了解工作负载的规划和 overcommit 情况，但 limits 不会决定容量状态。</p>
+        </details>
+        <details>
+          <summary>规划预留代表什么？</summary>
+          <p>规划预留用于为操作系统、kube-system、容器运行时、DaemonSet 以及日常运维预留容量。15% 是 InfraOpsX Calculator 的容量规划默认值，不是 Kubernetes 或 kubelet 的默认 systemReserved。该值仅用于容量规划，不代表 kubelet 的 systemReserved、kubeReserved 或实际 Node Allocatable。</p>
+        </details>
+        <details>
+          <summary>结果是否等同于 kube-scheduler？</summary>
+          <p>不等同。node allocatable、placement 规则、拓扑、extended resources、存储以及剩余资源的分布情况，都可能影响实际调度决定。</p>
+        </details>
+      </section>
+
+      <section class="related-tools">
+        <div>
+          <span class="section-label">RELATED TOOLS</span>
+          <h2>结合存储容量规划一起评估工作负载。</h2>
+        </div>
+        <a class="button secondary" href="/zh/tools/">查看全部工具</a>
+      </section>
+
+      <section class="tool-cta">
+        <div class="cta-box">
+          <div>
+            <span class="section-label">INFRAOPSX</span>
+            <h2>需要 Kubernetes 容量规划方面的帮助？</h2>
+            <p>联系 InfraOpsX，获取面向实际环境的基础设施建议。</p>
+          </div>
+          <a class="button primary" href="/zh/contact/">联系 InfraOpsX</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <Footer locale="zh" />
+</BaseLayout>

@@ -1,0 +1,645 @@
+---
+const { locale = 'en' } = Astro.props;
+const isZh = locale === 'zh';
+
+const defaults = {
+  replicas: 10,
+  cpuRequest: 250,
+  cpuRequestUnit: 'mCPU',
+  cpuLimit: 500,
+  cpuLimitUnit: 'mCPU',
+  memoryRequest: 256,
+  memoryRequestUnit: 'MiB',
+  memoryLimit: 512,
+  memoryLimitUnit: 'MiB',
+  nodeCount: 3,
+  cpuPerNode: 4,
+  memoryPerNode: 16,
+  reserve: 15
+};
+
+const cpuUnitMilli = {
+  mCPU: 1,
+  cores: 1000
+} as const;
+
+const memoryUnitBytes = {
+  MB: 10 ** 6,
+  MiB: 2 ** 20,
+  GB: 10 ** 9,
+  GiB: 2 ** 30
+} as const;
+
+const formatNumber = (value: number, decimals = 2) =>
+  value
+    .toFixed(decimals)
+    .replace(/\.00$/, '')
+    .replace(/(\.\d)0$/, '$1');
+
+const formatCpu = (milli: number) => ({
+  main: Math.abs(milli) >= 1000
+    ? `${formatNumber(milli / 1000)} CPU cores`
+    : `${formatNumber(milli)} mCPU`,
+  helper: Math.abs(milli) >= 1000
+    ? `${formatNumber(milli)} mCPU`
+    : `${formatNumber(milli / 1000)} CPU cores`
+});
+
+const formatCpuSummary = (milli: number) =>
+  Math.abs(milli) >= 1000
+    ? `${formatNumber(milli / 1000)} schedulable CPU cores`
+    : `${formatNumber(milli)} schedulable mCPU`;
+
+const formatCpuLimit = (milli: number) =>
+  milli > 0 ? formatCpu(milli) : { main: isZh ? '未设置' : 'Not set', helper: '' };
+
+const formatMemory = (bytes: number) => ({
+  main: bytes >= memoryUnitBytes.GiB
+    ? `${formatNumber(bytes / memoryUnitBytes.GiB)} GiB`
+    : `${formatNumber(bytes / memoryUnitBytes.MiB)} MiB`,
+  helper: bytes >= memoryUnitBytes.GiB
+    ? `≈ ${formatNumber(bytes / memoryUnitBytes.GB)} GB`
+    : `≈ ${formatNumber(bytes / memoryUnitBytes.MB)} MB`
+});
+
+const formatMemoryLimit = (bytes: number) =>
+  bytes > 0
+    ? formatMemory(bytes)
+    : { main: isZh ? '未设置' : 'Not set', helper: '' };
+
+const initialCpuRequest = defaults.replicas * defaults.cpuRequest * cpuUnitMilli.mCPU;
+const initialCpuLimit = defaults.replicas * defaults.cpuLimit * cpuUnitMilli.mCPU;
+const initialMemoryRequest = defaults.replicas * defaults.memoryRequest * memoryUnitBytes.MiB;
+const initialMemoryLimit = defaults.replicas * defaults.memoryLimit * memoryUnitBytes.MiB;
+const initialSchedulableCpuPerNode = defaults.cpuPerNode * 1000 * (1 - defaults.reserve / 100);
+const initialSchedulableMemoryPerNode = defaults.memoryPerNode * memoryUnitBytes.GiB * (1 - defaults.reserve / 100);
+const initialClusterCpu = defaults.nodeCount * initialSchedulableCpuPerNode;
+const initialClusterMemory = defaults.nodeCount * initialSchedulableMemoryPerNode;
+const initialCpuNodes = Math.ceil(initialCpuRequest / initialSchedulableCpuPerNode);
+const initialMemoryNodes = Math.ceil(initialMemoryRequest / initialSchedulableMemoryPerNode);
+const initialMinimumNodes = Math.max(initialCpuNodes, initialMemoryNodes);
+const initialCpuPodsPerNode = Math.floor(initialSchedulableCpuPerNode / (defaults.cpuRequest * cpuUnitMilli.mCPU));
+const initialMemoryPodsPerNode = Math.floor(initialSchedulableMemoryPerNode / (defaults.memoryRequest * memoryUnitBytes.MiB));
+const initialPodsPerNode = Math.min(initialCpuPodsPerNode, initialMemoryPodsPerNode);
+const initialCpuPressure = initialCpuRequest / initialClusterCpu;
+const initialMemoryPressure = initialMemoryRequest / initialClusterMemory;
+const initialPressureDifference = initialCpuPressure - initialMemoryPressure;
+const initialBottleneck = Math.abs(initialPressureDifference) <= 0.01
+  ? 'Balanced'
+  : initialPressureDifference > 0.01
+    ? 'CPU'
+    : 'Memory';
+const initialBottleneckLabel = isZh && initialBottleneck === 'Balanced' ? '平衡' : initialBottleneck;
+const initialCpuMain = formatCpu(initialCpuRequest);
+const initialCpuLimitMain = formatCpuLimit(initialCpuLimit);
+const initialMemoryMain = formatMemory(initialMemoryRequest);
+const initialMemoryLimitMain = formatMemoryLimit(initialMemoryLimit);
+const initialSchedulableCpuMain = formatCpu(initialSchedulableCpuPerNode);
+const initialSchedulableMemoryMain = formatMemory(initialSchedulableMemoryPerNode);
+const initialClusterCpuMain = formatCpu(initialClusterCpu);
+const initialClusterMemoryMain = formatMemory(initialClusterMemory);
+const initialCpuHeadroomMain = formatCpu(initialClusterCpu - initialCpuRequest);
+const initialMemoryHeadroomMain = formatMemory(initialClusterMemory - initialMemoryRequest);
+
+const initialSummary = isZh
+  ? `这个工作负载的 10 个 Pod 共请求 CPU ${initialCpuMain.main} 和 Memory ${initialMemoryMain.main}。3 个节点并保留 15% 规划预留后，节点池提供 ${formatCpuSummary(initialClusterCpu)} 和可调度 Memory ${initialClusterMemoryMain.main}。当前节点池可以满足该工作负载，CPU 是主要容量约束。`
+  : `This workload requests ${initialCpuMain.main} and ${initialMemoryMain.main} of memory across 10 Pods. With 3 nodes and a 15% planning reserve, the node pool provides ${formatCpuSummary(initialClusterCpu)} and ${initialClusterMemoryMain.main} of schedulable memory. The workload fits within the current node pool. CPU is the primary capacity constraint.`;
+---
+
+<section
+  class="resource-calculator"
+  data-resource-calculator
+  data-locale={locale}
+>
+  <div class="calculator-grid">
+    <form class="calculator-form" data-resource-form novalidate>
+      <section class="resource-form-section">
+        <div class="resource-section-title">
+          <span class="section-label">{isZh ? '工作负载' : 'WORKLOAD'}</span>
+          <h3>{isZh ? '工作负载' : 'Workload'}</h3>
+        </div>
+
+        <div class="resource-fields">
+          <label class="field">
+            <span>{isZh ? 'Pod 副本数' : 'Pod Replicas'}</span>
+            <input data-input="replicas" type="number" min="1" step="1" value={defaults.replicas} />
+          </label>
+
+          <label class="field">
+            <span>{isZh ? '每个 Pod 的 CPU Request' : 'CPU Request per Pod'}</span>
+            <span class="resource-input-row">
+              <input data-input="cpuRequest" type="number" min="0" step="any" value={defaults.cpuRequest} />
+              <select data-input="cpuRequestUnit">
+                <option value="mCPU" selected={defaults.cpuRequestUnit === 'mCPU'}>mCPU</option>
+                <option value="cores" selected={defaults.cpuRequestUnit === 'cores'}>CPU cores</option>
+              </select>
+            </span>
+          </label>
+
+          <label class="field">
+            <span>{isZh ? '每个 Pod 的 CPU Limit' : 'CPU Limit per Pod'}</span>
+            <span class="resource-input-row">
+              <input data-input="cpuLimit" type="number" min="0" step="any" value={defaults.cpuLimit} />
+              <select data-input="cpuLimitUnit">
+                <option value="mCPU" selected={defaults.cpuLimitUnit === 'mCPU'}>mCPU</option>
+                <option value="cores" selected={defaults.cpuLimitUnit === 'cores'}>CPU cores</option>
+              </select>
+            </span>
+          </label>
+
+          <label class="field">
+            <span>{isZh ? '每个 Pod 的 Memory Request' : 'Memory Request per Pod'}</span>
+            <span class="resource-input-row">
+              <input data-input="memoryRequest" type="number" min="0" step="any" value={defaults.memoryRequest} />
+              <select data-input="memoryRequestUnit">
+                <option value="MiB" selected={defaults.memoryRequestUnit === 'MiB'}>MiB</option>
+                <option value="GiB" selected={defaults.memoryRequestUnit === 'GiB'}>GiB</option>
+                <option value="MB" selected={defaults.memoryRequestUnit === 'MB'}>MB</option>
+                <option value="GB" selected={defaults.memoryRequestUnit === 'GB'}>GB</option>
+              </select>
+            </span>
+          </label>
+
+          <label class="field">
+            <span>{isZh ? '每个 Pod 的 Memory Limit' : 'Memory Limit per Pod'}</span>
+            <span class="resource-input-row">
+              <input data-input="memoryLimit" type="number" min="0" step="any" value={defaults.memoryLimit} />
+              <select data-input="memoryLimitUnit">
+                <option value="MiB" selected={defaults.memoryLimitUnit === 'MiB'}>MiB</option>
+                <option value="GiB" selected={defaults.memoryLimitUnit === 'GiB'}>GiB</option>
+                <option value="MB" selected={defaults.memoryLimitUnit === 'MB'}>MB</option>
+                <option value="GB" selected={defaults.memoryLimitUnit === 'GB'}>GB</option>
+              </select>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section class="resource-form-section">
+        <div class="resource-section-title">
+          <span class="section-label">{isZh ? '节点池' : 'NODE POOL'}</span>
+          <h3>{isZh ? '节点池' : 'Node Pool'}</h3>
+        </div>
+
+        <div class="resource-fields">
+          <label class="field">
+            <span>{isZh ? '节点数量' : 'Node Count'}</span>
+            <input data-input="nodeCount" type="number" min="1" step="1" value={defaults.nodeCount} />
+          </label>
+
+          <label class="field">
+            <span>{isZh ? '每个节点的 CPU' : 'CPU per Node'}</span>
+            <span class="resource-input-row resource-input-fixed-unit">
+              <input data-input="cpuPerNode" type="number" min="0" step="any" value={defaults.cpuPerNode} />
+              <span>CPU cores</span>
+            </span>
+          </label>
+
+          <label class="field">
+            <span>{isZh ? '每个节点的 Memory' : 'Memory per Node'}</span>
+            <span class="resource-input-row resource-input-fixed-unit">
+              <input data-input="memoryPerNode" type="number" min="0" step="any" value={defaults.memoryPerNode} />
+              <span>GiB</span>
+            </span>
+          </label>
+
+          <label class="field">
+            <span>{isZh ? '规划预留 (%)' : 'Planning Reserve (%)'}</span>
+            <input data-input="reserve" type="number" min="0" max="99.99" step="any" value={defaults.reserve} />
+          </label>
+        </div>
+
+        <p class="resource-help">
+          {isZh
+            ? '规划预留用于为操作系统、kube-system、容器运行时、DaemonSet 以及日常运维预留容量。15% 是 InfraOpsX Calculator 的容量规划默认值，不是 Kubernetes 或 kubelet 的默认 systemReserved。该值仅用于容量规划，不代表 kubelet 的 systemReserved、kubeReserved 或实际 Node Allocatable。'
+            : 'Planning Reserve provides headroom for the OS, kube-system workloads, the container runtime, DaemonSets, and operational overhead. The default value of 15% is an InfraOpsX Calculator capacity-planning default, not a Kubernetes or kubelet default systemReserved value. This estimate does not represent kubelet systemReserved, kubeReserved, or the actual Node Allocatable value.'}
+        </p>
+      </section>
+
+      <div class="calculator-error" data-calculator-error role="alert" hidden></div>
+
+      <button class="button primary calculator-submit" type="submit">
+        {isZh ? '计算资源' : 'Calculate resources'}
+      </button>
+    </form>
+
+    <div class="calculator-output resource-output" aria-live="polite">
+      <div class="summary-block">
+        <span class="section-label">{isZh ? '分析摘要' : 'ANALYSIS SUMMARY'}</span>
+        <h2>{isZh ? '分析摘要' : 'Analysis Summary'}</h2>
+        <p data-summary>{initialSummary}</p>
+      </div>
+
+      <div class="results-block">
+        <div class="results-heading">
+          <div>
+            <span class="section-label">{isZh ? '结果' : 'RESULTS'}</span>
+            <h2>{isZh ? '结果' : 'Results'}</h2>
+          </div>
+        </div>
+
+        <div class="resource-result-group">
+          <span class="resource-group-label">{isZh ? '主要结果' : 'PRIMARY RESULTS'}</span>
+          <dl class="result-list">
+            <div class="result-row result-row-primary">
+              <dt>{isZh ? '容量状态' : 'Fit Status'}</dt>
+              <dd><strong data-result="fit">{isZh ? '满足容量' : 'Fits'}</strong></dd>
+            </div>
+
+            <div class="result-row">
+              <dt>{isZh ? '最少所需节点数' : 'Minimum Nodes Required'}</dt>
+              <dd><strong data-result="minimumNodes">{initialMinimumNodes}</strong></dd>
+            </div>
+
+            <div class="result-row">
+              <dt>{isZh ? '每个节点预计 Pod 数量' : 'Estimated Pods per Node'}</dt>
+              <dd><strong data-result="podsPerNode">{initialPodsPerNode}</strong></dd>
+            </div>
+
+            <div class="result-row">
+              <dt>{isZh ? '主要容量约束' : 'Bottleneck'}</dt>
+              <dd><strong data-result="bottleneck">{initialBottleneckLabel}</strong></dd>
+            </div>
+          </dl>
+          <p class="resource-result-note">
+            {isZh
+              ? '某项 resource request 为 0 时，该资源不会限制 Pod 密度。'
+              : 'A zero resource request is treated as non-constraining for Pod density.'}
+          </p>
+        </div>
+
+        <div class="resource-result-group">
+          <span class="resource-group-label">{isZh ? '工作负载总量' : 'WORKLOAD TOTALS'}</span>
+          <dl class="result-list">
+            <div class="result-row">
+              <dt>Total CPU Requests</dt>
+              <dd>
+                <strong data-result="totalCpuRequests">{initialCpuMain.main}</strong>
+                <small data-result-secondary="totalCpuRequests">{initialCpuMain.helper}</small>
+              </dd>
+            </div>
+
+            <div class="result-row">
+              <dt>Total CPU Limits</dt>
+              <dd>
+                <strong data-result="totalCpuLimits">{initialCpuLimitMain.main}</strong>
+                <small data-result-secondary="totalCpuLimits">{initialCpuLimitMain.helper}</small>
+              </dd>
+            </div>
+
+            <div class="result-row">
+              <dt>Total Memory Requests</dt>
+              <dd>
+                <strong data-result="totalMemoryRequests">{initialMemoryMain.main}</strong>
+                <small data-result-secondary="totalMemoryRequests">{initialMemoryMain.helper}</small>
+              </dd>
+            </div>
+
+            <div class="result-row">
+              <dt>Total Memory Limits</dt>
+              <dd>
+                <strong data-result="totalMemoryLimits">{initialMemoryLimitMain.main}</strong>
+                <small data-result-secondary="totalMemoryLimits">{initialMemoryLimitMain.helper}</small>
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="resource-result-group">
+          <span class="resource-group-label">{isZh ? '节点池规划' : 'CLUSTER PLANNING'}</span>
+          <dl class="result-list">
+            <div class="result-row">
+              <dt>Schedulable CPU per Node</dt>
+              <dd>
+                <strong data-result="schedulableCpuPerNode">{initialSchedulableCpuMain.main}</strong>
+                <small data-result-secondary="schedulableCpuPerNode">{initialSchedulableCpuMain.helper}</small>
+              </dd>
+            </div>
+
+            <div class="result-row">
+              <dt>Schedulable Memory per Node</dt>
+              <dd>
+                <strong data-result="schedulableMemoryPerNode">{initialSchedulableMemoryMain.main}</strong>
+                <small data-result-secondary="schedulableMemoryPerNode">{initialSchedulableMemoryMain.helper}</small>
+              </dd>
+            </div>
+
+            <div class="result-row">
+              <dt>Cluster Schedulable CPU</dt>
+              <dd>
+                <strong data-result="clusterCpu">{initialClusterCpuMain.main}</strong>
+                <small data-result-secondary="clusterCpu">{initialClusterCpuMain.helper}</small>
+              </dd>
+            </div>
+
+            <div class="result-row">
+              <dt>Cluster Schedulable Memory</dt>
+              <dd>
+                <strong data-result="clusterMemory">{initialClusterMemoryMain.main}</strong>
+                <small data-result-secondary="clusterMemory">{initialClusterMemoryMain.helper}</small>
+              </dd>
+            </div>
+
+            <div class="result-row">
+              <dt>CPU Request Utilization</dt>
+              <dd><strong data-result="cpuUtilization">{formatNumber(initialCpuPressure * 100)}%</strong></dd>
+            </div>
+
+            <div class="result-row">
+              <dt>Memory Request Utilization</dt>
+              <dd><strong data-result="memoryUtilization">{formatNumber(initialMemoryPressure * 100)}%</strong></dd>
+            </div>
+
+            <div class="result-row">
+              <dt>CPU Headroom</dt>
+              <dd>
+                <strong data-result="cpuHeadroom">{initialCpuHeadroomMain.main}</strong>
+                <small data-result-secondary="cpuHeadroom">{initialCpuHeadroomMain.helper}</small>
+              </dd>
+            </div>
+
+            <div class="result-row">
+              <dt>Memory Headroom</dt>
+              <dd>
+                <strong data-result="memoryHeadroom">{initialMemoryHeadroomMain.main}</strong>
+                <small data-result-secondary="memoryHeadroom">{initialMemoryHeadroomMain.helper}</small>
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="calculator-privacy">
+    {isZh
+      ? '所有计算均在浏览器本地完成，不会上传配置或输入数据。'
+      : 'All calculations run locally in your browser. No configuration or input data is uploaded.'}
+  </p>
+</section>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector('[data-resource-calculator]');
+    if (!root) return;
+
+    const isZh = root.dataset.locale === 'zh';
+    const form = root.querySelector('[data-resource-form]');
+    const error = root.querySelector('[data-calculator-error]');
+    const fields = [...root.querySelectorAll('[data-input]')];
+    const resultNodes = Object.fromEntries(
+      [...root.querySelectorAll('[data-result]')].map((node) => [node.dataset.result, node])
+    );
+    const secondaryNodes = Object.fromEntries(
+      [...root.querySelectorAll('[data-result-secondary]')].map((node) => [node.dataset.resultSecondary, node])
+    );
+
+    const cpuUnitMilli = Object.freeze({
+      mCPU: 1,
+      cores: 1000
+    });
+
+    const memoryUnitBytes = Object.freeze({
+      MB: 10 ** 6,
+      MiB: 2 ** 20,
+      GB: 10 ** 9,
+      GiB: 2 ** 30
+    });
+
+    const input = (name) => root.querySelector(`[data-input="${name}"]`);
+    const numberValue = (name) => Number(input(name).value);
+
+    const formatNumber = (value, decimals = 2) => {
+      if (!Number.isFinite(value)) return '—';
+      return value
+        .toFixed(decimals)
+        .replace(/\.00$/, '')
+        .replace(/(\.\d)0$/, '$1');
+    };
+
+    const formatCpu = (milli) => ({
+      main: Math.abs(milli) >= 1000
+        ? `${formatNumber(milli / 1000)} CPU cores`
+        : `${formatNumber(milli)} mCPU`,
+      helper: Math.abs(milli) >= 1000
+        ? `${formatNumber(milli)} mCPU`
+        : `${formatNumber(milli / 1000)} CPU cores`
+    });
+
+    const formatCpuSummary = (milli) =>
+      Math.abs(milli) >= 1000
+        ? `${formatNumber(milli / 1000)} schedulable CPU cores`
+        : `${formatNumber(milli)} schedulable mCPU`;
+
+    const formatCpuLimit = (milli) =>
+      milli > 0 ? formatCpu(milli) : { main: isZh ? '未设置' : 'Not set', helper: '' };
+
+    const formatMemory = (bytes) => ({
+      main: bytes >= memoryUnitBytes.GiB
+        ? `${formatNumber(bytes / memoryUnitBytes.GiB)} GiB`
+        : `${formatNumber(bytes / memoryUnitBytes.MiB)} MiB`,
+      helper: bytes >= memoryUnitBytes.GiB
+        ? `≈ ${formatNumber(bytes / memoryUnitBytes.GB)} GB`
+        : `≈ ${formatNumber(bytes / memoryUnitBytes.MB)} MB`
+    });
+
+    const formatMemoryLimit = (bytes) =>
+      bytes > 0
+        ? formatMemory(bytes)
+        : { main: isZh ? '未设置' : 'Not set', helper: '' };
+
+    const setError = (message = '') => {
+      error.textContent = message;
+      error.hidden = !message;
+    };
+
+    const clearInvalid = () => {
+      fields.forEach((field) => field.removeAttribute('aria-invalid'));
+    };
+
+    const markInvalid = (...names) => {
+      names.forEach((name) => input(name).setAttribute('aria-invalid', 'true'));
+    };
+
+    const readValues = () => {
+      const cpuRequest = numberValue('cpuRequest');
+      const cpuLimit = numberValue('cpuLimit');
+      const memoryRequest = numberValue('memoryRequest');
+      const memoryLimit = numberValue('memoryLimit');
+
+      return {
+        replicas: numberValue('replicas'),
+        cpuRequest: cpuRequest * cpuUnitMilli[input('cpuRequestUnit').value],
+        cpuLimit: cpuLimit * cpuUnitMilli[input('cpuLimitUnit').value],
+        memoryRequest: memoryRequest * memoryUnitBytes[input('memoryRequestUnit').value],
+        memoryLimit: memoryLimit * memoryUnitBytes[input('memoryLimitUnit').value],
+        nodeCount: numberValue('nodeCount'),
+        cpuPerNode: numberValue('cpuPerNode') * 1000,
+        memoryPerNode: numberValue('memoryPerNode') * memoryUnitBytes.GiB,
+        reserve: numberValue('reserve')
+      };
+    };
+
+    const validate = (values) => {
+      clearInvalid();
+
+      if (!Number.isInteger(values.replicas) || values.replicas <= 0) {
+        markInvalid('replicas');
+        return isZh ? 'Pod 副本数必须是正整数。' : 'Pod Replicas must be a positive integer.';
+      }
+
+      if (!Number.isFinite(values.cpuRequest) || values.cpuRequest < 0) {
+        markInvalid('cpuRequest');
+        return isZh ? 'CPU Request 必须大于等于 0。' : 'CPU Request must be zero or greater.';
+      }
+
+      if (!Number.isFinite(values.cpuLimit) || values.cpuLimit < 0) {
+        markInvalid('cpuLimit');
+        return isZh ? 'CPU Limit 必须大于等于 0。' : 'CPU Limit must be zero or greater.';
+      }
+
+      if (values.cpuLimit > 0 && values.cpuRequest > values.cpuLimit) {
+        markInvalid('cpuRequest', 'cpuLimit');
+        return isZh ? 'CPU Request 不能大于 CPU Limit。' : 'CPU Request cannot exceed CPU Limit.';
+      }
+
+      if (!Number.isFinite(values.memoryRequest) || values.memoryRequest < 0) {
+        markInvalid('memoryRequest');
+        return isZh ? 'Memory Request 必须大于等于 0。' : 'Memory Request must be zero or greater.';
+      }
+
+      if (!Number.isFinite(values.memoryLimit) || values.memoryLimit < 0) {
+        markInvalid('memoryLimit');
+        return isZh ? 'Memory Limit 必须大于等于 0。' : 'Memory Limit must be zero or greater.';
+      }
+
+      if (values.memoryLimit > 0 && values.memoryRequest > values.memoryLimit) {
+        markInvalid('memoryRequest', 'memoryLimit');
+        return isZh ? 'Memory Request 不能大于 Memory Limit。' : 'Memory Request cannot exceed Memory Limit.';
+      }
+
+      if (!Number.isInteger(values.nodeCount) || values.nodeCount <= 0) {
+        markInvalid('nodeCount');
+        return isZh ? '节点数量必须是正整数。' : 'Node Count must be a positive integer.';
+      }
+
+      if (!Number.isFinite(values.cpuPerNode) || values.cpuPerNode <= 0) {
+        markInvalid('cpuPerNode');
+        return isZh ? '每个节点的 CPU 必须大于 0。' : 'CPU per Node must be greater than 0.';
+      }
+
+      if (!Number.isFinite(values.memoryPerNode) || values.memoryPerNode <= 0) {
+        markInvalid('memoryPerNode');
+        return isZh ? '每个节点的 Memory 必须大于 0。' : 'Memory per Node must be greater than 0.';
+      }
+
+      if (!Number.isFinite(values.reserve) || values.reserve < 0 || values.reserve >= 100) {
+        markInvalid('reserve');
+        return isZh ? '规划预留必须大于等于 0 且小于 100。' : 'Planning Reserve must be at least 0 and less than 100.';
+      }
+
+      return '';
+    };
+
+    const setPair = (name, value, helper = '') => {
+      resultNodes[name].textContent = value;
+      secondaryNodes[name].textContent = helper;
+      secondaryNodes[name].hidden = !helper;
+    };
+
+    const updateResults = (values) => {
+      const schedulableCpuPerNode = values.cpuPerNode * (1 - values.reserve / 100);
+      const schedulableMemoryPerNode = values.memoryPerNode * (1 - values.reserve / 100);
+      const clusterCpu = values.nodeCount * schedulableCpuPerNode;
+      const clusterMemory = values.nodeCount * schedulableMemoryPerNode;
+      const totalCpuRequests = values.replicas * values.cpuRequest;
+      const totalCpuLimits = values.replicas * values.cpuLimit;
+      const totalMemoryRequests = values.replicas * values.memoryRequest;
+      const totalMemoryLimits = values.replicas * values.memoryLimit;
+      const cpuNodesRequired = totalCpuRequests === 0
+        ? 0
+        : Math.ceil(totalCpuRequests / schedulableCpuPerNode);
+      const memoryNodesRequired = totalMemoryRequests === 0
+        ? 0
+        : Math.ceil(totalMemoryRequests / schedulableMemoryPerNode);
+      const minimumNodes = Math.max(cpuNodesRequired, memoryNodesRequired);
+      const cpuPodsPerNode = values.cpuRequest === 0
+        ? null
+        : Math.floor(schedulableCpuPerNode / values.cpuRequest);
+      const memoryPodsPerNode = values.memoryRequest === 0
+        ? null
+        : Math.floor(schedulableMemoryPerNode / values.memoryRequest);
+      const densities = [cpuPodsPerNode, memoryPodsPerNode].filter((value) => value !== null);
+      const podsPerNode = densities.length ? Math.min(...densities) : null;
+      const cpuPressure = totalCpuRequests / clusterCpu;
+      const memoryPressure = totalMemoryRequests / clusterMemory;
+      const fit = totalCpuRequests <= clusterCpu && totalMemoryRequests <= clusterMemory;
+      const bottleneck = Math.abs(cpuPressure - memoryPressure) <= 0.01
+        ? 'Balanced'
+        : cpuPressure > memoryPressure
+          ? 'CPU'
+          : 'Memory';
+
+      setPair('totalCpuRequests', formatCpu(totalCpuRequests).main, formatCpu(totalCpuRequests).helper);
+      setPair('totalCpuLimits', formatCpuLimit(totalCpuLimits).main, formatCpuLimit(totalCpuLimits).helper);
+      setPair('totalMemoryRequests', formatMemory(totalMemoryRequests).main, formatMemory(totalMemoryRequests).helper);
+      setPair('totalMemoryLimits', formatMemoryLimit(totalMemoryLimits).main, formatMemoryLimit(totalMemoryLimits).helper);
+      setPair('schedulableCpuPerNode', formatCpu(schedulableCpuPerNode).main, formatCpu(schedulableCpuPerNode).helper);
+      setPair('schedulableMemoryPerNode', formatMemory(schedulableMemoryPerNode).main, formatMemory(schedulableMemoryPerNode).helper);
+      setPair('clusterCpu', formatCpu(clusterCpu).main, formatCpu(clusterCpu).helper);
+      setPair('clusterMemory', formatMemory(clusterMemory).main, formatMemory(clusterMemory).helper);
+      setPair('cpuHeadroom', formatCpu(clusterCpu - totalCpuRequests).main, formatCpu(clusterCpu - totalCpuRequests).helper);
+      setPair('memoryHeadroom', formatMemory(clusterMemory - totalMemoryRequests).main, formatMemory(clusterMemory - totalMemoryRequests).helper);
+
+      resultNodes.fit.textContent = fit ? (isZh ? '满足容量' : 'Fits') : (isZh ? '容量不足' : 'Does not fit');
+      resultNodes.minimumNodes.textContent = minimumNodes;
+      resultNodes.podsPerNode.textContent = podsPerNode === null
+        ? (isZh ? '无请求约束' : 'No request constraint')
+        : podsPerNode;
+      resultNodes.bottleneck.textContent = isZh && bottleneck === 'Balanced'
+        ? '平衡'
+        : bottleneck;
+      resultNodes.cpuUtilization.textContent = `${formatNumber(cpuPressure * 100)}%`;
+      resultNodes.memoryUtilization.textContent = `${formatNumber(memoryPressure * 100)}%`;
+
+      const summary = root.querySelector('[data-summary]');
+      const fitText = fit
+        ? (isZh ? '当前节点池可以满足该工作负载。' : 'The workload fits within the current node pool.')
+        : (isZh ? '当前节点池无法满足该工作负载的请求容量。' : 'The workload does not fit within the current node pool.');
+      const bottleneckText = bottleneck === 'Balanced'
+        ? (isZh ? 'CPU 和 Memory 的压力基本平衡。' : 'CPU and memory are under balanced pressure.')
+        : (isZh ? `${bottleneck} 是主要容量约束。` : `${bottleneck} is the primary capacity constraint.`);
+      summary.textContent = isZh
+        ? `这个工作负载的 ${values.replicas} 个 Pod 共请求 CPU ${formatCpu(totalCpuRequests).main} 和 Memory ${formatMemory(totalMemoryRequests).main}。${values.nodeCount} 个节点并保留 ${formatNumber(values.reserve)}% 规划预留后，节点池提供 ${formatCpuSummary(clusterCpu)} 和可调度 Memory ${formatMemory(clusterMemory).main}。${fitText}${bottleneckText}`
+        : `This workload requests ${formatCpu(totalCpuRequests).main} and ${formatMemory(totalMemoryRequests).main} of memory across ${values.replicas} Pods. With ${values.nodeCount} nodes and a ${formatNumber(values.reserve)}% planning reserve, the node pool provides ${formatCpuSummary(clusterCpu)} and ${formatMemory(clusterMemory).main} of schedulable memory. ${fitText} ${bottleneckText}`;
+    };
+
+    const refreshResults = () => {
+      const values = readValues();
+      const message = validate(values);
+
+      if (message) {
+        setError(message);
+        return;
+      }
+
+      setError('');
+      updateResults(values);
+    };
+
+    fields.forEach((field) => {
+      field.addEventListener('input', () => {
+        setError('');
+        if (field.getAttribute('aria-invalid')) field.removeAttribute('aria-invalid');
+      });
+      field.addEventListener('change', refreshResults);
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      refreshResults();
+    });
+
+    updateResults(readValues());
+  })();
+</script>

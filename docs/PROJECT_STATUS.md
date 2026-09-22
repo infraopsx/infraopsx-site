@@ -73,12 +73,30 @@ All calculator inputs are processed locally in the browser.
 
 No calculator input is uploaded to a server.
 
+#### Kubernetes Resource Calculator
+
+Routes:
+
+- `/tools/kubernetes-resource-calculator/`
+- `/zh/tools/kubernetes-resource-calculator/`
+
+Current capabilities:
+
+- CPU and memory request/limit planning
+- decimal and binary memory units
+- homogeneous node-pool capacity planning
+- System Reserved planning reserve
+- request-based fit status and node requirements
+- Pod density and CPU / memory bottleneck analysis
+- client-side input validation
+- bilingual interface
+- local browser calculation
+
 ## Planned Tools
 
 Near-term priorities:
 
-1. Kubernetes Resource Calculator
-2. Kubernetes Quantity Converter
+1. Kubernetes Quantity Converter
 
 Possible later tools:
 
@@ -134,9 +152,9 @@ The first InfraOpsX tool, Ceph Capacity Calculator, is complete and deployed.
 
 The next planned tool is:
 
-`Kubernetes Resource Calculator`
+`Kubernetes Quantity Converter`
 
-Before starting it, reuse the layout and development conventions established by the Ceph Capacity Calculator.
+Reuse the layout and development conventions established by the Ceph Capacity Calculator for the next tool.
 
 ## Maintenance Notes
 
