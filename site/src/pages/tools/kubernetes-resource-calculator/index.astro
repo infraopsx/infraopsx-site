@@ -1,0 +1,95 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+import KubernetesResourceCalculator from '../../../components/tools/KubernetesResourceCalculator.astro';
+---
+
+<BaseLayout
+  title="Kubernetes Resource Calculator | InfraOpsX"
+  description="Estimate Kubernetes workload requests, limits, schedulable node capacity, and Pod density for a homogeneous node pool."
+  lang="en"
+  canonicalPath="/tools/kubernetes-resource-calculator/"
+  enPath="/tools/kubernetes-resource-calculator/"
+  zhPath="/zh/tools/kubernetes-resource-calculator/"
+>
+  <Header locale="en" switchHref="/zh/tools/kubernetes-resource-calculator/" />
+
+  <main class="tool-detail-shell">
+    <div class="container tool-detail-container">
+      <div class="tools-breadcrumb">
+        <a href="/">Home</a>
+        <span>/</span>
+        <a href="/tools/">Tools</a>
+        <span>/</span>
+        <span>Kubernetes Resource Calculator</span>
+      </div>
+
+      <header class="tool-detail-header">
+        <span class="section-label">KUBERNETES · RESOURCE PLANNING</span>
+        <h1>Kubernetes Resource Calculator</h1>
+        <p>Plan Kubernetes requests and node capacity for a homogeneous node pool.</p>
+      </header>
+
+      <section class="tool-section" aria-labelledby="calculator-heading">
+        <div class="tool-section-heading">
+          <span class="section-label">CALCULATOR</span>
+          <h2 id="calculator-heading">Plan requests before deployment.</h2>
+        </div>
+        <KubernetesResourceCalculator locale="en" />
+      </section>
+
+      <section class="tool-info-grid">
+        <article class="tool-info-card">
+          <span class="section-label">HOW IT WORKS</span>
+          <h2>Compare requests with schedulable capacity.</h2>
+          <p>Kubernetes scheduling normally considers effective resource requests. This calculator uses configured requests; when a request is omitted and a limit is configured, that limit becomes the effective request for this calculation. It normalizes CPU to mCPU and memory to bytes, applies the Planning Reserve to each node, and compares effective workload requests with the resulting schedulable capacity. The default value of 15% is an InfraOpsX Calculator capacity-planning default, not a Kubernetes or kubelet default systemReserved value. This estimate does not represent kubelet systemReserved, kubeReserved, or the actual Node Allocatable value. Configured limits are also shown as planning and overcommit information, but they do not add a separate fit constraint.</p>
+        </article>
+
+        <article class="tool-info-card">
+          <span class="section-label">IMPORTANT CONSIDERATIONS</span>
+          <h2>This is a planning estimate.</h2>
+          <p>Actual scheduling can also be affected by node allocatable values, kube-system workloads, DaemonSets, taints and tolerations, node affinity and anti-affinity, topology spread constraints, Pod max limits, hugepages, GPUs and other extended resources, ephemeral storage, uneven node sizes, and fragmentation of remaining resources. This result does not exactly reproduce kube-scheduler behavior.</p>
+        </article>
+      </section>
+
+      <section class="tool-faq" aria-labelledby="faq-heading">
+        <span class="section-label">FAQ</span>
+        <h2 id="faq-heading">Common questions</h2>
+        <details open>
+          <summary>How are requests and limits used to determine fit?</summary>
+          <p>Kubernetes scheduling uses effective resource requests when deciding whether a Pod can fit on a node. When a request is configured, this calculator uses it for fit; when only a limit is configured, it uses that limit as the effective request. Configured limits are otherwise displayed to show the workload's planning and overcommit profile, but they do not add a separate fit constraint.</p>
+        </details>
+        <details>
+          <summary>What does Planning Reserve represent?</summary>
+          <p>Planning Reserve provides headroom for the OS, kube-system workloads, the container runtime, DaemonSets, and operational overhead. The default value of 15% is an InfraOpsX Calculator capacity-planning default, not a Kubernetes or kubelet default systemReserved value. This estimate does not represent kubelet systemReserved, kubeReserved, or the actual Node Allocatable value.</p>
+        </details>
+        <details>
+          <summary>Does this exactly match kube-scheduler?</summary>
+          <p>No. Node allocatable values, placement rules, topology, extended resources, storage, and the shape of remaining capacity can change actual scheduling decisions.</p>
+        </details>
+      </section>
+
+      <section class="related-tools">
+        <div>
+          <span class="section-label">RELATED TOOLS</span>
+          <h2>Pair workload planning with storage capacity planning.</h2>
+        </div>
+        <a class="button secondary" href="/tools/">View all tools</a>
+      </section>
+
+      <section class="tool-cta">
+        <div class="cta-box">
+          <div>
+            <span class="section-label">INFRAOPSX</span>
+            <h2>Need help with Kubernetes capacity planning?</h2>
+            <p>Contact InfraOpsX for practical infrastructure guidance.</p>
+          </div>
+          <a class="button primary" href="/contact/">Contact InfraOpsX</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <Footer locale="en" />
+</BaseLayout>

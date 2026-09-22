@@ -1653,6 +1653,194 @@ html[lang="zh-CN"] body {
 }
 
 
+/* ===== Kubernetes Resource Calculator ===== */
+
+.resource-form-section + .resource-form-section {
+  margin-top: 30px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+
+.resource-section-title {
+  margin-bottom: 19px;
+}
+
+.resource-section-title h3 {
+  margin: 9px 0 0;
+  font-size: 23px;
+  letter-spacing: -.025em;
+}
+
+.resource-fields {
+  display: grid;
+  gap: 15px;
+}
+
+.resource-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  gap: 10px;
+  align-items: center;
+}
+
+.resource-input-row > span {
+  display: flex;
+  align-items: center;
+  min-height: 43px;
+  padding: 9px 11px;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 8px;
+  background: rgba(255,255,255,.045);
+  color: #c7d4e0;
+  font-size: 13px;
+}
+
+.resource-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #c7d4e0;
+  font-size: 13px;
+}
+
+.resource-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.resource-toggle input {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--cyan);
+}
+
+.resource-field-disabled .resource-input-row {
+  opacity: .48;
+}
+
+.resource-field-disabled .resource-toggle {
+  color: #8fa0b1;
+}
+
+.resource-help {
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.resource-result-group + .resource-result-group {
+  margin-top: 27px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.resource-group-label {
+  display: block;
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+}
+
+.resource-output .result-list {
+  margin-top: 8px;
+}
+
+.resource-result-note {
+  margin: 15px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.resource-output [data-result-secondary][hidden] {
+  display: none;
+}
+
+.resource-yaml-block {
+  padding: 26px;
+  border-top: 1px solid var(--line);
+}
+
+.resource-yaml-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.resource-yaml-heading h3 {
+  margin: 9px 0 0;
+  font-size: 21px;
+  letter-spacing: -.02em;
+}
+
+.resource-copy-button {
+  flex-shrink: 0;
+  padding: 9px 13px;
+  font-size: 12px;
+}
+
+.resource-copy-button:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.resource-yaml {
+  overflow-x: auto;
+  margin: 18px 0 0;
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #050d17;
+}
+
+.resource-yaml code {
+  color: #bcd0df;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.resource-copy-status {
+  min-height: 18px;
+  margin: 8px 0 0;
+  color: var(--cyan);
+  font-size: 12px;
+}
+
+.tool-info-card ul {
+  margin: 22px 0 0;
+  padding-left: 20px;
+  color: #c7d4e0;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+@media (max-width: 520px) {
+  .resource-input-row {
+    grid-template-columns: 1fr;
+  }
+
+  .resource-yaml-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .resource-copy-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+
 /* ===== Contact page ===== */
 
 .contact-hero {
