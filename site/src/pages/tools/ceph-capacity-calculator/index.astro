@@ -7,7 +7,7 @@ import CephCapacityCalculator from '../../../components/tools/CephCapacityCalcul
 
 <BaseLayout
   title="Ceph Capacity Calculator | InfraOpsX"
-  description="Estimate Ceph Raw Capacity, Usable Capacity, Data Efficiency and reserve headroom for Replicated and Erasure Coding layouts."
+  description="Estimate Ceph raw and usable capacity, data efficiency, redundancy overhead, and reserve headroom for replicated and erasure-coded layouts."
   lang="en"
   canonicalPath="/tools/ceph-capacity-calculator/"
   enPath="/tools/ceph-capacity-calculator/"
@@ -28,13 +28,13 @@ import CephCapacityCalculator from '../../../components/tools/CephCapacityCalcul
       <header class="tool-detail-header">
         <span class="section-label">CEPH · CAPACITY PLANNING</span>
         <h1>Ceph Capacity Calculator</h1>
-        <p>Estimate Raw Capacity, Usable Capacity and practical reserve headroom for a Ceph cluster.</p>
+        <p>Estimate raw capacity, theoretical usable capacity, and reserve headroom for a Ceph cluster.</p>
       </header>
 
       <section class="tool-section" aria-labelledby="calculator-heading">
         <div class="tool-section-heading">
           <span class="section-label">CALCULATOR</span>
-          <h2 id="calculator-heading">Plan the capacity before deployment.</h2>
+          <h2 id="calculator-heading">Plan Ceph capacity before deployment.</h2>
         </div>
         <CephCapacityCalculator locale="en" />
       </section>
@@ -43,13 +43,13 @@ import CephCapacityCalculator from '../../../components/tools/CephCapacityCalcul
         <article class="tool-info-card">
           <span class="section-label">HOW IT WORKS</span>
           <h2>Use the layout that matches your data protection model.</h2>
-          <p>Replicated layouts divide Raw Capacity by Replication Size. Erasure Coding uses the data shard ratio <code>k / (k + m)</code>. Recommended Usable applies the Reserve percentage after the theoretical capacity is calculated.</p>
+          <p>For replicated storage, theoretical usable capacity is the raw capacity divided by the replication size. For erasure-coded storage, usable capacity is based on the data-to-total-shard ratio <code>k / (k + m)</code>. Recommended usable capacity is calculated after applying the configured reserve percentage.</p>
         </article>
 
         <article class="tool-info-card">
           <span class="section-label">IMPORTANT CONSIDERATIONS</span>
           <h2>Capacity planning is an estimate.</h2>
-          <p>Actual available space can also be affected by BlueStore, metadata, different OSD capacities, CRUSH / failure domain choices, recovery / backfill headroom and overall cluster utilization. This result is not the same as actual Ceph <code>df</code> output.</p>
+          <p>Actual available space can also be affected by BlueStore overhead, metadata, uneven OSD sizes, CRUSH rules and failure domains, recovery and backfill headroom, and current cluster utilization. This estimate is not the same as the capacity reported by Ceph <code>df</code>.</p>
         </article>
       </section>
 
@@ -58,11 +58,11 @@ import CephCapacityCalculator from '../../../components/tools/CephCapacityCalcul
         <h2 id="faq-heading">Common questions</h2>
         <details open>
           <summary>What is the difference between TB and TiB?</summary>
-          <p>TB uses decimal units: 1 TB = 10<sup>12</sup> bytes. TiB uses binary units: 1 TiB = 2<sup>40</sup> bytes. The calculator keeps your selected unit as the main display and shows the other unit as a reference.</p>
+          <p>TB uses decimal units: 1 TB = 10<sup>12</sup> bytes. TiB uses binary units: 1 TiB = 2<sup>40</sup> bytes. The calculator keeps your selected unit as the primary display and shows the corresponding decimal or binary unit as a reference.</p>
         </details>
         <details>
-          <summary>Does Recommended Usable equal Ceph's available capacity?</summary>
-          <p>No. It is a planning estimate that applies your Reserve percentage to theoretical usable capacity. BlueStore, metadata, topology, recovery behavior and utilization can make the actual Ceph result different.</p>
+          <summary>Does the recommended usable capacity equal the available capacity reported by Ceph?</summary>
+          <p>No. It is a planning estimate that applies your reserve percentage to theoretical usable capacity. BlueStore, metadata, topology, recovery behavior and utilization can make the actual Ceph result different.</p>
         </details>
       </section>
 

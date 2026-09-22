@@ -37,7 +37,7 @@ const initialSecondaryUnit = secondaryUnit(initialUnit);
 
 const initialSummary = isZh
   ? `这个集群提供 ${capacityText(initialRawBytes, initialUnit)} 的 Raw Capacity。采用 Replication Size ${defaults.replication} 时，Theoretical Usable Capacity 为 ${capacityText(initialTheoreticalBytes, initialUnit)}。保留 ${defaults.reserve}% Reserve 后，Recommended Usable 约为 ${capacityText(initialRecommendedBytes, initialUnit)}。`
-  : `This cluster provides ${capacityText(initialRawBytes, initialUnit)} of Raw Capacity. With Replication Size ${defaults.replication}, the theoretical Usable Capacity is ${capacityText(initialTheoreticalBytes, initialUnit)}. Keeping ${defaults.reserve}% Reserve leaves approximately ${capacityText(initialRecommendedBytes, initialUnit)} as Recommended Usable Capacity.`;
+  : `This configuration provides ${capacityText(initialRawBytes, initialUnit)} of raw capacity. With a replication size of ${defaults.replication}, the theoretical usable capacity is ${capacityText(initialTheoreticalBytes, initialUnit)}. Reserving ${defaults.reserve}% leaves approximately ${capacityText(initialRecommendedBytes, initialUnit)} of recommended usable capacity.`;
 ---
 
 <section
@@ -84,8 +84,8 @@ const initialSummary = isZh
           <select data-input="unit">
             <option value="GB">GB — {isZh ? '十进制' : 'Decimal'}</option>
             <option value="GiB">GiB — {isZh ? '二进制' : 'Binary'}</option>
-            <option value="TB" selected={defaults.unit === 'TB'}>TB — {isZh ? '十进制，硬盘厂商常用' : 'Decimal, disk vendor'}</option>
-            <option value="TiB">TiB — {isZh ? '二进制，Linux/Ceph 常用' : 'Binary, Linux/Ceph'}</option>
+            <option value="TB" selected={defaults.unit === 'TB'}>TB — {isZh ? '十进制，硬盘厂商常用' : 'Decimal, commonly used by disk vendors'}</option>
+            <option value="TiB">TiB — {isZh ? '二进制，Linux/Ceph 常用' : 'Binary, commonly used by Linux/Ceph'}</option>
           </select>
         </label>
 
@@ -125,7 +125,7 @@ const initialSummary = isZh
 
     <div class="calculator-output" aria-live="polite">
       <div class="summary-block">
-        <span class="section-label">{isZh ? '分析摘要' : 'ANALYSIS SUMMARY'}</span>
+        <span class="section-label">{isZh ? '容量分析' : 'CAPACITY ANALYSIS'}</span>
         <h2>{isZh ? '分析摘要' : 'Analysis Summary'}</h2>
         <p data-summary>{initialSummary}</p>
       </div>
@@ -133,7 +133,7 @@ const initialSummary = isZh
       <div class="results-block">
         <div class="results-heading">
           <div>
-            <span class="section-label">{isZh ? '计算结果' : 'RESULTS'}</span>
+            <span class="section-label">{isZh ? '容量结果' : 'CAPACITY RESULTS'}</span>
             <h2>{isZh ? '计算结果' : 'Results'}</h2>
           </div>
           <span class="result-mode" data-result-mode>Replicated</span>
@@ -255,38 +255,38 @@ const initialSummary = isZh
 
       if (!Number.isInteger(values.osdCount) || values.osdCount <= 0) {
         input('osdCount').setAttribute('aria-invalid', 'true');
-        return isZh ? 'OSD 数量必须是大于 0 的整数。' : 'OSD Count must be an integer greater than 0.';
+        return isZh ? 'OSD 数量必须是大于 0 的整数。' : 'OSD Count must be a positive integer.';
       }
 
       if (!Number.isFinite(values.capacity) || values.capacity <= 0) {
         input('capacity').setAttribute('aria-invalid', 'true');
-        return isZh ? 'Capacity per OSD 必须大于 0。' : 'Capacity per OSD must be greater than 0.';
+        return isZh ? 'Capacity per OSD 必须大于 0。' : 'Capacity per OSD must be positive.';
       }
 
       if (mode === 'replicated') {
         if (!Number.isInteger(values.replication) || values.replication < 1) {
           input('replication').setAttribute('aria-invalid', 'true');
-          return isZh ? 'Replication Size 必须是至少为 1 的整数。' : 'Replication Size must be an integer of at least 1.';
+          return isZh ? 'Replication Size 必须是至少为 1 的整数。' : 'Replication Size must be a positive integer.';
         }
 
         if (values.replication > values.osdCount) {
           input('replication').setAttribute('aria-invalid', 'true');
-          return isZh ? 'Replication Size 不能大于 OSD 数量。' : 'Replication Size cannot exceed OSD Count.';
+          return isZh ? 'Replication Size 不能大于 OSD 数量。' : 'Replication Size cannot exceed the OSD Count.';
         }
       } else {
         if (!Number.isInteger(values.k) || values.k <= 0) {
           input('k').setAttribute('aria-invalid', 'true');
-          return isZh ? 'k 必须是大于 0 的整数。' : 'k must be an integer greater than 0.';
+          return isZh ? 'k 必须是大于 0 的整数。' : 'k must be a positive integer.';
         }
 
         if (!Number.isInteger(values.m) || values.m <= 0) {
           input('m').setAttribute('aria-invalid', 'true');
-          return isZh ? 'm 必须是大于 0 的整数。' : 'm must be an integer greater than 0.';
+          return isZh ? 'm 必须是大于 0 的整数。' : 'm must be a positive integer.';
         }
 
         if (values.k + values.m > values.osdCount) {
           input('m').setAttribute('aria-invalid', 'true');
-          return isZh ? 'k + m 不能大于 OSD 数量。' : 'k + m cannot exceed OSD Count.';
+          return isZh ? 'k + m 不能大于 OSD 数量。' : 'k + m cannot exceed the OSD Count.';
         }
       }
 
@@ -347,17 +347,22 @@ const initialSummary = isZh
 
       resultNodes.efficiency.textContent = `${formatNumber(efficiency * 100)}%`;
 
-      const modeSummary = mode === 'replicated'
-        ? `Replication Size ${formatNumber(values.replication, 0)}`
-        : `EC ${formatNumber(values.k, 0)}+${formatNumber(values.m, 0)}`;
       const summary = root.querySelector('[data-summary]');
       summary.textContent = isZh
-        ? `这个集群提供 ${capacityText(rawBytes, values.unit)} 的 Raw Capacity。采用 ${modeSummary} 时，Theoretical Usable Capacity 为 ${capacityText(theoreticalBytes, values.unit)}。保留 ${formatNumber(values.reserve)}% Reserve 后，Recommended Usable 约为 ${capacityText(recommendedBytes, values.unit)}。`
-        : `This cluster provides ${capacityText(rawBytes, values.unit)} of Raw Capacity. With ${modeSummary}, the theoretical Usable Capacity is ${capacityText(theoreticalBytes, values.unit)}. Keeping ${formatNumber(values.reserve)}% Reserve leaves approximately ${capacityText(recommendedBytes, values.unit)} as Recommended Usable Capacity.`;
+        ? `这个集群提供 ${capacityText(rawBytes, values.unit)} 的 Raw Capacity。采用 ${mode === 'replicated' ? `Replication Size ${formatNumber(values.replication, 0)}` : `EC ${formatNumber(values.k, 0)}+${formatNumber(values.m, 0)}`} 时，Theoretical Usable Capacity 为 ${capacityText(theoreticalBytes, values.unit)}。保留 ${formatNumber(values.reserve)}% Reserve 后，Recommended Usable 约为 ${capacityText(recommendedBytes, values.unit)}。`
+        : `This configuration provides ${capacityText(rawBytes, values.unit)} of raw capacity. With ${mode === 'replicated' ? `a replication size of ${formatNumber(values.replication, 0)}` : `an EC ${formatNumber(values.k, 0)}+${formatNumber(values.m, 0)} profile`}, the theoretical usable capacity is ${capacityText(theoreticalBytes, values.unit)}. Reserving ${formatNumber(values.reserve)}% leaves approximately ${capacityText(recommendedBytes, values.unit)} of recommended usable capacity.`;
     };
 
     modeInputs.forEach((modeInput) => modeInput.addEventListener('change', () => {
       updateMode();
+
+      const message = validate(selectedMode(), readValues());
+
+      if (message) {
+        setError(message);
+        return;
+      }
+
       setError('');
       updateResults();
     }));
