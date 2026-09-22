@@ -41,13 +41,13 @@ import KubernetesResourceCalculator from '../../../../components/tools/Kubernete
 
       <section class="tool-info-grid">
         <article class="tool-info-card">
-          <span class="section-label">HOW IT WORKS</span>
+          <span class="section-label">工作原理</span>
           <h2>将 requests 与可调度容量进行比较。</h2>
           <p>Kubernetes 调度通常依据 effective resource requests。这个计算器使用已配置的 requests；如果没有配置 request 但配置了 limit，本次计算会将该 limit 作为 effective request。计算器会将 CPU 统一为 mCPU、Memory 统一为 bytes，在每个节点上应用规划预留，再将 effective workload requests 与计算后的可调度容量进行比较。15% 是 InfraOpsX Calculator 的容量规划默认值，不是 Kubernetes 或 kubelet 的默认 systemReserved。该值仅用于容量规划，不代表 kubelet 的 systemReserved、kubeReserved 或实际 Node Allocatable。已配置的 limits 也会作为规划和 overcommit 信息展示，但不会额外增加容量约束。</p>
         </article>
 
         <article class="tool-info-card">
-          <span class="section-label">IMPORTANT CONSIDERATIONS</span>
+          <span class="section-label">重要说明</span>
           <h2>这是容量规划估算。</h2>
           <p>实际调度还可能受到 node allocatable、kube-system 工作负载、DaemonSets、taints 和 tolerations、node affinity / anti-affinity、topology spread constraints、Pod max limits、hugepages、GPU 或其他 extended resources、ephemeral storage、不同节点规格以及剩余资源碎片等因素影响。结果不等同于 kube-scheduler 的精确行为。</p>
         </article>
@@ -72,7 +72,7 @@ import KubernetesResourceCalculator from '../../../../components/tools/Kubernete
 
       <section class="related-tools">
         <div>
-          <span class="section-label">RELATED TOOLS</span>
+          <span class="section-label">相关工具</span>
           <h2>结合存储容量规划一起评估工作负载。</h2>
         </div>
         <a class="button secondary" href="/zh/tools/">查看全部工具</a>

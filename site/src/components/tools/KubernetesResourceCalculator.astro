@@ -276,8 +276,8 @@ const initialSummary = isZh
 
         <p class="resource-help">
           {isZh
-            ? '如果资源配置在 Container 级别，请填写一个 Pod 内所有 Container 的 requests / limits 合计值。'
-            : 'For container-level resource specs, enter the total requests and limits across all containers in one Pod.'}
+            ? '如果资源配置在 Container 级别，请先分别确定各 Container 的 effective requests，再将其合计用于容量规划；已配置的 limits 仍单独用于 YAML 配置参考。'
+            : 'For container-level resource specs, resolve the effective request for each container first, then use the summed effective requests for capacity planning. Configured limits are kept separately for the YAML reference.'}
         </p>
 
         <p class="resource-help">
@@ -516,8 +516,8 @@ const initialSummary = isZh
         <pre class="resource-yaml"><code data-yaml>{initialYaml}</code></pre>
         <p class="resource-result-note">
           {isZh
-            ? 'YAML 仅反映已配置的值；本次计算使用的 effective requests 显示在上方。该 YAML 仅作为单 Container 配置参考。对于多 Container Pod，请根据实际情况将计算出的 Pod 总资源分配到各 Container。'
-            : 'This YAML reflects configured values only; the effective requests used for this calculation are shown above. This YAML is a single-container reference. For multi-container Pods, distribute the calculated Pod totals across containers as appropriate.'}
+            ? 'YAML 仅反映已配置的值；本次计算使用的 effective requests 显示在上方。对于多 Container Pod，请先分别确定各 Container 的 effective requests，再将其合计用于容量规划。生成的 YAML 仍仅作为单 Container 配置参考。'
+            : 'This YAML reflects configured values only; the effective requests used for this calculation are shown above. For multi-container Pods, resolve the effective request for each container first, then use the summed effective requests for capacity planning. The generated YAML remains a single-container reference.'}
         </p>
         <p class="resource-copy-status" data-copy-status aria-live="polite"></p>
       </div>
@@ -709,9 +709,19 @@ const initialSummary = isZh
         return isZh ? 'CPU Request 必须大于等于 0。' : 'CPU Request must be zero or greater.';
       }
 
+      if (values.cpuRequest.configured && !Number.isInteger(values.cpuRequest.value)) {
+        markInvalid('cpuRequest');
+        return isZh ? 'CPU 资源精度不能小于 1 mCPU。' : 'CPU resources cannot use precision finer than 1 mCPU.';
+      }
+
       if (values.cpuLimit.configured && (!Number.isFinite(values.cpuLimit.value) || values.cpuLimit.value < 0)) {
         markInvalid('cpuLimit');
         return isZh ? 'CPU Limit 必须大于等于 0。' : 'CPU Limit must be zero or greater.';
+      }
+
+      if (values.cpuLimit.configured && !Number.isInteger(values.cpuLimit.value)) {
+        markInvalid('cpuLimit');
+        return isZh ? 'CPU 资源精度不能小于 1 mCPU。' : 'CPU resources cannot use precision finer than 1 mCPU.';
       }
 
       if (values.cpuRequest.configured && values.cpuLimit.configured && values.cpuRequest.value > values.cpuLimit.value) {
@@ -920,16 +930,11 @@ const initialSummary = isZh
       field.classList.toggle('resource-field-disabled', !isEnabled);
     };
 
-    const syncCopyAvailability = () => {
-      copyButton.disabled = !resourceToggles.some((toggle) => toggle.checked);
-    };
-
     resourceToggles.forEach((toggle) => {
       const name = toggle.dataset.resourceEnabled;
       syncResourceField(name);
       toggle.addEventListener('change', () => {
         syncResourceField(name);
-        syncCopyAvailability();
         setError('');
       });
     });
@@ -965,6 +970,5 @@ const initialSummary = isZh
       }
     });
 
-    syncCopyAvailability();
   })();
 </script>
