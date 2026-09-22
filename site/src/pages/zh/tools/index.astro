@@ -1,0 +1,61 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+---
+
+<BaseLayout
+  title="基础设施工具 | InfraOpsX"
+  description="面向 Ceph、Kubernetes 和基础设施容量规划的实用浏览器工具。"
+  lang="zh-CN"
+  canonicalPath="/zh/tools/"
+  enPath="/tools/"
+  zhPath="/zh/tools/"
+>
+  <Header locale="zh" switchHref="/tools/" />
+
+  <main>
+    <section class="tools-hero">
+      <div class="container">
+        <div class="tools-breadcrumb">
+          <a href="/zh/">首页</a>
+          <span>/</span>
+          <span>工具</span>
+        </div>
+
+        <span class="section-label">INFRAOPSX 工具</span>
+        <h1>面向真实基础设施的实用工具。</h1>
+        <p>用于存储和 Kubernetes 规划的小型实用计算器。</p>
+      </div>
+    </section>
+
+    <section class="tools-section">
+      <div class="container">
+        <div class="tools-grid">
+          <a class="tool-card tool-card-active" href="/zh/tools/ceph-capacity-calculator/">
+            <span class="tool-card-number">01</span>
+            <h2>Ceph Capacity Calculator</h2>
+            <p>估算 Replicated 和 Erasure Coding 布局下的 Raw Capacity、Usable Capacity 以及 Reserve headroom。</p>
+            <span class="tool-card-link">打开计算器 →</span>
+          </a>
+
+          <article class="tool-card tool-card-muted">
+            <span class="tool-card-number">02</span>
+            <span class="tool-status">COMING SOON</span>
+            <h2>Kubernetes Resource Calculator</h2>
+            <p>为 Kubernetes 工作负载规划 CPU 与内存 requests 和 limits。</p>
+          </article>
+
+          <article class="tool-card tool-card-muted">
+            <span class="tool-card-number">03</span>
+            <span class="tool-status">COMING SOON</span>
+            <h2>Kubernetes Quantity Converter</h2>
+            <p>将 Kubernetes resource quantity 转换为更易阅读的数值和单位。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer locale="zh" />
+</BaseLayout>

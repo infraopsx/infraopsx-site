@@ -1,0 +1,91 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+import CephCapacityCalculator from '../../../components/tools/CephCapacityCalculator.astro';
+---
+
+<BaseLayout
+  title="Ceph Capacity Calculator | InfraOpsX"
+  description="Estimate Ceph Raw Capacity, Usable Capacity, Data Efficiency and reserve headroom for Replicated and Erasure Coding layouts."
+  lang="en"
+  canonicalPath="/tools/ceph-capacity-calculator/"
+  enPath="/tools/ceph-capacity-calculator/"
+  zhPath="/zh/tools/ceph-capacity-calculator/"
+>
+  <Header locale="en" switchHref="/zh/tools/ceph-capacity-calculator/" />
+
+  <main class="tool-detail-shell">
+    <div class="container tool-detail-container">
+      <div class="tools-breadcrumb">
+        <a href="/">Home</a>
+        <span>/</span>
+        <a href="/tools/">Tools</a>
+        <span>/</span>
+        <span>Ceph Capacity Calculator</span>
+      </div>
+
+      <header class="tool-detail-header">
+        <span class="section-label">CEPH · CAPACITY PLANNING</span>
+        <h1>Ceph Capacity Calculator</h1>
+        <p>Estimate Raw Capacity, Usable Capacity and practical reserve headroom for a Ceph cluster.</p>
+      </header>
+
+      <section class="tool-section" aria-labelledby="calculator-heading">
+        <div class="tool-section-heading">
+          <span class="section-label">CALCULATOR</span>
+          <h2 id="calculator-heading">Plan the capacity before deployment.</h2>
+        </div>
+        <CephCapacityCalculator locale="en" />
+      </section>
+
+      <section class="tool-info-grid">
+        <article class="tool-info-card">
+          <span class="section-label">HOW IT WORKS</span>
+          <h2>Use the layout that matches your data protection model.</h2>
+          <p>Replicated layouts divide Raw Capacity by Replication Size. Erasure Coding uses the data shard ratio <code>k / (k + m)</code>. Recommended Usable applies the Reserve percentage after the theoretical capacity is calculated.</p>
+        </article>
+
+        <article class="tool-info-card">
+          <span class="section-label">IMPORTANT CONSIDERATIONS</span>
+          <h2>Capacity planning is an estimate.</h2>
+          <p>Actual available space can also be affected by BlueStore, metadata, different OSD capacities, CRUSH / failure domain choices, recovery / backfill headroom and overall cluster utilization. This result is not the same as actual Ceph <code>df</code> output.</p>
+        </article>
+      </section>
+
+      <section class="tool-faq" aria-labelledby="faq-heading">
+        <span class="section-label">FAQ</span>
+        <h2 id="faq-heading">Common questions</h2>
+        <details open>
+          <summary>What is the difference between TB and TiB?</summary>
+          <p>TB uses decimal units: 1 TB = 10<sup>12</sup> bytes. TiB uses binary units: 1 TiB = 2<sup>40</sup> bytes. The calculator keeps your selected unit as the main display and shows the other unit as a reference.</p>
+        </details>
+        <details>
+          <summary>Does Recommended Usable equal Ceph's available capacity?</summary>
+          <p>No. It is a planning estimate that applies your Reserve percentage to theoretical usable capacity. BlueStore, metadata, topology, recovery behavior and utilization can make the actual Ceph result different.</p>
+        </details>
+      </section>
+
+      <section class="related-tools">
+        <div>
+          <span class="section-label">RELATED TOOLS</span>
+          <h2>More infrastructure tools are on the way.</h2>
+        </div>
+        <a class="button secondary" href="/tools/">View all tools</a>
+      </section>
+
+      <section class="tool-cta">
+        <div class="cta-box">
+          <div>
+            <span class="section-label">INFRAOPSX</span>
+            <h2>Need help with Ceph or Kubernetes storage?</h2>
+            <p>Contact InfraOpsX for practical infrastructure guidance.</p>
+          </div>
+          <a class="button primary" href="/contact/">Contact InfraOpsX</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <Footer locale="en" />
+</BaseLayout>
