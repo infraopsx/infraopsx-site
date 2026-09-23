@@ -55,7 +55,7 @@ export const toolsCatalog = [
     },
     description: {
       en: 'Estimate raw capacity, theoretical usable capacity, and reserve headroom for replicated and erasure-coded Ceph layouts.',
-      zh: '估算 Ceph Replicated 和 Erasure Coding 布局下的 Raw Capacity、Usable Capacity 以及 Reserve headroom。'
+      zh: '估算 Ceph 副本与 Erasure Coding 布局下的 Raw Capacity、Usable Capacity 和预留空间。'
     },
     path: {
       en: '/tools/ceph-capacity-calculator/',
@@ -102,7 +102,7 @@ export const toolsCatalog = [
     },
     description: {
       en: 'Plan CPU and memory requests, limits, node capacity, and Pod density for a homogeneous Kubernetes node pool.',
-      zh: '为 Kubernetes 工作负载规划 CPU、Memory requests、limits、节点容量和 Pod 密度等资源。'
+      zh: '估算 Kubernetes 工作负载的 CPU / Memory requests、limits、节点容量和 Pod 密度。'
     },
     path: {
       en: '/tools/kubernetes-resource-calculator/',
@@ -149,7 +149,7 @@ export const toolsCatalog = [
     },
     description: {
       en: 'Convert Kubernetes resource quantities into readable values and units.',
-      zh: '将 Kubernetes resource quantity 转换为更易阅读的数值和单位。'
+      zh: '在 mCPU、CPU cores、MiB、GiB 等常用 Kubernetes 资源单位之间快速换算。'
     },
     path: {
       en: null,

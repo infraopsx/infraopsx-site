@@ -49,7 +49,7 @@ const actionLabels: Record<ToolCategory, string> = isZh
 const labels = isZh
   ? {
       search: '搜索基础设施工具',
-      placeholder: '搜索 Kubernetes、Ceph、Docker、YAML...',
+      placeholder: '搜索 Kubernetes、Ceph、资源、容量...',
       filter: '按分类筛选工具',
       all: '全部',
       featured: '推荐工具',
@@ -60,7 +60,7 @@ const labels = isZh
     }
   : {
       search: 'Search infrastructure tools',
-      placeholder: 'Search Kubernetes, Ceph, Docker, YAML...',
+      placeholder: 'Search Kubernetes, Ceph, resources, capacity...',
       filter: 'Filter tools by category',
       all: 'All',
       featured: 'Featured tools',
@@ -184,7 +184,7 @@ const initialSummary = isZh
       >
         <div class="tools-explorer-section-heading">
           <span class="section-label">
-            {isZh ? '推荐工具' : 'FEATURED TOOLS'}
+            {isZh ? '重点推荐' : 'FEATURED'}
           </span>
           <h2 id={featuredHeadingId}>{labels.featured}</h2>
         </div>
@@ -220,7 +220,7 @@ const initialSummary = isZh
     >
       <div class="tools-explorer-section-heading">
         <span class="section-label">
-          {isZh ? '浏览全部工具' : 'BROWSE ALL TOOLS'}
+          {isZh ? '工具目录' : 'TOOL DIRECTORY'}
         </span>
         <h2 id={browseHeadingId}>{labels.browse}</h2>
       </div>
