@@ -12,7 +12,7 @@
 .tools-explorer-search-label {
   display: block;
   margin-bottom: 9px;
-  color: #b7c8d9;
+  color: var(--text-soft);
   font-size: 13px;
   font-weight: 650;
 }
@@ -39,7 +39,7 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   outline: 0;
-  background: rgba(255,255,255,.025);
+  background: var(--input-bg-soft);
   color: var(--text);
   font: inherit;
   font-size: 15px;
@@ -50,13 +50,13 @@
 }
 
 .tools-explorer-search-input::placeholder {
-  color: #71869b;
+  color: var(--input-placeholder);
 }
 
 .tools-explorer-search-input:focus {
-  border-color: rgba(50,215,244,.52);
-  background: rgba(255,255,255,.035);
-  box-shadow: 0 0 0 3px rgba(50,215,244,.07);
+  border-color: var(--input-focus-border);
+  background: var(--input-focus-bg);
+  box-shadow: 0 0 0 3px var(--input-focus-ring);
 }
 
 .tools-explorer-search-input::-webkit-search-cancel-button {
@@ -78,8 +78,8 @@
   padding: 7px 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255,255,255,.018);
-  color: #aebfd0;
+  background: var(--panel-faint);
+  color: var(--text-subtle);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
@@ -90,13 +90,13 @@
 }
 
 .tools-explorer-filter-button:hover {
-  border-color: rgba(50,215,244,.32);
-  color: white;
+  border-color: rgba(var(--cyan-rgb),.32);
+  color: var(--strong-text);
 }
 
 .tools-explorer-filter-button.is-active {
-  border-color: rgba(50,215,244,.42);
-  background: rgba(50,215,244,.08);
+  border-color: rgba(var(--cyan-rgb),.42);
+  background: var(--accent-soft-bg);
   color: var(--cyan);
 }
 
@@ -107,17 +107,17 @@
   height: 21px;
   padding: 0 6px;
   place-items: center;
-  border: 1px solid rgba(255,255,255,.07);
+  border: 1px solid var(--counter-border);
   border-radius: 999px;
-  background: rgba(255,255,255,.035);
-  color: #8195a9;
+  background: var(--counter-bg);
+  color: var(--counter-text);
   font-size: 11px;
   line-height: 1;
 }
 
 .tools-explorer-filter-button.is-active .tools-explorer-filter-count {
-  border-color: rgba(50,215,244,.16);
-  color: #bdeff7;
+  border-color: rgba(var(--cyan-rgb),.16);
+  color: var(--accent-text);
 }
 
 .tools-explorer-results-summary {
@@ -152,19 +152,17 @@
   display: block;
   min-height: 235px;
   padding: 30px;
-  border: 1px solid rgba(50,215,244,.2);
+  border: 1px solid rgba(var(--cyan-rgb),.2);
   border-radius: 16px;
-  background:
-    linear-gradient(135deg, rgba(50,215,244,.075), rgba(255,255,255,.015));
+  background: var(--featured-card-bg);
   transition:
     border-color .2s ease,
     background .2s ease;
 }
 
 .tools-explorer-featured-card:hover {
-  border-color: rgba(50,215,244,.48);
-  background:
-    linear-gradient(135deg, rgba(50,215,244,.11), rgba(255,255,255,.02));
+  border-color: rgba(var(--cyan-rgb),.48);
+  background: var(--featured-card-hover-bg);
 }
 
 .tools-explorer-card-category {
@@ -237,15 +235,15 @@
   padding: 19px 22px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: rgba(255,255,255,.018);
+  background: var(--panel-faint);
   transition:
     border-color .2s ease,
     background .2s ease;
 }
 
 .tools-explorer-browse-card[href]:hover {
-  border-color: rgba(50,215,244,.35);
-  background: rgba(50,215,244,.04);
+  border-color: rgba(var(--cyan-rgb),.35);
+  background: rgba(var(--cyan-rgb),.04);
 }
 
 .tools-explorer-browse-card h4 {
@@ -266,11 +264,11 @@
 }
 
 .tools-explorer-browse-card-planned {
-  background: rgba(255,255,255,.012);
+  background: var(--panel-minimal);
 }
 
 .tools-explorer-browse-card-planned h4 {
-  color: #c7d4e0;
+  color: var(--text-label);
 }
 
 .tools-explorer-card-status {
@@ -288,7 +286,7 @@
   border: 1px dashed var(--line);
   border-radius: 14px;
   text-align: center;
-  background: rgba(255,255,255,.015);
+  background: var(--empty-bg);
 }
 
 .tools-explorer-empty strong,
@@ -310,7 +308,7 @@
 .tools-explorer a:focus-visible,
 .tools-explorer button:focus-visible,
 .tools-explorer input:focus-visible {
-  outline: 3px solid rgba(50,215,244,.36);
+  outline: 3px solid var(--accent-outline);
   outline-offset: 3px;
 }
 

@@ -238,3 +238,15 @@ Pagefind remains the static search engine for site-wide search. Content pages ex
 ### Why
 
 This keeps search lightweight and build-time generated while preventing navigation, utility pages, unfinished tools, and listing-page chrome from becoming search results. A shared localized UI can filter the same static Pagefind data without introducing a backend or another runtime dependency.
+
+---
+
+## ADR-013: Browser-local appearance preference
+
+### Decision
+
+The shared site appearance control supports `system`, `light`, and `dark` preferences, with `system` as the default. Explicit choices are stored in browser local storage under `infraopsx-theme`; the resolved appearance and selected preference are exposed separately on the document root. Shared semantic CSS tokens control theme-dependent colors, while terminal and code panels may remain intentionally dark.
+
+### Why
+
+This provides a consistent, bilingual appearance control while preserving operating-system behavior and keeping the static site free of account storage, backend services, and theme dependencies.

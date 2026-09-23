@@ -44,6 +44,125 @@ const zhUrl = new URL(zhPath, site).toString();
     />
     {noindex && <meta name="robots" content="noindex,follow" />}
     <meta name="theme-color" content="#07111f" />
+    <script is:inline>
+      (() => {
+        const storageKey = 'infraopsx-theme';
+        const preferences = ['system', 'light', 'dark'];
+        const root = document.documentElement;
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const themeColor = document.querySelector('meta[name="theme-color"]');
+        let preference = 'system';
+
+        const readPreference = () => {
+          try {
+            const stored = window.localStorage.getItem(storageKey);
+            return preferences.includes(stored) ? stored : 'system';
+          } catch {
+            return 'system';
+          }
+        };
+
+        const syncChoices = () => {
+          document.querySelectorAll('[data-theme-choice]').forEach((choice) => {
+            choice.setAttribute(
+              'aria-pressed',
+              String(choice.dataset.themeChoice === preference)
+            );
+          });
+        };
+
+        const applyPreference = (nextPreference) => {
+          preference = preferences.includes(nextPreference)
+            ? nextPreference
+            : 'system';
+          const theme = preference === 'system'
+            ? (media.matches ? 'dark' : 'light')
+            : preference;
+
+          root.dataset.theme = theme;
+          root.dataset.themePreference = preference;
+          themeColor?.setAttribute(
+            'content',
+            theme === 'dark' ? '#07111f' : '#f6f8fb'
+          );
+          syncChoices();
+        };
+
+        applyPreference(readPreference());
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', syncChoices, { once: true });
+        }
+
+        const syncMenuState = (menu) => {
+          menu.querySelector('summary')?.setAttribute(
+            'aria-expanded',
+            String(menu.open)
+          );
+        };
+        const initializeMenus = () => {
+          document.querySelectorAll('details[data-theme-menu]').forEach((menu) => {
+            menu.addEventListener('toggle', () => syncMenuState(menu));
+            syncMenuState(menu);
+          });
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initializeMenus, { once: true });
+        } else {
+          initializeMenus();
+        }
+
+        const handleSystemChange = () => {
+          if (preference === 'system') applyPreference('system');
+        };
+        if (media.addEventListener) {
+          media.addEventListener('change', handleSystemChange);
+        } else {
+          media.addListener(handleSystemChange);
+        }
+
+        window.addEventListener('storage', (event) => {
+          if (event.key === storageKey || event.key === null) {
+            applyPreference(readPreference());
+          }
+        });
+
+        document.addEventListener('click', (event) => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+
+          document.querySelectorAll('details[data-theme-menu="desktop"][open]')
+            .forEach((menu) => {
+              if (!menu.contains(target)) menu.open = false;
+            });
+
+          const choice = target.closest('[data-theme-choice]');
+          if (!choice || !preferences.includes(choice.dataset.themeChoice)) return;
+
+          const nextPreference = choice.dataset.themeChoice;
+          try {
+            window.localStorage.setItem(storageKey, nextPreference);
+          } catch {
+            // Keep the in-page preference even when storage is unavailable.
+          }
+          applyPreference(nextPreference);
+
+          const desktopMenu = choice.closest('details[data-theme-menu="desktop"]');
+          if (desktopMenu) {
+            desktopMenu.open = false;
+            desktopMenu.querySelector('summary')?.focus();
+          }
+        });
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key !== 'Escape') return;
+          document.querySelectorAll('details[data-theme-menu][open]').forEach((menu) => {
+            const shouldRestoreFocus = menu.contains(document.activeElement);
+            menu.open = false;
+            if (shouldRestoreFocus) menu.querySelector('summary')?.focus();
+          });
+        });
+      })();
+    </script>
 
     <link rel="canonical" href={canonicalUrl} />
 
