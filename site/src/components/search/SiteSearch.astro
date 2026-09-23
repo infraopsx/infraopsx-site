@@ -152,7 +152,6 @@ const types: Array<{ value: SearchType; label: string }> = isZh
     <div
       class="site-search-results"
       data-search-results
-      role="list"
       hidden
     ></div>
 
@@ -328,7 +327,6 @@ const types: Array<{ value: SearchType; label: string }> = isZh
       const card = document.createElement('a');
       card.className = 'site-search-result';
       card.href = href;
-      card.setAttribute('role', 'listitem');
 
       const top = document.createElement('div');
       top.className = 'site-search-result-top';
@@ -363,7 +361,7 @@ const types: Array<{ value: SearchType; label: string }> = isZh
         excerpt.innerHTML = result.excerpt;
       } else {
         excerpt.textContent =
-          result.plain_excerpt || meta.description || '';
+          meta.description || result.plain_excerpt || '';
       }
 
       card.append(top, title, excerpt);
