@@ -1,0 +1,448 @@
+---
+import '../../styles/site-search.css';
+
+type Locale = 'en' | 'zh';
+
+type SearchType = 'Article' | 'Tool' | 'Case Study' | 'Portfolio';
+
+const { locale = 'en' } = Astro.props as { locale?: Locale };
+const isZh = locale === 'zh';
+const inputId = `site-search-input-${locale}`;
+
+const copy = isZh
+  ? {
+      eyebrow: '站内搜索',
+      title: '搜索 InfraOpsX',
+      intro: '搜索技术文章、基础设施工具、案例和作品集内容。',
+      inputLabel: '搜索 InfraOpsX 内容',
+      placeholder: '搜索 Kubernetes、Ceph、RBD、pg_wal...',
+      filterLabel: '按内容类型筛选',
+      all: '全部',
+      initial: '输入关键词，或选择一个内容类型开始浏览。',
+      searching: '正在搜索…',
+      unavailable:
+        '搜索索引暂不可用。完成生产构建后，Pagefind 搜索会正常工作。',
+      noResults: '没有找到匹配的内容。',
+      noResultsHint: '可以换一个关键词或内容类型再试。',
+      resultCount: (count: number) => `共 ${count} 条结果`,
+      capped: (visible: number, total: number) =>
+        `显示 ${visible} / ${total} 条结果`
+    }
+  : {
+      eyebrow: 'SITE SEARCH',
+      title: 'Search InfraOpsX',
+      intro: 'Search technical articles, infrastructure tools, case studies and portfolio work.',
+      inputLabel: 'Search InfraOpsX content',
+      placeholder: 'Search Kubernetes, Ceph, RBD, pg_wal...',
+      filterLabel: 'Filter by content type',
+      all: 'All',
+      initial: 'Enter a keyword, or choose a content type to browse.',
+      searching: 'Searching…',
+      unavailable:
+        'The search index is not available yet. Pagefind search works after a production build.',
+      noResults: 'No matching results.',
+      noResultsHint: 'Try another keyword or content type.',
+      resultCount: (count: number) =>
+        `${count} result${count === 1 ? '' : 's'}`,
+      capped: (visible: number, total: number) =>
+        `Showing ${visible} of ${total} results`
+    };
+
+const types: Array<{ value: SearchType; label: string }> = isZh
+  ? [
+      { value: 'Article', label: '技术文章' },
+      { value: 'Tool', label: '工具' },
+      { value: 'Case Study', label: '案例' },
+      { value: 'Portfolio', label: '作品集' }
+    ]
+  : [
+      { value: 'Article', label: 'Articles' },
+      { value: 'Tool', label: 'Tools' },
+      { value: 'Case Study', label: 'Case Studies' },
+      { value: 'Portfolio', label: 'Portfolio' }
+    ];
+---
+
+<section class="site-search" data-site-search data-locale={locale}>
+  <div class="container">
+    <div class="site-search-intro">
+      <span class="section-label">{copy.eyebrow}</span>
+      <h1>{copy.title}</h1>
+      <p>{copy.intro}</p>
+    </div>
+
+    <div class="site-search-panel">
+      <label class="site-search-label" for={inputId}>
+        {copy.inputLabel}
+      </label>
+
+      <div class="site-search-input-wrap">
+        <svg
+          class="site-search-input-icon"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            d="m21 21-4.35-4.35m2.35-5.15a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+
+        <input
+          id={inputId}
+          class="site-search-input"
+          data-search-input
+          type="search"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder={copy.placeholder}
+        />
+      </div>
+
+      <div
+        class="site-search-filters"
+        role="group"
+        aria-label={copy.filterLabel}
+      >
+        <button
+          class="site-search-filter is-active"
+          type="button"
+          data-type-filter="all"
+          aria-pressed="true"
+        >
+          <span>{copy.all}</span>
+          <span class="site-search-filter-count" data-type-count="all">–</span>
+        </button>
+
+        {types.map((type) => (
+          <button
+            class="site-search-filter"
+            type="button"
+            data-type-filter={type.value}
+            aria-pressed="false"
+          >
+            <span>{type.label}</span>
+            <span
+              class="site-search-filter-count"
+              data-type-count={type.value}
+            >–</span>
+          </button>
+        ))}
+      </div>
+
+      <p class="site-search-summary" data-search-summary aria-live="polite">
+      </p>
+      <p
+        class="site-search-unavailable"
+        data-search-unavailable
+        aria-live="polite"
+        hidden
+      >
+        {copy.unavailable}
+      </p>
+    </div>
+
+    <p class="site-search-guidance" data-search-guidance>
+      {copy.initial}
+    </p>
+
+    <div
+      class="site-search-results"
+      data-search-results
+      role="list"
+      hidden
+    ></div>
+
+    <div class="site-search-empty" data-search-empty hidden>
+      <strong>{copy.noResults}</strong>
+      <span>{copy.noResultsHint}</span>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector('[data-site-search]');
+    if (!root) return;
+
+    const locale = root.dataset.locale === 'zh' ? 'zh' : 'en';
+    const isZh = locale === 'zh';
+    const input = root.querySelector('[data-search-input]');
+    const summary = root.querySelector('[data-search-summary]');
+    const guidance = root.querySelector('[data-search-guidance]');
+    const unavailable = root.querySelector('[data-search-unavailable]');
+    const results = root.querySelector('[data-search-results]');
+    const empty = root.querySelector('[data-search-empty]');
+    const filters = [...root.querySelectorAll('[data-type-filter]')];
+    const countNodes = [
+      ...root.querySelectorAll('[data-type-count]')
+    ];
+
+    if (!input || !summary || !guidance || !unavailable || !results || !empty) {
+      return;
+    }
+
+    const typeLabels = isZh
+      ? {
+          Article: '技术文章',
+          Tool: '工具',
+          'Case Study': '案例',
+          Portfolio: '作品集'
+        }
+      : {
+          Article: 'Article',
+          Tool: 'Tool',
+          'Case Study': 'Case Study',
+          Portfolio: 'Portfolio'
+        };
+
+    const categoryLabels = isZh
+      ? {
+          Kubernetes: 'Kubernetes',
+          Databases: '数据库',
+          Storage: '存储',
+          Linux: 'Linux',
+          Networking: '网络',
+          Observability: '可观测性',
+          'Docker & Containers': 'Docker / 容器',
+          Uncategorized: '未分类'
+        }
+      : {};
+
+    const labelForCategory = (category) =>
+      categoryLabels[category] || category;
+
+    let selectedType = 'all';
+    let pagefindPromise = null;
+    let pagefindUnavailable = false;
+    let searchSequence = 0;
+    let debounceTimer = null;
+
+    const setUnavailable = (show) => {
+      unavailable.hidden = !show;
+    };
+
+    const setInitialState = () => {
+      guidance.hidden = false;
+      summary.textContent = '';
+      results.hidden = true;
+      results.replaceChildren();
+      empty.hidden = true;
+    };
+
+    const setSearchingState = () => {
+      guidance.hidden = true;
+      empty.hidden = true;
+      summary.textContent = isZh ? '正在搜索…' : 'Searching…';
+      results.hidden = true;
+      results.replaceChildren();
+    };
+
+    const setCount = (value, count) => {
+      for (const node of countNodes) {
+        if (node.dataset.typeCount === value) {
+          node.textContent = count == null ? '–' : String(count);
+        }
+      }
+    };
+
+    const countFromEntry = (entry) => {
+      if (typeof entry === 'number') return entry;
+      if (!entry || typeof entry !== 'object') return null;
+      if (typeof entry.total === 'number') return entry.total;
+      if (typeof entry.count === 'number') return entry.count;
+      return null;
+    };
+
+    const updateTypeCounts = (filterData) => {
+      const typeFilter = filterData?.type;
+      const values = typeFilter?.values || typeFilter;
+      if (!values || typeof values !== 'object') return;
+
+      const counts = {};
+      for (const [value, entry] of Object.entries(values)) {
+        const count = countFromEntry(entry);
+        if (count != null) counts[value] = count;
+      }
+
+      const total = Object.values(counts).reduce(
+        (sum, count) => sum + count,
+        0
+      );
+
+      setCount('all', total);
+      for (const value of Object.keys(typeLabels)) {
+        setCount(value, counts[value] ?? null);
+      }
+    };
+
+    const loadPagefind = async () => {
+      if (pagefindUnavailable) {
+        throw new Error('Pagefind unavailable');
+      }
+
+      if (!pagefindPromise) {
+        pagefindPromise = import('/pagefind/pagefind.js').catch(() => {
+          pagefindUnavailable = true;
+          throw new Error('Pagefind unavailable');
+        });
+      }
+
+      return pagefindPromise;
+    };
+
+    const loadFilters = async () => {
+      try {
+        const pagefind = await loadPagefind();
+        const filterData = await pagefind.filters();
+        updateTypeCounts(filterData);
+        setUnavailable(false);
+      } catch {
+        setUnavailable(true);
+      }
+    };
+
+    const summaryFor = (visible, total) => {
+      if (isZh) {
+        return visible < total
+          ? `显示 ${visible} / ${total} 条结果`
+          : `共 ${total} 条结果`;
+      }
+
+      return visible < total
+        ? `Showing ${visible} of ${total} results`
+        : `${total} result${total === 1 ? '' : 's'}`;
+    };
+
+    const renderResult = (result, hasQuery) => {
+      const href = result?.url;
+      if (!href || !href.startsWith('/') || href.startsWith('//')) {
+        return null;
+      }
+
+      const meta = result.meta || {};
+      const type = meta.type || (selectedType === 'all' ? '' : selectedType);
+      const card = document.createElement('a');
+      card.className = 'site-search-result';
+      card.href = href;
+      card.setAttribute('role', 'listitem');
+
+      const top = document.createElement('div');
+      top.className = 'site-search-result-top';
+
+      const badge = document.createElement('span');
+      badge.className = 'site-search-result-type';
+      badge.textContent =
+        typeLabels[type] || (isZh ? '内容' : 'Content');
+      top.append(badge);
+
+      const date = meta.date || '';
+      const category = meta.category || '';
+      if (date || category) {
+        const articleMeta = document.createElement('span');
+        articleMeta.className = 'site-search-result-meta';
+        articleMeta.textContent = [
+          date,
+          category ? labelForCategory(category) : ''
+        ]
+          .filter(Boolean)
+          .join(' · ');
+        top.append(articleMeta);
+      }
+
+      const title = document.createElement('h2');
+      title.textContent = meta.title || href;
+
+      const excerpt = document.createElement('p');
+      excerpt.className = 'site-search-result-excerpt';
+      if (hasQuery && result.excerpt) {
+        // Pagefind generates this markup and uses marks for query matches.
+        excerpt.innerHTML = result.excerpt;
+      } else {
+        excerpt.textContent =
+          result.plain_excerpt || meta.description || '';
+      }
+
+      card.append(top, title, excerpt);
+      return card;
+    };
+
+    const runSearch = async () => {
+      const query = input.value.trim();
+      const sequence = ++searchSequence;
+
+      setUnavailable(false);
+
+      if (!query && selectedType === 'all') {
+        setInitialState();
+        return;
+      }
+
+      setSearchingState();
+
+      try {
+        const pagefind = await loadPagefind();
+        const options =
+          selectedType === 'all'
+            ? {}
+            : { filters: { type: selectedType } };
+        const response = await pagefind.search(query || null, options);
+
+        if (sequence !== searchSequence) return;
+
+        const total = response.results.length;
+        const loaded = await Promise.all(
+          response.results
+            .slice(0, 30)
+            .map((result) => result.data())
+        );
+
+        if (sequence !== searchSequence) return;
+
+        const cards = loaded
+          .map((result) => renderResult(result, Boolean(query)))
+          .filter(Boolean);
+        results.replaceChildren(...cards);
+        guidance.hidden = true;
+        summary.textContent = summaryFor(cards.length, total);
+        results.hidden = cards.length === 0;
+        empty.hidden = total !== 0;
+      } catch {
+        if (sequence !== searchSequence) return;
+        setUnavailable(true);
+        guidance.hidden = true;
+        summary.textContent = '';
+        results.hidden = true;
+        results.replaceChildren();
+        empty.hidden = true;
+      }
+    };
+
+    for (const filter of filters) {
+      filter.addEventListener('click', () => {
+        selectedType = filter.dataset.typeFilter || 'all';
+
+        for (const item of filters) {
+          const active = item === filter;
+          item.classList.toggle('is-active', active);
+          item.setAttribute('aria-pressed', String(active));
+        }
+
+        runSearch();
+      });
+    }
+
+    input.addEventListener('input', () => {
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(runSearch, 170);
+    });
+
+    input.addEventListener('search', runSearch);
+
+    setInitialState();
+    loadFilters();
+  })();
+</script>

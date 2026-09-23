@@ -354,16 +354,13 @@ const searchPlaceholder = isZh
       try {
         const pagefind = await loadPagefind();
 
-        const options =
-          selectedCategory === 'all'
-            ? {}
-            : {
-                filters: {
-                  category: selectedCategory
-                }
-              };
+        const filters = { type: 'Article' };
 
-        const response = await pagefind.search(query, options);
+        if (selectedCategory !== 'all') {
+          filters.category = selectedCategory;
+        }
+
+        const response = await pagefind.search(query, { filters });
 
         if (sequence !== searchSequence) return;
 

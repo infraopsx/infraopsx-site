@@ -31,7 +31,9 @@ const navItems = isZh
 
 const defaultSwitchHref = isZh ? '/' : '/zh/';
 const languageHref = switchHref || defaultSwitchHref;
+const searchHref = isZh ? '/zh/search/' : '/search/';
 const switchLabel = isZh ? 'English' : '中文';
+const searchLabel = isZh ? '搜索' : 'Search';
 const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
 ---
 
@@ -49,12 +51,54 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
 
       <span class="nav-divider"></span>
 
+      <a
+        class="search-link"
+        href={searchHref}
+        aria-label={searchLabel}
+        title={searchLabel}
+      >
+        <svg
+          class="search-link-icon"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            d="m21 21-4.35-4.35m2.35-5.15a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+      </a>
+
       <a class="language-switch" href={languageHref}>
         {switchLabel}
       </a>
     </nav>
 
     <div class="mobile-actions">
+      <a
+        class="search-link mobile-search-link"
+        href={searchHref}
+        aria-label={searchLabel}
+        title={searchLabel}
+      >
+        <svg
+          class="search-link-icon"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            d="m21 21-4.35-4.35m2.35-5.15a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+      </a>
+
       <a class="language-switch mobile-language" href={languageHref}>
         {switchLabel}
       </a>
@@ -79,6 +123,38 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
 <style>
   .mobile-actions {
     gap: 8px;
+  }
+
+  .search-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--muted);
+    transition:
+      border-color .2s ease,
+      background .2s ease,
+      color .2s ease;
+  }
+
+  .search-link:hover,
+  .search-link:focus-visible {
+    border-color: rgba(50, 215, 244, .3);
+    background: rgba(50, 215, 244, .07);
+    color: white;
+  }
+
+  .search-link:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 2px;
+  }
+
+  .search-link-icon {
+    width: 18px;
+    height: 18px;
   }
 
   .mobile-menu {
@@ -162,6 +238,17 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
   .mobile-nav a:focus-visible {
     background: rgba(50, 215, 244, .07);
     color: white;
+  }
+
+  @media (min-width: 821px) and (max-width: 900px) {
+    .desktop-nav {
+      gap: 10px;
+    }
+
+    .search-link {
+      width: 30px;
+      height: 32px;
+    }
   }
 
   @media (min-width: 821px) {

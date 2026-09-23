@@ -28,10 +28,11 @@ const pipeline = [
   canonicalPath="/zh/portfolio/"
   enPath="/portfolio/"
   zhPath="/zh/portfolio/"
+  pagefindType="Portfolio"
 >
   <Header locale="zh" switchHref="/portfolio/" />
 
-  <main>
+  <main data-pagefind-body>
     <section class="showcase-hero">
       <div class="container">
         <span class="section-label">作品集</span>
@@ -66,7 +67,7 @@ const pipeline = [
               <span>Cloudflare</span>
             </div>
 
-            <div class="project-actions">
+            <div class="project-actions" data-pagefind-ignore>
               <a
                 class="button primary"
                 href="https://github.com/infraopsx/infraopsx-site"
@@ -107,7 +108,7 @@ const pipeline = [
           ))}
         </div>
 
-        <div class="portfolio-links">
+        <div class="portfolio-links" data-pagefind-ignore>
           <a class="button primary" href="/zh/case-studies/">查看案例</a>
           <a class="button secondary" href="/zh/blog/">阅读技术文章</a>
         </div>

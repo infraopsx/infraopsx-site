@@ -152,11 +152,20 @@ Google Search Console verification has been completed.
 
 SEO work should focus on useful technical content and tools rather than large volumes of low-value pages.
 
+## Site-wide Search
+
+The site has a bilingual Pagefind search experience at:
+
+- `/search/`
+- `/zh/search/`
+
+The index intentionally covers only completed Article, Tool, Case Study, and Portfolio destinations. Content-type filtering is browser-local, and the English and Chinese indexes remain separated by each page's `html lang` value. Tools catalog search remains local to the Tools section.
+
 ## Current Development Focus
 
 Current website focus:
 
-`Site-wide Pagefind search and content-type filtering`
+`Services / Expertise positioning and one high-value Case Study`
 
 Next planned tool:
 

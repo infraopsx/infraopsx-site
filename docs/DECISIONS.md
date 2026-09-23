@@ -226,3 +226,15 @@ Tools metadata is maintained in one centralized catalog. The English and Chinese
 ### Why
 
 A single catalog prevents language metadata drift and keeps future Tools discovery changes data-driven without duplicating page logic.
+
+---
+
+## ADR-012: Static site-wide Pagefind search
+
+### Decision
+
+Pagefind remains the static search engine for site-wide search. Content pages explicitly opt into the index through `data-pagefind-body` and expose stable content-type filters for `Article`, `Tool`, `Case Study`, and `Portfolio`. English and Chinese results follow each page's `html lang` value rather than using a custom cross-language index. The Tools catalog keeps its existing browser-local search independently from site-wide search.
+
+### Why
+
+This keeps search lightweight and build-time generated while preventing navigation, utility pages, unfinished tools, and listing-page chrome from becoming search results. A shared localized UI can filter the same static Pagefind data without introducing a backend or another runtime dependency.
