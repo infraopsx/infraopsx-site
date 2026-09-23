@@ -35,6 +35,11 @@ const searchHref = isZh ? '/zh/search/' : '/search/';
 const switchLabel = isZh ? 'English' : '中文';
 const searchLabel = isZh ? '搜索' : 'Search';
 const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
+const themeLabel = isZh ? '主题' : 'Theme';
+const appearanceLabel = isZh ? '外观' : 'Appearance';
+const systemLabel = isZh ? '跟随系统' : 'System';
+const lightLabel = isZh ? '浅色' : 'Light';
+const darkLabel = isZh ? '深色' : 'Dark';
 ---
 
 <header class="header">
@@ -72,6 +77,37 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
         </svg>
       </a>
 
+      <details class="theme-menu desktop-theme-menu" data-theme-menu="desktop">
+        <summary
+          class="theme-trigger"
+          aria-label={themeLabel}
+          title={appearanceLabel}
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="desktop-theme-options"
+        >
+          <svg class="theme-state-icon" data-theme-icon="system" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3.5" y="4" width="17" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.7" />
+            <path d="M8 20h8m-4-4v4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+          </svg>
+          <svg class="theme-state-icon" data-theme-icon="light" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="1.7" />
+            <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+          </svg>
+          <svg class="theme-state-icon" data-theme-icon="dark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20.2 15.3A8.5 8.5 0 0 1 8.7 3.8 8.5 8.5 0 1 0 20.2 15.3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </summary>
+        <div class="theme-popover" id="desktop-theme-options">
+          <p class="theme-popover-title">{appearanceLabel}</p>
+          <div class="theme-options" role="group" aria-label={appearanceLabel}>
+            <button class="theme-option" type="button" data-theme-choice="system" aria-pressed="true">{systemLabel}</button>
+            <button class="theme-option" type="button" data-theme-choice="light" aria-pressed="false">{lightLabel}</button>
+            <button class="theme-option" type="button" data-theme-choice="dark" aria-pressed="false">{darkLabel}</button>
+          </div>
+        </div>
+      </details>
+
       <a class="language-switch" href={languageHref}>
         {switchLabel}
       </a>
@@ -103,8 +139,8 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
         {switchLabel}
       </a>
 
-      <details class="mobile-menu">
-        <summary class="mobile-menu-toggle" aria-label={menuLabel}>
+      <details class="mobile-menu" data-theme-menu="mobile">
+        <summary class="mobile-menu-toggle" aria-label={menuLabel} aria-expanded="false">
           <span></span>
           <span></span>
           <span></span>
@@ -114,6 +150,14 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
           {navItems.map((item) => (
             <a href={item.href}>{item.label}</a>
           ))}
+          <div class="mobile-theme-section">
+            <p class="mobile-theme-heading">{appearanceLabel}</p>
+            <div class="theme-options mobile-theme-options" role="group" aria-label={appearanceLabel}>
+              <button class="theme-option" type="button" data-theme-choice="system" aria-pressed="true">{systemLabel}</button>
+              <button class="theme-option" type="button" data-theme-choice="light" aria-pressed="false">{lightLabel}</button>
+              <button class="theme-option" type="button" data-theme-choice="dark" aria-pressed="false">{darkLabel}</button>
+            </div>
+          </div>
         </nav>
       </details>
     </div>
@@ -142,9 +186,9 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
 
   .search-link:hover,
   .search-link:focus-visible {
-    border-color: rgba(50, 215, 244, .3);
-    background: rgba(50, 215, 244, .07);
-    color: white;
+    border-color: var(--accent-border);
+    background: var(--hover-bg);
+    color: var(--strong-text);
   }
 
   .search-link:focus-visible {
@@ -155,6 +199,126 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
   .search-link-icon {
     width: 18px;
     height: 18px;
+  }
+
+  .desktop-theme-menu {
+    position: relative;
+  }
+
+  .theme-menu > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .theme-menu > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .theme-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--muted);
+    transition:
+      border-color .2s ease,
+      background .2s ease,
+      color .2s ease;
+  }
+
+  .theme-trigger:hover,
+  .desktop-theme-menu[open] .theme-trigger {
+    border-color: var(--accent-border);
+    background: var(--hover-bg);
+    color: var(--strong-text);
+  }
+
+  .theme-state-icon {
+    display: none;
+    width: 18px;
+    height: 18px;
+  }
+
+  :global(html[data-theme-preference="system"]) [data-theme-icon="system"],
+  :global(html[data-theme-preference="light"]) [data-theme-icon="light"],
+  :global(html[data-theme-preference="dark"]) [data-theme-icon="dark"] {
+    display: block;
+  }
+
+  .theme-popover {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    z-index: 30;
+    width: 200px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--popover-bg);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+  }
+
+  .theme-popover-title,
+  .mobile-theme-heading {
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .theme-options {
+    display: grid;
+    gap: 4px;
+  }
+
+  .theme-option {
+    min-width: 0;
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-soft);
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    transition:
+      border-color .2s ease,
+      background .2s ease,
+      color .2s ease;
+  }
+
+  .theme-option:hover {
+    background: var(--hover-bg);
+    color: var(--strong-text);
+  }
+
+  .theme-option[aria-pressed="true"] {
+    border-color: var(--accent-border);
+    background: var(--accent-soft-bg);
+    color: var(--accent-text);
+  }
+
+  .mobile-theme-section {
+    margin-top: 8px;
+    padding: 14px 10px 6px;
+    border-top: 1px solid var(--line);
+  }
+
+  .mobile-theme-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mobile-theme-options .theme-option {
+    min-height: 44px;
+    padding: 7px 4px;
+    font-size: 12px;
+    text-align: center;
   }
 
   .mobile-menu {
@@ -169,9 +333,16 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
     padding: 0;
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: rgba(255, 255, 255, .03);
+    background: var(--panel-subtle);
     cursor: pointer;
     list-style: none;
+  }
+
+  .mobile-menu-toggle:focus-visible,
+  .theme-trigger:focus-visible,
+  .theme-option:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 2px;
   }
 
   .mobile-menu-toggle::-webkit-details-marker {
@@ -189,8 +360,8 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
   }
 
   .mobile-menu[open] .mobile-menu-toggle {
-    border-color: rgba(50, 215, 244, .4);
-    background: rgba(50, 215, 244, .08);
+    border-color: var(--accent-border);
+    background: var(--accent-soft-bg);
   }
 
   .mobile-menu[open] .mobile-menu-toggle span:nth-child(1) {
@@ -217,8 +388,8 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
     padding: 8px;
     border: 1px solid var(--line);
     border-radius: 12px;
-    background: rgba(7, 17, 31, .98);
-    box-shadow: 0 18px 45px rgba(0, 0, 0, .35);
+    background: var(--popover-bg);
+    box-shadow: var(--shadow);
     backdrop-filter: blur(18px);
   }
 
@@ -230,14 +401,14 @@ const menuLabel = isZh ? '打开导航菜单' : 'Open navigation menu';
     display: block;
     padding: 13px 14px;
     border-radius: 7px;
-    color: #c7d4e0;
+    color: var(--text-soft);
     font-size: 14px;
   }
 
   .mobile-nav a:hover,
   .mobile-nav a:focus-visible {
-    background: rgba(50, 215, 244, .07);
-    color: white;
+    background: var(--hover-bg);
+    color: var(--strong-text);
   }
 
   @media (min-width: 821px) and (max-width: 900px) {

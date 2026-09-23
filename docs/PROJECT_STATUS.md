@@ -161,6 +161,10 @@ The site has a bilingual Pagefind search experience at:
 
 The index intentionally covers only completed Article, Tool, Case Study, and Portfolio destinations. Content-type filtering is browser-local, and the English and Chinese indexes remain separated by each page's `html lang` value. Tools catalog search remains local to the Tools section.
 
+## Site Appearance
+
+The shared header provides System, Light, and Dark appearance preferences in English and Chinese. System is the default and follows the operating system; an explicit choice is stored locally in the browser. Theme-dependent colors use shared semantic tokens, while terminal and code panels remain intentionally dark.
+
 ## Current Development Focus
 
 Current website focus:
