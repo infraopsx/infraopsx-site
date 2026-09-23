@@ -1,0 +1,398 @@
+---
+import '../../styles/tools-explorer.css';
+import {
+  toolCategories,
+  toolsCatalog,
+  type Tool,
+  type ToolCategory
+} from '../../data/tools';
+
+interface Props {
+  locale?: 'en' | 'zh';
+}
+
+const { locale = 'en' } = Astro.props;
+const isZh = locale === 'zh';
+
+const categoryLabels: Record<ToolCategory, string> = isZh
+  ? {
+      Calculator: '计算器',
+      Converter: '转换器',
+      Generator: '生成器',
+      Validator: '验证器',
+      Inspector: '检查器'
+    }
+  : {
+      Calculator: 'Calculator',
+      Converter: 'Converter',
+      Generator: 'Generator',
+      Validator: 'Validator',
+      Inspector: 'Inspector'
+    };
+
+const actionLabels: Record<ToolCategory, string> = isZh
+  ? {
+      Calculator: '打开计算器',
+      Converter: '打开转换器',
+      Generator: '打开生成器',
+      Validator: '打开验证器',
+      Inspector: '打开检查器'
+    }
+  : {
+      Calculator: 'Open calculator',
+      Converter: 'Open converter',
+      Generator: 'Open generator',
+      Validator: 'Open validator',
+      Inspector: 'Open inspector'
+    };
+
+const labels = isZh
+  ? {
+      search: '搜索基础设施工具',
+      placeholder: '搜索 Kubernetes、Ceph、Docker、YAML...',
+      filter: '按分类筛选工具',
+      all: '全部',
+      featured: '推荐工具',
+      browse: '浏览全部工具',
+      comingSoon: '即将推出',
+      emptyTitle: '没有找到匹配的工具。',
+      emptyDescription: '请尝试其他关键词或分类。'
+    }
+  : {
+      search: 'Search infrastructure tools',
+      placeholder: 'Search Kubernetes, Ceph, Docker, YAML...',
+      filter: 'Filter tools by category',
+      all: 'All',
+      featured: 'Featured tools',
+      browse: 'Browse all tools',
+      comingSoon: 'Coming soon',
+      emptyTitle: 'No matching tools found.',
+      emptyDescription: 'Try another keyword or category.'
+    };
+
+const presentCategories = toolCategories.filter((category) =>
+  toolsCatalog.some((tool) => tool.category === category)
+);
+
+const availableTools = toolsCatalog.filter(
+  (tool): tool is Extract<Tool, { status: 'available' }> =>
+    tool.status === 'available'
+);
+
+const featuredTools = availableTools.filter((tool) => tool.featured);
+
+const categoryTools = (category: ToolCategory) =>
+  toolsCatalog.filter((tool) => tool.category === category);
+
+const searchTextFor = (tool: Tool) => [
+  tool.title[locale],
+  tool.description[locale],
+  tool.category,
+  categoryLabels[tool.category],
+  ...tool.keywords[locale]
+].join(' ').toLocaleLowerCase(isZh ? 'zh-CN' : 'en-US');
+
+const searchId = `tools-search-${locale}`;
+const featuredHeadingId = `tools-featured-heading-${locale}`;
+const browseHeadingId = `tools-browse-heading-${locale}`;
+const initialSummary = isZh
+  ? `共 ${toolsCatalog.length} 个工具`
+  : `${toolsCatalog.length} tools`;
+---
+
+<section
+  class="tools-explorer"
+  data-tools-explorer
+  data-locale={locale}
+>
+  <div class="container">
+    <div class="tools-explorer-controls">
+      <label class="tools-explorer-search-label" for={searchId}>
+        {labels.search}
+      </label>
+
+      <div class="tools-explorer-search-box">
+        <svg
+          class="tools-explorer-search-icon"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            d="m21 21-4.35-4.35m2.35-5.15a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+
+        <input
+          id={searchId}
+          class="tools-explorer-search-input"
+          data-tools-search
+          type="search"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder={labels.placeholder}
+        />
+      </div>
+
+      <div
+        class="tools-explorer-filter"
+        role="group"
+        aria-label={labels.filter}
+      >
+        <button
+          class="tools-explorer-filter-button is-active"
+          type="button"
+          data-tools-category="all"
+          aria-pressed="true"
+        >
+          <span>{labels.all}</span>
+          <span class="tools-explorer-filter-count">{toolsCatalog.length}</span>
+        </button>
+
+        {presentCategories.map((category) => (
+          <button
+            class="tools-explorer-filter-button"
+            type="button"
+            data-tools-category={category}
+            aria-pressed="false"
+          >
+            <span>{categoryLabels[category]}</span>
+            <span class="tools-explorer-filter-count">
+              {categoryTools(category).length}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <p
+        class="tools-explorer-results-summary"
+        data-tools-results-summary
+        aria-live="polite"
+      >
+        {initialSummary}
+      </p>
+    </div>
+
+    {featuredTools.length > 0 && (
+      <section
+        class="tools-explorer-featured"
+        data-featured-section
+        aria-labelledby={featuredHeadingId}
+      >
+        <div class="tools-explorer-section-heading">
+          <span class="section-label">
+            {isZh ? '推荐工具' : 'FEATURED TOOLS'}
+          </span>
+          <h2 id={featuredHeadingId}>{labels.featured}</h2>
+        </div>
+
+        <div class="tools-explorer-featured-grid">
+          {featuredTools.map((tool) => (
+            <a
+              class="tools-explorer-featured-card"
+              href={tool.path[locale]}
+              data-featured-card
+              data-tool-id={tool.id}
+            >
+              <span class="tools-explorer-card-category">
+                {categoryLabels[tool.category]}
+              </span>
+              <h3>{tool.title[locale]}</h3>
+              <p class="tools-explorer-card-description">
+                {tool.description[locale]}
+              </p>
+              <span class="tools-explorer-card-action">
+                {actionLabels[tool.category]}
+                <span aria-hidden="true">→</span>
+              </span>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <section
+      class="tools-explorer-browse"
+      aria-labelledby={browseHeadingId}
+    >
+      <div class="tools-explorer-section-heading">
+        <span class="section-label">
+          {isZh ? '浏览全部工具' : 'BROWSE ALL TOOLS'}
+        </span>
+        <h2 id={browseHeadingId}>{labels.browse}</h2>
+      </div>
+
+      <div class="tools-explorer-category-groups">
+        {presentCategories.map((category) => (
+          <section
+            class="tools-explorer-category-section"
+            data-category-section
+            data-category={category}
+            aria-labelledby={`tools-category-${locale}-${category}`}
+          >
+            <div class="tools-explorer-category-heading">
+              <h3 id={`tools-category-${locale}-${category}`}>
+                {categoryLabels[category]}
+              </h3>
+              <span class="tools-explorer-category-count">
+                {categoryTools(category).length}
+              </span>
+            </div>
+
+            <div class="tools-explorer-browse-list">
+              {categoryTools(category).map((tool) =>
+                tool.status === 'available' ? (
+                  <a
+                    class="tools-explorer-browse-card"
+                    href={tool.path[locale]}
+                    data-browse-card
+                    data-tool-id={tool.id}
+                    data-category={tool.category}
+                    data-status={tool.status}
+                    data-search={searchTextFor(tool)}
+                  >
+                    <div>
+                      <span class="tools-explorer-card-category">
+                        {categoryLabels[tool.category]}
+                      </span>
+                      <h4>{tool.title[locale]}</h4>
+                      <p class="tools-explorer-card-description">
+                        {tool.description[locale]}
+                      </p>
+                    </div>
+                    <span class="tools-explorer-card-action">
+                      {actionLabels[tool.category]}
+                      <span aria-hidden="true">→</span>
+                    </span>
+                  </a>
+                ) : (
+                  <article
+                    class="tools-explorer-browse-card tools-explorer-browse-card-planned"
+                    data-browse-card
+                    data-tool-id={tool.id}
+                    data-category={tool.category}
+                    data-status={tool.status}
+                    data-search={searchTextFor(tool)}
+                  >
+                    <div>
+                      <span class="tools-explorer-card-category">
+                        {categoryLabels[tool.category]}
+                      </span>
+                      <h4>{tool.title[locale]}</h4>
+                      <p class="tools-explorer-card-description">
+                        {tool.description[locale]}
+                      </p>
+                    </div>
+                    <span class="tools-explorer-card-status">
+                      {labels.comingSoon}
+                    </span>
+                  </article>
+                )
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      <div class="tools-explorer-empty" data-tools-empty hidden>
+        <strong>{labels.emptyTitle}</strong>
+        <span>{labels.emptyDescription}</span>
+      </div>
+    </section>
+  </div>
+</section>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector('[data-tools-explorer]');
+    if (!root) return;
+
+    const isZh = root.dataset.locale === 'zh';
+    const input = root.querySelector('[data-tools-search]');
+    const summary = root.querySelector('[data-tools-results-summary]');
+    const emptyState = root.querySelector('[data-tools-empty]');
+    const featuredSection = root.querySelector('[data-featured-section]');
+    const cards = [...root.querySelectorAll('[data-browse-card]')];
+    const groups = [...root.querySelectorAll('[data-category-section]')];
+    const chips = [...root.querySelectorAll('[data-tools-category]')];
+
+    if (!(input instanceof HTMLInputElement) || !summary || !emptyState) return;
+
+    const categoryLabels = isZh
+      ? {
+          Calculator: '计算器',
+          Converter: '转换器',
+          Generator: '生成器',
+          Validator: '验证器',
+          Inspector: '检查器'
+        }
+      : {
+          Calculator: 'Calculator',
+          Converter: 'Converter',
+          Generator: 'Generator',
+          Validator: 'Validator',
+          Inspector: 'Inspector'
+        };
+
+    let selectedCategory = 'all';
+
+    const normalize = (value) => value.trim().toLocaleLowerCase(isZh ? 'zh-CN' : 'en-US');
+
+    const setSummary = (count) => {
+      const categoryText = selectedCategory === 'all'
+        ? ''
+        : `${categoryLabels[selectedCategory] || selectedCategory} · `;
+
+      summary.textContent = isZh
+        ? `${categoryText}共 ${count} 个工具`
+        : `${categoryText}${count} tool${count === 1 ? '' : 's'}`;
+    };
+
+    const applyFilter = () => {
+      const needle = normalize(input.value);
+      let visible = 0;
+
+      cards.forEach((card) => {
+        const categoryMatch =
+          selectedCategory === 'all' || card.dataset.category === selectedCategory;
+        const textMatch = !needle || (card.dataset.search || '').includes(needle);
+        const show = categoryMatch && textMatch;
+
+        card.hidden = !show;
+        if (show) visible += 1;
+      });
+
+      groups.forEach((group) => {
+        group.hidden = group.querySelector('[data-browse-card]:not([hidden])') === null;
+      });
+
+      if (featuredSection) {
+        featuredSection.hidden = Boolean(needle || selectedCategory !== 'all');
+      }
+
+      emptyState.hidden = visible !== 0;
+      setSummary(visible);
+    };
+
+    chips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        selectedCategory = chip.dataset.toolsCategory || 'all';
+
+        chips.forEach((item) => {
+          const active = item === chip;
+          item.classList.toggle('is-active', active);
+          item.setAttribute('aria-pressed', String(active));
+        });
+
+        applyFilter();
+      });
+    });
+
+    input.addEventListener('input', applyFilter);
+    input.addEventListener('search', applyFilter);
+    applyFilter();
+  })();
+</script>

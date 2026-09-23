@@ -1,6 +1,6 @@
 # InfraOpsX Project Status
 
-Last updated: 2026-09-22
+Last updated: 2026-09-23
 
 ## Production Site
 
@@ -41,6 +41,12 @@ Available sections include:
 - Privacy
 
 ## Tools
+
+### Catalog and discovery
+
+The Tools section uses a centralized catalog shared by the English and Chinese Tools pages. The catalog drives localized metadata, Featured and Browse All sections, category filtering, and browser-local search across titles, descriptions, categories, and keywords.
+
+The current public catalog contains the two completed calculators below and the planned Kubernetes Quantity Converter. Planned entries are shown as Coming Soon and do not generate links.
 
 ### Completed
 
@@ -148,7 +154,7 @@ SEO work should focus on useful technical content and tools rather than large vo
 
 ## Current Development Focus
 
-The first InfraOpsX tool, Ceph Capacity Calculator, is complete and deployed.
+The Tools catalog and shared bilingual discovery pages are in place. The two completed calculators remain available under their paired English and Chinese routes.
 
 The next planned tool is:
 

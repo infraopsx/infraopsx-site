@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
+import ToolsExplorer from '../../components/tools/ToolsExplorer.astro';
 ---
 
 <BaseLayout
@@ -29,32 +30,7 @@ import Footer from '../../components/Footer.astro';
       </div>
     </section>
 
-    <section class="tools-section">
-      <div class="container">
-        <div class="tools-grid">
-          <a class="tool-card tool-card-active" href="/tools/ceph-capacity-calculator/">
-            <span class="tool-card-number">01</span>
-            <h2>Ceph Capacity Calculator</h2>
-            <p>Estimate raw capacity, theoretical usable capacity, and reserve headroom for replicated and erasure-coded Ceph layouts.</p>
-            <span class="tool-card-link">Open calculator →</span>
-          </a>
-
-          <a class="tool-card tool-card-active" href="/tools/kubernetes-resource-calculator/">
-            <span class="tool-card-number">02</span>
-            <h2>Kubernetes Resource Calculator</h2>
-            <p>Plan CPU and memory requests, limits, node capacity, and Pod density for a homogeneous Kubernetes node pool.</p>
-            <span class="tool-card-link">Open calculator →</span>
-          </a>
-
-          <article class="tool-card tool-card-muted">
-            <span class="tool-card-number">03</span>
-            <span class="tool-status">COMING SOON</span>
-            <h2>Kubernetes Quantity Converter</h2>
-            <p>Convert Kubernetes resource quantities into readable values and units.</p>
-          </article>
-        </div>
-      </div>
-    </section>
+    <ToolsExplorer locale="en" />
   </main>
 
   <Footer locale="en" />
