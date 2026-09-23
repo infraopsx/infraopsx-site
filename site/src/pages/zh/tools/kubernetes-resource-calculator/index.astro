@@ -12,12 +12,13 @@ import KubernetesResourceCalculator from '../../../../components/tools/Kubernete
   canonicalPath="/zh/tools/kubernetes-resource-calculator/"
   enPath="/tools/kubernetes-resource-calculator/"
   zhPath="/zh/tools/kubernetes-resource-calculator/"
+  pagefindType="Tool"
 >
   <Header locale="zh" switchHref="/tools/kubernetes-resource-calculator/" />
 
-  <main class="tool-detail-shell">
+  <main class="tool-detail-shell" data-pagefind-body>
     <div class="container tool-detail-container">
-      <div class="tools-breadcrumb">
+      <div class="tools-breadcrumb" data-pagefind-ignore>
         <a href="/zh/">首页</a>
         <span>/</span>
         <a href="/zh/tools/">工具</a>
@@ -36,7 +37,9 @@ import KubernetesResourceCalculator from '../../../../components/tools/Kubernete
           <span class="section-label">计算器</span>
           <h2 id="calculator-heading">在部署前规划 requests。</h2>
         </div>
-        <KubernetesResourceCalculator locale="zh" />
+        <div data-pagefind-ignore>
+          <KubernetesResourceCalculator locale="zh" />
+        </div>
       </section>
 
       <section class="tool-info-grid">
@@ -70,7 +73,7 @@ import KubernetesResourceCalculator from '../../../../components/tools/Kubernete
         </details>
       </section>
 
-      <section class="related-tools">
+      <section class="related-tools" data-pagefind-ignore>
         <div>
           <span class="section-label">相关工具</span>
           <h2>结合存储容量规划一起评估工作负载。</h2>
@@ -78,7 +81,7 @@ import KubernetesResourceCalculator from '../../../../components/tools/Kubernete
         <a class="button secondary" href="/zh/tools/">查看全部工具</a>
       </section>
 
-      <section class="tool-cta">
+      <section class="tool-cta" data-pagefind-ignore>
         <div class="cta-box">
           <div>
             <span class="section-label">INFRAOPSX</span>

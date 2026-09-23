@@ -5,6 +5,10 @@ export default defineConfig({
   site: 'https://infra.oeax.de',
   output: 'static',
   integrations: [
-    sitemap()
+    sitemap({
+      filter: (page) =>
+        page !== 'https://infra.oeax.de/search/' &&
+        page !== 'https://infra.oeax.de/zh/search/'
+    })
   ]
 });

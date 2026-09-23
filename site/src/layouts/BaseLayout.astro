@@ -1,14 +1,27 @@
 ---
 import '../styles/global.css';
 
+type PagefindType = 'Article' | 'Tool' | 'Case Study' | 'Portfolio';
+
 const {
   title = 'InfraOpsX',
   description = 'Linux, Docker, Kubernetes and infrastructure engineering.',
   lang = 'en',
   canonicalPath = '/',
   enPath = '/',
-  zhPath = '/zh/'
-} = Astro.props;
+  zhPath = '/zh/',
+  pagefindType,
+  noindex = false
+} = Astro.props as {
+  title?: string;
+  description?: string;
+  lang?: string;
+  canonicalPath?: string;
+  enPath?: string;
+  zhPath?: string;
+  pagefindType?: PagefindType;
+  noindex?: boolean;
+};
 
 const site = 'https://infra.oeax.de';
 
@@ -24,7 +37,12 @@ const zhUrl = new URL(zhPath, site).toString();
     <meta name="viewport" content="width=device-width" />
 
     <title>{title}</title>
-    <meta name="description" content={description} />
+    <meta
+      name="description"
+      content={description}
+      data-pagefind-default-meta="description[content]"
+    />
+    {noindex && <meta name="robots" content="noindex,follow" />}
     <meta name="theme-color" content="#07111f" />
 
     <link rel="canonical" href={canonicalUrl} />
@@ -50,7 +68,10 @@ const zhUrl = new URL(zhPath, site).toString();
     <meta name="twitter:card" content="summary" />
   </head>
 
-  <body>
+  <body
+    data-pagefind-filter={pagefindType ? `type:${pagefindType}` : undefined}
+    data-pagefind-meta={pagefindType ? `type:${pagefindType}` : undefined}
+  >
     <slot />
   </body>
 </html>

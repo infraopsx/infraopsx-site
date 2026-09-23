@@ -11,16 +11,17 @@ import Footer from '../../../components/Footer.astro';
   canonicalPath="/case-studies/kubernetes-pod-pending/"
   enPath="/case-studies/kubernetes-pod-pending/"
   zhPath="/zh/case-studies/kubernetes-pod-pending/"
+  pagefindType="Case Study"
 >
   <Header
     locale="en"
     switchHref="/zh/case-studies/kubernetes-pod-pending/"
   />
 
-  <main class="case-detail-shell">
+  <main class="case-detail-shell" data-pagefind-body>
     <div class="container case-detail-container">
 
-      <div class="article-breadcrumb">
+      <div class="article-breadcrumb" data-pagefind-ignore>
         <a href="/">Home</a>
         <span>/</span>
         <a href="/case-studies/">Case Studies</a>
@@ -256,7 +257,7 @@ kubectl get nodes --show-labels</code></pre>
 
       </article>
 
-      <div class="case-detail-actions">
+      <div class="case-detail-actions" data-pagefind-ignore>
         <a class="button primary" href="/case-studies/">← All case studies</a>
         <a class="button secondary" href="/blog/kubernetes-pod-pending/">
           Read the troubleshooting guide

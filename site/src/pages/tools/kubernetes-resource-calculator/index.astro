@@ -12,12 +12,13 @@ import KubernetesResourceCalculator from '../../../components/tools/KubernetesRe
   canonicalPath="/tools/kubernetes-resource-calculator/"
   enPath="/tools/kubernetes-resource-calculator/"
   zhPath="/zh/tools/kubernetes-resource-calculator/"
+  pagefindType="Tool"
 >
   <Header locale="en" switchHref="/zh/tools/kubernetes-resource-calculator/" />
 
-  <main class="tool-detail-shell">
+  <main class="tool-detail-shell" data-pagefind-body>
     <div class="container tool-detail-container">
-      <div class="tools-breadcrumb">
+      <div class="tools-breadcrumb" data-pagefind-ignore>
         <a href="/">Home</a>
         <span>/</span>
         <a href="/tools/">Tools</a>
@@ -36,7 +37,9 @@ import KubernetesResourceCalculator from '../../../components/tools/KubernetesRe
           <span class="section-label">CALCULATOR</span>
           <h2 id="calculator-heading">Plan requests before deployment.</h2>
         </div>
-        <KubernetesResourceCalculator locale="en" />
+        <div data-pagefind-ignore>
+          <KubernetesResourceCalculator locale="en" />
+        </div>
       </section>
 
       <section class="tool-info-grid">
@@ -70,7 +73,7 @@ import KubernetesResourceCalculator from '../../../components/tools/KubernetesRe
         </details>
       </section>
 
-      <section class="related-tools">
+      <section class="related-tools" data-pagefind-ignore>
         <div>
           <span class="section-label">RELATED TOOLS</span>
           <h2>Pair workload planning with storage capacity planning.</h2>
@@ -78,7 +81,7 @@ import KubernetesResourceCalculator from '../../../components/tools/KubernetesRe
         <a class="button secondary" href="/tools/">View all tools</a>
       </section>
 
-      <section class="tool-cta">
+      <section class="tool-cta" data-pagefind-ignore>
         <div class="cta-box">
           <div>
             <span class="section-label">INFRAOPSX</span>
