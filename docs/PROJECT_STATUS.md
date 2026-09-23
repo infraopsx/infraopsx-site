@@ -154,9 +154,11 @@ SEO work should focus on useful technical content and tools rather than large vo
 
 ## Current Development Focus
 
-The Tools catalog and shared bilingual discovery pages are in place. The two completed calculators remain available under their paired English and Chinese routes.
+Current website focus:
 
-The next planned tool is:
+`Site-wide Pagefind search and content-type filtering`
+
+Next planned tool:
 
 `Kubernetes Quantity Converter`
 

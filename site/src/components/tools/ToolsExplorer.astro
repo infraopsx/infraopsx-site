@@ -352,13 +352,16 @@ const initialSummary = isZh
     };
 
     const applyFilter = () => {
-      const needle = normalize(input.value);
+      const terms = normalize(input.value)
+        .split(/\s+/)
+        .filter(Boolean);
       let visible = 0;
 
       cards.forEach((card) => {
         const categoryMatch =
           selectedCategory === 'all' || card.dataset.category === selectedCategory;
-        const textMatch = !needle || (card.dataset.search || '').includes(needle);
+        const text = card.dataset.search || '';
+        const textMatch = terms.every((term) => text.includes(term));
         const show = categoryMatch && textMatch;
 
         card.hidden = !show;
@@ -370,7 +373,7 @@ const initialSummary = isZh
       });
 
       if (featuredSection) {
-        featuredSection.hidden = Boolean(needle || selectedCategory !== 'all');
+        featuredSection.hidden = Boolean(terms.length || selectedCategory !== 'all');
       }
 
       emptyState.hidden = visible !== 0;

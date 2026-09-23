@@ -102,7 +102,7 @@ export const toolsCatalog = [
     },
     description: {
       en: 'Plan CPU and memory requests, limits, node capacity, and Pod density for a homogeneous Kubernetes node pool.',
-      zh: '估算 Kubernetes 工作负载的 CPU / Memory requests、limits、节点容量和 Pod 密度。'
+      zh: '估算 Kubernetes 工作负载的 CPU / Memory requests 与 limits，并评估节点容量和 Pod 密度。'
     },
     path: {
       en: '/tools/kubernetes-resource-calculator/',
@@ -112,6 +112,8 @@ export const toolsCatalog = [
       en: [
         'Kubernetes',
         'resource',
+        'resources',
+        'k8s',
         'CPU',
         'memory',
         'requests',
@@ -160,6 +162,8 @@ export const toolsCatalog = [
         'Kubernetes',
         'quantity',
         'resource quantity',
+        'resources',
+        'k8s',
         'mCPU',
         'MiB',
         'GiB',
