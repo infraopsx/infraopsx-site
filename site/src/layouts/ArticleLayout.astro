@@ -3,7 +3,7 @@ import BaseLayout from './BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 
-const { frontmatter } = Astro.props;
+const { frontmatter, headings = [] } = Astro.props;
 
 const {
   title,
@@ -48,6 +48,12 @@ const categoryLabels: Record<string, string> = isZh
 
 const displayCategory = categoryLabels[category] ?? category;
 const switchHref = isZh ? enPath : zhPath;
+
+const tocHeadings = headings.filter(
+  (heading: { depth: number; slug: string; text: string }) =>
+    heading.depth === 2
+);
+const showToc = tocHeadings.length >= 4;
 ---
 
 <BaseLayout
@@ -113,6 +119,27 @@ const switchHref = isZh ? enPath : zhPath;
       </header>
 
       <article class="article-content">
+        {showToc && (
+          <nav
+            class="article-toc"
+            aria-label={isZh ? '本文目录' : 'Table of contents'}
+            data-pagefind-ignore
+          >
+            <div class="article-toc-title">
+              {isZh ? '本文目录' : 'Table of contents'}
+            </div>
+            <ol>
+              {tocHeadings.map(
+                (heading: { depth: number; slug: string; text: string }) => (
+                  <li>
+                    <a href={`#${heading.slug}`}>{heading.text}</a>
+                  </li>
+                )
+              )}
+            </ol>
+          </nav>
+        )}
+
         <slot />
       </article>
 
@@ -127,3 +154,55 @@ const switchHref = isZh ? enPath : zhPath;
 
   <Footer locale={isZh ? 'zh' : 'en'} />
 </BaseLayout>
+
+<style>
+  .article-toc {
+    display: block;
+    margin: 0 0 48px;
+    padding: 24px 26px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .025);
+  }
+
+  .article-toc-title {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .article-toc ol {
+    columns: 2;
+    column-gap: 36px;
+    margin: 16px 0 0;
+    padding-left: 22px;
+  }
+
+  .article-toc li {
+    break-inside: avoid;
+    margin: 7px 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .article-toc a {
+    color: inherit;
+    font-size: inherit;
+    text-decoration: none;
+  }
+
+  .article-toc a:hover {
+    color: var(--cyan);
+  }
+
+  @media (max-width: 600px) {
+    .article-toc {
+      padding: 20px;
+    }
+
+    .article-toc ol {
+      columns: 1;
+    }
+  }
+</style>
