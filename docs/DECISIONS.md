@@ -214,3 +214,15 @@ Use:
 ### Why
 
 This avoids duplicated documentation that quickly becomes stale.
+
+---
+
+## ADR-011: Centralized Tools catalog
+
+### Decision
+
+Tools metadata is maintained in one centralized catalog. The English and Chinese Tools discovery pages derive their localized cards, categories, links, and search index from that same source. Planned entries have no generated route or link.
+
+### Why
+
+A single catalog prevents language metadata drift and keeps future Tools discovery changes data-driven without duplicating page logic.
