@@ -427,7 +427,10 @@ const idSuffix = isZh ? 'zh' : 'en';
       copyStatus.textContent = '';
     };
 
-    typeSelect.addEventListener('change', updateExamples);
+    typeSelect.addEventListener('change', () => {
+      updateExamples();
+      clearInputFeedback();
+    });
     quantityInput.addEventListener('input', clearInputFeedback);
 
     exampleList.addEventListener('click', (event) => {
