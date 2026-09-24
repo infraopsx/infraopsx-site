@@ -5,20 +5,20 @@ import Footer from '../../components/Footer.astro';
 
 const services = [
   {
-    title: 'Docker 与自托管应用',
-    text: '使用 Docker 和 Docker Compose 部署自托管及容器化应用，包括数据持久化、反向代理和 HTTPS。'
+    title: 'Docker 与自托管应用部署',
+    text: '使用 Docker 和 Docker Compose 部署或迁移自托管及容器化应用，并配置数据持久化、反向代理和 HTTPS。'
   },
   {
-    title: 'Kubernetes',
-    text: '应用部署、工作负载、Service、Ingress、存储以及实际 Kubernetes 基础设施配置。'
+    title: 'Kubernetes 部署与故障排查',
+    text: '部署 Kubernetes 工作负载，并排查调度、资源配置、Service、Ingress 和 CSI 存储等问题。'
+  },
+  {
+    title: 'Linux 与基础设施故障排查',
+    text: '结合日志、监控指标和系统状态，排查 Linux 服务、文件系统、磁盘 I/O、存储、网络及基础设施运行异常。'
   },
   {
     title: '监控与可观测性',
-    text: '使用 Prometheus、Grafana 和基础设施指标构建实用的监控与可观测性方案。'
-  },
-  {
-    title: '故障排查',
-    text: '针对 Linux、Docker、Kubernetes、网络、存储和基础设施问题进行根因分析与故障排查。'
+    text: '使用 Prometheus 和 Grafana，为服务器、容器及基础设施指标构建实用的监控视图。'
   }
 ];
 
@@ -111,8 +111,9 @@ const skills = [
           <h2>建立在真实基础设施之上。</h2>
 
           <p class="large-copy">
-            长期围绕 Linux、容器、网络、存储与编排系统开展工作，
-            注重从真实现象出发定位问题，并让服务可靠地运行在生产环境中。
+            工作范围涵盖 Linux、容器、Kubernetes、网络、存储与监控，
+            重点是结合日志、监控指标和系统状态跨层定位实际问题，
+            并帮助服务以清晰、可维护的方式运行在生产环境中。
           </p>
         </div>
 
