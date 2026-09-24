@@ -207,16 +207,25 @@ git diff --stat main...HEAD
 git status --short
 ```
 
-For site changes, also run:
+For site changes, use Docker-first validation by default. Host Node/npm is not required, and do not run `npm install` or `npm run` directly on the host by default. Use npm scripts inside containers as the build and test entry points.
+
+Prefer the repository's Docker workflow:
 
 ```bash
-cd site
-npm run build
+# Run tests inside the builder image (replace the script as appropriate).
+docker build --target builder -t infraopsx-site:builder .
+docker run --rm infraopsx-site:builder npm run test:quantity
+
+# Validate the complete production site build.
+docker build -t infraopsx-site:ci .
+
+# Start the local site for browser acceptance checks.
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-If Node/npm is unavailable on the host, use the repository's existing Docker build workflow.
+Use host Node/npm only when the user explicitly requests it.
 
-For user-facing tools, also verify default values, formulas, invalid inputs, language switch, English and Chinese routes, desktop layout, mobile layout, console errors, and links.
+For user-facing tools, also verify default values, formulas, invalid inputs, language switch, English and Chinese routes, desktop layout, mobile layout, console errors, and links using the local Docker Compose site.
 
 ## Scope Discipline
 

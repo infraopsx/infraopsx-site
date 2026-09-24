@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build && pagefind --site dist",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "test:quantity": "node --test tests/kubernetes-quantity.test.mjs"
   },
   "dependencies": {
     "astro": "latest",

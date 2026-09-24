@@ -1,0 +1,123 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import Header from '../../../../components/Header.astro';
+import Footer from '../../../../components/Footer.astro';
+import KubernetesQuantityConverter from '../../../../components/tools/KubernetesQuantityConverter.astro';
+---
+
+<BaseLayout
+  title="Kubernetes Quantity 换算器 | InfraOpsX"
+  description="解析并换算 Kubernetes CPU 与 Memory Quantity，例如 500m、512Mi、1Gi 和 1G，同时提示可疑单位和精度问题。"
+  lang="zh-CN"
+  canonicalPath="/zh/tools/kubernetes-quantity-converter/"
+  enPath="/tools/kubernetes-quantity-converter/"
+  zhPath="/zh/tools/kubernetes-quantity-converter/"
+  pagefindType="Tool"
+>
+  <Header locale="zh" switchHref="/tools/kubernetes-quantity-converter/" />
+
+  <main class="tool-detail-shell" data-pagefind-body>
+    <div class="container tool-detail-container">
+      <div class="tools-breadcrumb" data-pagefind-ignore>
+        <a href="/zh/">首页</a>
+        <span>/</span>
+        <a href="/zh/tools/">工具</a>
+        <span>/</span>
+        <span>Kubernetes Quantity Converter</span>
+      </div>
+
+      <header class="tool-detail-header">
+        <span class="section-label">KUBERNETES · QUANTITY 换算</span>
+        <h1>Kubernetes Quantity 换算器</h1>
+        <p>了解 CPU 或 Memory Quantity 的实际含义、单位换算结果，以及可能与预期不符的值。</p>
+      </header>
+
+      <section class="tool-section" aria-labelledby="converter-heading">
+        <div class="tool-section-heading">
+          <span class="section-label">换算器</span>
+          <h2 id="converter-heading">写入 YAML 前，先确认这个值代表什么。</h2>
+        </div>
+        <div data-pagefind-ignore>
+          <KubernetesQuantityConverter locale="zh" />
+        </div>
+      </section>
+
+      <section class="tool-info-grid">
+        <article class="tool-info-card">
+          <span class="section-label">工作原理</span>
+          <h2>解析 Quantity，再换算其基准值。</h2>
+          <p>CPU Quantity 以 cores 表示：1 CPU = 1000m，因此 0.5 CPU = 500m。Memory Quantity 以 bytes 表示。十进制和二进制后缀使用不同的倍率：1G = 1,000,000,000 bytes，而 1Gi = 1,073,741,824 bytes。本工具使用精确值进行解析；经过舍入的单位显示会标记为近似值。</p>
+        </article>
+
+        <article class="tool-info-card">
+          <span class="section-label">重要说明</span>
+          <h2>确认资源类型和单位后再使用结果。</h2>
+          <ul>
+            <li>Quantity 后缀区分大小写，M 和 Mi 是不同单位。</li>
+            <li>400m Memory 表示 0.4 bytes，很可能不是你想要的值。</li>
+            <li>Kubernetes CPU resource 的精度不能细于 1m。</li>
+            <li>本工具使用精确 fixed-point 算术，不会连接 Kubernetes Cluster。</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="official-kubernetes-references" aria-labelledby="official-references-heading">
+        <span class="section-label">官方文档</span>
+        <h2 id="official-references-heading">Kubernetes 官方参考</h2>
+        <ul>
+          <li>
+            <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/" target="_blank" rel="noopener noreferrer">Pod 和 Container 的资源管理 ↗</a>
+            <p>了解 resource requests、limits，以及 CPU 和 Memory 单位的官方说明。</p>
+          </li>
+          <li>
+            <a href="https://kubernetes.io/docs/reference/kubernetes-api/definitions/quantity-resource/" target="_blank" rel="noopener noreferrer">Quantity API 定义 ↗</a>
+            <p>查看 Quantity 语法、SI 后缀、exponent notation、精度和规范化规则。</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="tool-faq" aria-labelledby="faq-heading">
+        <span class="section-label">常见问题</span>
+        <h2 id="faq-heading">常见问题</h2>
+        <details open>
+          <summary>500m CPU 表示什么？</summary>
+          <p>500m CPU 等于 0.5 CPU，也就是 500 milliCPU。</p>
+        </details>
+        <details>
+          <summary>M 和 Mi 有什么区别？</summary>
+          <p>M 使用 1000 的幂次，Mi 使用 1024 的幂次，因此两种后缀代表的 bytes 数量不同。</p>
+        </details>
+        <details>
+          <summary>为什么 400m Memory 可能有问题？</summary>
+          <p>后缀 m 表示 milli，因此 400m Memory 实际只有 0.4 bytes。请确认你是否想使用 Mi 或 M 等其他单位。</p>
+        </details>
+        <details>
+          <summary>0.5m CPU 有效吗？</summary>
+          <p>无效。Kubernetes CPU resource requests 和 limits 的精度不能细于 1m。</p>
+        </details>
+      </section>
+
+      <section class="related-tools" data-pagefind-ignore>
+        <div>
+          <span class="section-label">相关工具</span>
+          <h2>需要规划完整的工作负载吗？</h2>
+          <p class="related-tools-copy">使用 Kubernetes Resource Calculator 估算总 requests、节点容量和 Pod 密度。</p>
+        </div>
+        <a class="button secondary" href="/zh/tools/kubernetes-resource-calculator/">打开 Kubernetes Resource Calculator</a>
+      </section>
+
+      <section class="tool-cta" data-pagefind-ignore>
+        <div class="cta-box">
+          <div>
+            <span class="section-label">INFRAOPSX</span>
+            <h2>需要 Kubernetes 资源规划方面的帮助？</h2>
+            <p>联系 InfraOpsX，获取面向实际环境的基础设施建议。</p>
+          </div>
+          <a class="button primary" href="/zh/contact/">联系 InfraOpsX</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <Footer locale="zh" />
+</BaseLayout>

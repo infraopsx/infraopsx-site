@@ -1,0 +1,123 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+import KubernetesQuantityConverter from '../../../components/tools/KubernetesQuantityConverter.astro';
+---
+
+<BaseLayout
+  title="Kubernetes Quantity Converter | InfraOpsX"
+  description="Parse and convert Kubernetes CPU and memory quantities such as 500m, 512Mi, 1Gi and 1G, with warnings for suspicious units and precision."
+  lang="en"
+  canonicalPath="/tools/kubernetes-quantity-converter/"
+  enPath="/tools/kubernetes-quantity-converter/"
+  zhPath="/zh/tools/kubernetes-quantity-converter/"
+  pagefindType="Tool"
+>
+  <Header locale="en" switchHref="/zh/tools/kubernetes-quantity-converter/" />
+
+  <main class="tool-detail-shell" data-pagefind-body>
+    <div class="container tool-detail-container">
+      <div class="tools-breadcrumb" data-pagefind-ignore>
+        <a href="/">Home</a>
+        <span>/</span>
+        <a href="/tools/">Tools</a>
+        <span>/</span>
+        <span>Kubernetes Quantity Converter</span>
+      </div>
+
+      <header class="tool-detail-header">
+        <span class="section-label">KUBERNETES · QUANTITY CONVERSION</span>
+        <h1>Kubernetes Quantity Converter</h1>
+        <p>See what a CPU or memory quantity means, compare its units, and catch values that may not match your intent.</p>
+      </header>
+
+      <section class="tool-section" aria-labelledby="converter-heading">
+        <div class="tool-section-heading">
+          <span class="section-label">CONVERTER</span>
+          <h2 id="converter-heading">Understand the value before adding it to YAML.</h2>
+        </div>
+        <div data-pagefind-ignore>
+          <KubernetesQuantityConverter locale="en" />
+        </div>
+      </section>
+
+      <section class="tool-info-grid">
+        <article class="tool-info-card">
+          <span class="section-label">HOW IT WORKS</span>
+          <h2>Parse the quantity, then convert its base value.</h2>
+          <p>CPU quantities are measured in cores: 1 CPU = 1000m, so 0.5 CPU = 500m. Memory quantities are measured in bytes. Decimal and binary suffixes use different scales: 1G = 1,000,000,000 bytes, while 1Gi = 1,073,741,824 bytes. The converter keeps the parsed value exact and labels rounded unit displays as approximate.</p>
+        </article>
+
+        <article class="tool-info-card">
+          <span class="section-label">IMPORTANT CONSIDERATIONS</span>
+          <h2>Check the unit and resource type.</h2>
+          <ul>
+            <li>Quantity suffixes are case-sensitive. M and Mi are different units.</li>
+            <li>400m Memory means 0.4 bytes and is probably not the intended value.</li>
+            <li>Kubernetes CPU resource precision cannot be finer than 1m.</li>
+            <li>This converter uses exact fixed-point arithmetic and does not connect to a Kubernetes cluster.</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="official-kubernetes-references" aria-labelledby="official-references-heading">
+        <span class="section-label">OFFICIAL DOCUMENTATION</span>
+        <h2 id="official-references-heading">Official Kubernetes references</h2>
+        <ul>
+          <li>
+            <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/" target="_blank" rel="noopener noreferrer">Resource Management for Pods and Containers ↗</a>
+            <p>Resource requests, limits, and CPU and memory units, including common unit mistakes.</p>
+          </li>
+          <li>
+            <a href="https://kubernetes.io/docs/reference/kubernetes-api/definitions/quantity-resource/" target="_blank" rel="noopener noreferrer">Quantity API definition ↗</a>
+            <p>Quantity syntax, SI suffixes, exponent notation, precision, and canonical representation rules.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="tool-faq" aria-labelledby="faq-heading">
+        <span class="section-label">FAQ</span>
+        <h2 id="faq-heading">Common questions</h2>
+        <details open>
+          <summary>What does 500m CPU mean?</summary>
+          <p>500m CPU equals 0.5 CPU, or 500 milliCPU.</p>
+        </details>
+        <details>
+          <summary>What is the difference between M and Mi?</summary>
+          <p>M uses powers of 1000. Mi uses powers of 1024, so the two suffixes do not represent the same number of bytes.</p>
+        </details>
+        <details>
+          <summary>Why is 400m memory dangerous?</summary>
+          <p>The suffix m means milli, so 400m memory is 0.4 bytes. Check whether you intended a different unit, such as Mi or M.</p>
+        </details>
+        <details>
+          <summary>Is 0.5m CPU valid?</summary>
+          <p>No. Kubernetes CPU resource requests and limits cannot use precision finer than 1m.</p>
+        </details>
+      </section>
+
+      <section class="related-tools" data-pagefind-ignore>
+        <div>
+          <span class="section-label">RELATED TOOL</span>
+          <h2>Need to plan a full workload?</h2>
+          <p class="related-tools-copy">Use Kubernetes Resource Calculator to estimate total requests, node capacity, and Pod density.</p>
+        </div>
+        <a class="button secondary" href="/tools/kubernetes-resource-calculator/">Open Kubernetes Resource Calculator</a>
+      </section>
+
+      <section class="tool-cta" data-pagefind-ignore>
+        <div class="cta-box">
+          <div>
+            <span class="section-label">INFRAOPSX</span>
+            <h2>Need help with Kubernetes resource planning?</h2>
+            <p>Contact InfraOpsX for practical infrastructure guidance.</p>
+          </div>
+          <a class="button primary" href="/contact/">Contact InfraOpsX</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <Footer locale="en" />
+</BaseLayout>
