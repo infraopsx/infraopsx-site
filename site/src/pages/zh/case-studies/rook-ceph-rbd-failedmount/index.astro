@@ -6,7 +6,7 @@ import Footer from '../../../../components/Footer.astro';
 
 <BaseLayout
   title="案例：Rook Ceph RBD FailedMount 恢复 | InfraOpsX"
-  description="一个匿名化的 Kubernetes 与 Rook Ceph 案例：排查 RBD FailedMount 时发现 CSI Node 上残留旧 mapping，并在确认安全后解除旧 mount 与 mapping。"
+  description="一个匿名化的 Kubernetes 与 Rook Ceph 案例：排查 RBD FailedMount 时发现 CSI Node 上残留 mapping，随后记录了 mount 检查、umount 与 unmap。"
   lang="zh-CN"
   canonicalPath="/zh/case-studies/rook-ceph-rbd-failedmount/"
   enPath="/case-studies/rook-ceph-rbd-failedmount/"
@@ -38,8 +38,10 @@ import Footer from '../../../../components/Footer.astro';
 
         <p class="case-lead">
           一个 Pod 卡在 <code>ContainerCreating</code>，CSI 持续提示 RBD image
-          is still being used。扫描 RBD nodeplugin 后，在一个节点上找到了目标
-          image 的旧 mapping。只有确认旧 workload 已停止，并检查 mount 和设备状态后，才进行了清理。
+          is still being used。扫描所有 RBD nodeplugin 后，在对应的 CSI nodeplugin
+          中找到了目标 image 的 mapping。记录写明检查了 mount 状态，随后执行
+          <code>umount</code> 和 <code>rbd unmap</code>；但没有单独记录旧 workload
+          已停止或不存在合法 writer。
         </p>
 
         <div class="case-facts">
@@ -89,8 +91,8 @@ rbd image ceph-blockpool/csi-vol-xxxxxxxx is still being used</code></pre>
           <h2>从 Kubernetes 状态追到 CSI Node</h2>
 
           <p>
-            先确认 Pod、PVC、PV 和 attachment 状态，明确问题涉及哪个 volume，
-            以及 Kubernetes 认为它应当挂在哪个节点：
+            为了关联故障 Pod、volume 与 Kubernetes 预期的 attachment 状态，
+            排查时可以检查：
           </p>
 
           <pre><code>kubectl describe pod -n &lt;namespace&gt; &lt;pod-name&gt;
@@ -99,7 +101,8 @@ kubectl get pv &lt;pv-name&gt; -o yaml
 kubectl get volumeattachment</code></pre>
 
           <p>
-            随后找到 Rook 的 RBD nodeplugin，并检查各节点上的本地 mapping：
+            本次记录显示，排查时扫描了所有 RBD nodeplugin，并通过
+            <code>rbd device list</code> 定位目标 image：
           </p>
 
           <pre><code>kubectl -n rook-ceph get pod -o wide | grep csi-rbdplugin
@@ -111,8 +114,8 @@ kubectl -n rook-ceph exec &lt;nodeplugin-pod&gt; -c csi-rbdplugin -- rbd device 
           <h2>目标 image 仍映射在一个节点上</h2>
 
           <p>
-            扫描 RBD nodeplugin 后，在一个旧节点上找到了目标 image。下面使用匿名化的 image
-            和设备名表示：
+            扫描所有 RBD nodeplugin 后，在对应的 CSI nodeplugin 中找到了目标 image
+            的 mapping。下面使用匿名化的 image 和设备名表示：
           </p>
 
           <pre><code>ceph-blockpool/csi-vol-xxxxxxxx → /dev/rbd5</code></pre>
@@ -129,15 +132,17 @@ kubectl -n rook-ceph exec &lt;nodeplugin-pod&gt; -c csi-rbdplugin -- rbd device 
           <h2>清理前先确认 volume 的使用者</h2>
 
           <p>
-            我们把 “still being used” 当作数据安全信号，而不是强制 unmap 的理由。清理之前，
-            先确认旧 workload 已停止、没有合法 writer，并在持有 mapping 的 nodeplugin 上检查 mount 状态。
+            “still being used” 是数据安全信号，不是强制 unmap 的理由。本次记录写明，
+            在持有 mapping 的 nodeplugin 上检查了 mount 状态，随后执行普通
+            <code>umount</code> 和 <code>rbd unmap</code>。记录没有单独说明旧 workload
+            已停止，也没有证明不存在合法 writer。
           </p>
 
           <pre><code>mount | grep /dev/rbdX</code></pre>
 
           <p>
-            只有确认 volume 已不再被业务使用后，才可以解除旧 mount 和 mapping。
-            本次没有把 force unmap、blocklist 或删除 <code>VolumeAttachment</code> 当作默认处理方式。
+            作为通用安全要求，清理 mount 或 mapping 前应确认 volume 不再被合法使用。
+            Force unmap、blocklist 或删除 <code>VolumeAttachment</code> 不应作为默认清理步骤。
           </p>
         </section>
 
@@ -177,8 +182,8 @@ rbd unmap ceph-blockpool/csi-vol-xxxxxxxx</code></pre>
           <h2>把模糊的 FailedMount 缩小到具体存储状态</h2>
 
           <p>
-            排查最终定位到节点上残留的旧 RBD mapping。在确认旧 workload 不再是 writer 后，
-            清理 mount 和 mapping，CSI 随后重新接管 volume，Pod 恢复。
+            本次记录显示，检查 mount 状态后执行了 <code>umount</code> 和
+            <code>rbd unmap</code>。随后 CSI 重新 map image，Pod 恢复。
           </p>
 
           <p>

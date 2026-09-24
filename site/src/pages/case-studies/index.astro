@@ -16,8 +16,8 @@ const cases = [
     title: 'Rook Ceph RBD FailedMount Recovery',
     area: 'Kubernetes · Rook Ceph · Storage',
     problem: 'A stateful Pod was stuck in ContainerCreating while CSI reported that the RBD image was still being used.',
-    diagnosis: 'Scanning the RBD nodeplugins found the target image still mapped on an old node. The old workload was checked before removing the stale mount and mapping.',
-    outcome: 'After the old mount and RBD mapping were removed safely, CSI could map the volume again and the Pod recovered.',
+    diagnosis: 'Scanning all RBD nodeplugins found the target image mapped on a CSI node.',
+    outcome: 'After the recorded mount check, umount and RBD unmap, CSI mapped the volume again and the Pod recovered.',
     href: '/case-studies/rook-ceph-rbd-failedmount/'
   },
   {

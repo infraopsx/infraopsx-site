@@ -6,7 +6,7 @@ import Footer from '../../../components/Footer.astro';
 
 <BaseLayout
   title="Case Study: Rook Ceph RBD FailedMount Recovery | InfraOpsX"
-  description="An anonymized Kubernetes and Rook Ceph case study tracing an RBD FailedMount to an old node mapping and a controlled unmount and unmap."
+  description="An anonymized Kubernetes and Rook Ceph case study tracing an RBD FailedMount to a mapping that remained on a CSI node, followed by unmount and unmap."
   lang="en"
   canonicalPath="/case-studies/rook-ceph-rbd-failedmount/"
   enPath="/case-studies/rook-ceph-rbd-failedmount/"
@@ -38,10 +38,11 @@ import Footer from '../../../components/Footer.astro';
 
         <p class="case-lead">
           A Pod remained in <code>ContainerCreating</code> while CSI repeatedly
-          reported that the RBD image was still being used. Scanning the RBD
-          nodeplugins traced the failure to a mapping that remained on a node.
-          Cleanup was performed only after confirming the old workload had
-          stopped and checking the mount and device state.
+          reported that the RBD image was still being used. Scanning all RBD
+          nodeplugins found the image mapped on a CSI node. The incident record
+          documents a mount check followed by <code>umount</code> and
+          <code>rbd unmap</code>; it does not document a separate confirmation
+          that the old workload had stopped or that no legitimate writer existed.
         </p>
 
         <div class="case-facts">
@@ -92,8 +93,8 @@ rbd image ceph-blockpool/csi-vol-xxxxxxxx is still being used</code></pre>
           <h2>Trace the claim from Kubernetes to the CSI node</h2>
 
           <p>
-            The Pod, PVC, PV and attachment state established which volume was
-            involved and where Kubernetes expected it to be attached:
+            The following are useful diagnostic checks for correlating the
+            Pod and volume with the attachment state Kubernetes expects:
           </p>
 
           <pre><code>kubectl describe pod -n &lt;namespace&gt; &lt;pod-name&gt;
@@ -102,8 +103,8 @@ kubectl get pv &lt;pv-name&gt; -o yaml
 kubectl get volumeattachment</code></pre>
 
           <p>
-            The investigation then located the Rook RBD nodeplugins and checked
-            their local mappings:
+            The incident record says all RBD nodeplugins were scanned with
+            <code>rbd device list</code> to locate the target image:
           </p>
 
           <pre><code>kubectl -n rook-ceph get pod -o wide | grep csi-rbdplugin
@@ -115,8 +116,8 @@ kubectl -n rook-ceph exec &lt;nodeplugin-pod&gt; -c csi-rbdplugin -- rbd device 
           <h2>The target image was still mapped on a node</h2>
 
           <p>
-            Scanning the RBD nodeplugins found the target image on an old node,
-            represented here with an anonymized image and device:
+            Scanning all RBD nodeplugins found the target image mapped on a
+            CSI node, shown here with an anonymized image and device:
           </p>
 
           <pre><code>ceph-blockpool/csi-vol-xxxxxxxx → /dev/rbd5</code></pre>
@@ -135,19 +136,21 @@ kubectl -n rook-ceph exec &lt;nodeplugin-pod&gt; -c csi-rbdplugin -- rbd device 
           <h2>Confirm ownership before removing the mapping</h2>
 
           <p>
-            “Still being used” was treated as a data-safety signal, not an
-            instruction to force an unmap. Before cleanup, the old workload was
-            confirmed stopped, there was no legitimate writer, and the mount
-            state was checked on the nodeplugin holding the mapping.
+            “Still being used” is a data-safety signal, not an instruction to
+            force an unmap. The incident record documents checking the mount
+            state on the nodeplugin holding the mapping, then running
+            <code>umount</code> and <code>rbd unmap</code>. It does not separately
+            document that the old workload had stopped or establish that no
+            legitimate writer existed.
           </p>
 
           <pre><code>mount | grep /dev/rbdX</code></pre>
 
           <p>
-            Only after confirming that the volume was no longer in active use
-            was it safe to remove the old mount and mapping. Force unmap,
-            blocklisting and deleting a <code>VolumeAttachment</code> were not
-            used as default recovery steps.
+            As a general safety requirement, confirm that the volume is no
+            longer in legitimate use before removing a mount or mapping. Force
+            unmap, blocklisting and deleting a <code>VolumeAttachment</code>
+            should not be treated as default recovery steps.
           </p>
         </section>
 
@@ -192,10 +195,9 @@ rbd unmap ceph-blockpool/csi-vol-xxxxxxxx</code></pre>
           <h2>A vague FailedMount became a specific storage finding</h2>
 
           <p>
-            The investigation narrowed the failure to an old RBD mapping that
-            remained on a node. After confirming the old workload was no longer
-            a writer, the mount and mapping were cleaned up, CSI took over the
-            volume again, and the Pod recovered.
+            The incident record says the mount state was checked, then
+            <code>umount</code> and <code>rbd unmap</code> were run. CSI mapped
+            the image again, and the Pod recovered.
           </p>
 
           <p>

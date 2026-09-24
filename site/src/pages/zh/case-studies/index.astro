@@ -16,8 +16,8 @@ const cases = [
     title: 'Rook Ceph RBD FailedMount 恢复',
     area: 'Kubernetes · Rook Ceph · 存储',
     problem: '某个有状态 Pod 卡在 ContainerCreating，CSI 持续提示 RBD image is still being used。',
-    diagnosis: '扫描 RBD nodeplugin 后发现目标 image 仍残留在旧节点的 mapping 中；清理前先确认旧 workload 已停止使用该 volume。',
-    outcome: '安全解除旧 mount 和 RBD mapping 后，CSI 可以重新 map volume，Pod 恢复。',
+    diagnosis: '扫描所有 RBD nodeplugin 后，在对应的 CSI nodeplugin 中找到目标 image 的 mapping。',
+    outcome: '记录中的 mount 检查、umount 和 RBD unmap 完成后，CSI 重新 map volume，Pod 恢复。',
     href: '/zh/case-studies/rook-ceph-rbd-failedmount/'
   },
   {
