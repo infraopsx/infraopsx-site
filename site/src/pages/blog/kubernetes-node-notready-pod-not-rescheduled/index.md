@@ -1,6 +1,6 @@
 ---
 layout: ../../../layouts/ArticleLayout.astro
-title: "Kubernetes Node NotReady: Why Pods Aren't Rescheduled"
+title: "Why a Kubernetes Pod Isn't Rescheduled After a Node Goes NotReady"
 description: "A real Kubernetes troubleshooting note for when a Node is NotReady but the workload does not recover elsewhere. Check taints, tolerationSeconds, nodeName, and DaemonSet behavior."
 pubDate: "2026-09-24"
 category: Kubernetes
