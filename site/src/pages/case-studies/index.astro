@@ -13,6 +13,14 @@ const cases = [
     href: '/case-studies/kubernetes-pod-pending/'
   },
   {
+    title: 'Rook Ceph RBD FailedMount Recovery',
+    area: 'Kubernetes · Rook Ceph · Storage',
+    problem: 'A stateful Pod was stuck in ContainerCreating while CSI reported that the RBD image was still being used.',
+    diagnosis: 'Scanning all RBD nodeplugins found the target image mapped on a CSI node.',
+    outcome: 'After the recorded mount check, umount and RBD unmap, CSI mapped the volume again and the Pod recovered.',
+    href: '/case-studies/rook-ceph-rbd-failedmount/'
+  },
+  {
     title: 'PostgreSQL WAL Growth Investigation',
     area: 'PostgreSQL · Storage',
     problem: 'The PostgreSQL data directory showed unexpectedly high disk consumption concentrated in pg_wal.',

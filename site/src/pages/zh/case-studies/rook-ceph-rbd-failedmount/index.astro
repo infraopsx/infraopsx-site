@@ -1,0 +1,224 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import Header from '../../../../components/Header.astro';
+import Footer from '../../../../components/Footer.astro';
+---
+
+<BaseLayout
+  title="案例：Rook Ceph RBD FailedMount 恢复 | InfraOpsX"
+  description="一个匿名化的 Kubernetes 与 Rook Ceph 案例：排查 RBD FailedMount 时发现 CSI Node 上残留 mapping，随后记录了 mount 检查、umount 与 unmap。"
+  lang="zh-CN"
+  canonicalPath="/zh/case-studies/rook-ceph-rbd-failedmount/"
+  enPath="/case-studies/rook-ceph-rbd-failedmount/"
+  zhPath="/zh/case-studies/rook-ceph-rbd-failedmount/"
+  pagefindType="Case Study"
+>
+  <Header
+    locale="zh"
+    switchHref="/case-studies/rook-ceph-rbd-failedmount/"
+  />
+
+  <main class="case-detail-shell" data-pagefind-body>
+    <div class="container case-detail-container">
+
+      <div class="article-breadcrumb" data-pagefind-ignore>
+        <a href="/zh/">首页</a>
+        <span>/</span>
+        <a href="/zh/case-studies/">案例</a>
+        <span>/</span>
+        <span>Rook Ceph RBD FailedMount 恢复</span>
+      </div>
+
+      <header class="case-detail-header">
+        <span class="section-label">案例 · KUBERNETES · ROOK CEPH</span>
+
+        <h1>
+          一次因旧 RBD mapping 阻塞的 Kubernetes FailedMount 恢复过程
+        </h1>
+
+        <p class="case-lead">
+          一个 Pod 卡在 <code>ContainerCreating</code>，CSI 持续提示 RBD image
+          is still being used。扫描所有 RBD nodeplugin 后，在对应的 CSI nodeplugin
+          中找到了目标 image 的 mapping。记录写明检查了 mount 状态，随后执行
+          <code>umount</code> 和 <code>rbd unmap</code>；但没有单独记录旧 workload
+          已停止或不存在合法 writer。
+        </p>
+
+        <div class="case-facts">
+          <div>
+            <span>环境</span>
+            <strong>Kubernetes + Rook Ceph RBD</strong>
+          </div>
+          <div>
+            <span>主要信号</span>
+            <strong>FailedMount · image is still being used</strong>
+          </div>
+          <div>
+            <span>诊断</span>
+            <strong>CSI Node 上残留旧 RBD mapping</strong>
+          </div>
+          <div>
+            <span>结果</span>
+            <strong>CSI 重新 map volume，Pod 恢复</strong>
+          </div>
+        </div>
+      </header>
+
+      <article class="case-detail-content">
+
+        <section>
+          <span class="case-step">01 · 问题</span>
+          <h2>Pod 无法离开 ContainerCreating</h2>
+
+          <p>
+            Pod 一直停留在 <code>ContainerCreating</code>，
+            <code>kubectl describe pod</code> 中反复出现挂载失败：
+          </p>
+
+          <pre><code>Warning  FailedMount  kubelet
+MountVolume.MountDevice failed for volume "pvc-xxxxxxxx":
+rbd image ceph-blockpool/csi-vol-xxxxxxxx is still being used</code></pre>
+
+          <p>
+            这是 storage handoff / ownership 问题，单纯重建 Pod 并不能清理旧 mapping。
+            这个报错也意味着可能仍有客户端持有该 RBD image，因此排查重点是先找到 mapping，
+            而不是强行让新挂载继续。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">02 · 证据</span>
+          <h2>从 Kubernetes 状态追到 CSI Node</h2>
+
+          <p>
+            为了关联故障 Pod、volume 与 Kubernetes 预期的 attachment 状态，
+            排查时可以检查：
+          </p>
+
+          <pre><code>kubectl describe pod -n &lt;namespace&gt; &lt;pod-name&gt;
+kubectl get pvc -n &lt;namespace&gt; &lt;pvc-name&gt;
+kubectl get pv &lt;pv-name&gt; -o yaml
+kubectl get volumeattachment</code></pre>
+
+          <p>
+            本次记录显示，排查时扫描了所有 RBD nodeplugin，并通过
+            <code>rbd device list</code> 定位目标 image：
+          </p>
+
+          <pre><code>kubectl -n rook-ceph get pod -o wide | grep csi-rbdplugin
+kubectl -n rook-ceph exec &lt;nodeplugin-pod&gt; -c csi-rbdplugin -- rbd device list</code></pre>
+        </section>
+
+        <section>
+          <span class="case-step">03 · 诊断</span>
+          <h2>目标 image 仍映射在一个节点上</h2>
+
+          <p>
+            扫描所有 RBD nodeplugin 后，在对应的 CSI nodeplugin 中找到了目标 image
+            的 mapping。下面使用匿名化的 image 和设备名表示：
+          </p>
+
+          <pre><code>ceph-blockpool/csi-vol-xxxxxxxx → /dev/rbd5</code></pre>
+
+          <p>
+            在 <code>rook-ceph-tools</code> 中执行 <code>rbd device list</code>
+            没有输出，只能说明该 Pod 自己没有对应 mapping，不能证明其他 Kubernetes Node 上也没有。
+            已确认的直接阻塞点是旧 mapping 仍然存在；现有记录没有证明它最初为何未被清理。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">04 · 安全确认</span>
+          <h2>清理前先确认 volume 的使用者</h2>
+
+          <p>
+            “still being used” 是数据安全信号，不是强制 unmap 的理由。本次记录写明，
+            在持有 mapping 的 nodeplugin 上检查了 mount 状态，随后执行普通
+            <code>umount</code> 和 <code>rbd unmap</code>。记录没有单独说明旧 workload
+            已停止，也没有证明不存在合法 writer。
+          </p>
+
+          <pre><code>mount | grep /dev/rbdX</code></pre>
+
+          <p>
+            作为通用安全要求，清理 mount 或 mapping 前应确认 volume 不再被合法使用。
+            Force unmap、blocklist 或删除 <code>VolumeAttachment</code> 不应作为默认清理步骤。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">05 · 处理</span>
+          <h2>先 umount，再 unmap RBD image</h2>
+
+          <p>
+            记录中的恢复顺序是先解除残留的 filesystem mount，再移除旧 RBD mapping：
+          </p>
+
+          <pre><code>umount &lt;mount-point&gt;
+rbd unmap ceph-blockpool/csi-vol-xxxxxxxx</code></pre>
+
+          <p>
+            旧 mapping 清理后，CSI 就可以按正常的 attach 和 mount 流程重新 map volume。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">06 · 验证</span>
+          <h2>CSI 重新 map，Pod 恢复</h2>
+
+          <p>
+            umount 和 unmap 之后，CSI 可以重新 map image，Pod 也恢复了。
+            持续阻塞挂载的 <code>FailedMount</code> 不再阻止恢复流程。
+          </p>
+
+          <p>
+            对于有状态工作负载，Pod 正常运行不等于应用层数据完整性已经验证。
+            仍应单独检查应用读写；现有事故记录没有声称完成了这项检查。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">07 · 结果</span>
+          <h2>把模糊的 FailedMount 缩小到具体存储状态</h2>
+
+          <p>
+            本次记录显示，检查 mount 状态后执行了 <code>umount</code> 和
+            <code>rbd unmap</code>。随后 CSI 重新 map image，Pod 恢复。
+          </p>
+
+          <p>
+            这确认了直接故障点和恢复结果，但没有证据说明旧 mapping 当初为什么没有清理掉。
+          </p>
+        </section>
+
+        <section>
+          <span class="case-step">08 · 总结</span>
+          <h2>先诊断，再修改。</h2>
+
+          <ul>
+            <li>
+              “image is still being used” 是 ownership 和数据安全信号，不只是一个普通的 Ceph 报错。
+            </li>
+            <li>
+              Kubernetes attachment state、CSI Node mapping 和 Ceph client state 属于不同层，需要分别核对。
+            </li>
+            <li>
+              清理 mount 或 mapping 前，先确认旧 writer 已停止。
+            </li>
+          </ul>
+        </section>
+
+      </article>
+
+      <div class="case-detail-actions" data-pagefind-ignore>
+        <a class="button primary" href="/zh/case-studies/">← 返回全部案例</a>
+        <a class="button secondary" href="/zh/blog/rook-ceph-rbd-image-still-being-used-failedmount/">
+          阅读完整排查指南
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <Footer locale="zh" />
+</BaseLayout>

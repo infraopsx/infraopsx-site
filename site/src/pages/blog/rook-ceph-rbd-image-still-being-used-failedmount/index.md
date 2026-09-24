@@ -45,6 +45,8 @@ That worked for the incident, but the more important lesson is:
 
 Deleting `VolumeAttachment`, forcing an unmap, or blocklisting a client before understanding the old writer can turn a mount failure into a data-integrity problem.
 
+Prefer the condensed incident view? Read the [Rook Ceph RBD FailedMount case study](/case-studies/rook-ceph-rbd-failedmount/).
+
 > PVC names, RBD image IDs, node names, and addresses below are generic examples.
 
 ## What the error is protecting
