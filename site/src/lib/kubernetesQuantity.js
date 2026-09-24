@@ -301,15 +301,12 @@ export function analyzeCpuQuantity(input) {
     return { ...failedAnalysis(parsed), error: 'negative' };
   }
 
-  if (
-    parsed.value.numerator > 0n &&
-    compare(parsed.value, asRational(1n, 1000n)) < 0
-  ) {
+  const milliCpu = multiply(parsed.value, asRational(1000n));
+  if (milliCpu.denominator !== 1n) {
     return { ...failedAnalysis(parsed), error: 'cpu-precision' };
   }
 
   const value = parsed.normalizedValue;
-  const milliCpu = multiply(value, asRational(1000n));
   const warnings = precisionWarning(parsed);
   if (parsed.notation !== 'exponent' && parsed.suffix && parsed.suffix !== 'm') {
     warnings.push('unusual-cpu-suffix');

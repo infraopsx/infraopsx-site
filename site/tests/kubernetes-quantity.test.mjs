@@ -14,6 +14,8 @@ test('CPU quantities convert exactly to cores and mCPU', () => {
     ['500m', '0.5', '500', '500m'],
     ['0.5', '0.5', '500', '500m'],
     ['1', '1', '1000', '1'],
+    ['1.001', '1.001', '1001', '1001m'],
+    ['1001e-3', '1.001', '1001', '1001m'],
     ['1.5', '1.5', '1500', '1500m'],
     ['1500m', '1.5', '1500', '1500m'],
     ['0', '0', '0', '0'],
@@ -31,7 +33,7 @@ test('CPU quantities convert exactly to cores and mCPU', () => {
 });
 
 test('CPU rejects negative and finer-than-1m resource values', () => {
-  for (const input of ['0.5m', '0.0005', '0.1m']) {
+  for (const input of ['0.5m', '0.0005', '0.1m', '1.0001', '2.3456', '1.0001m']) {
     const result = analyzeCpuQuantity(input);
     assert.equal(result.status, 'Error', input);
     assert.equal(result.error, 'cpu-precision', input);
