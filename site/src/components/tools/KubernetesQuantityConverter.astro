@@ -1,0 +1,456 @@
+---
+import {
+  analyzeCpuQuantity,
+  formatQuantityValue
+} from '../../lib/kubernetesQuantity.js';
+
+const { locale = 'en' } = Astro.props;
+const isZh = locale === 'zh';
+const initialInput = '500m';
+const initialResult = analyzeCpuQuantity(initialInput);
+const initialYaml = `resources:\n  requests:\n    cpu: "${initialResult.recommendedQuantity}"`;
+const idSuffix = isZh ? 'zh' : 'en';
+---
+
+<section
+  class="kubernetes-quantity-converter"
+  data-kubernetes-quantity-converter
+  data-locale={locale}
+>
+  <div class="calculator-grid">
+    <form class="calculator-form" data-quantity-form novalidate>
+      <div class="form-fields">
+        <label class="field">
+          <span>{isZh ? '资源类型' : 'Resource Type'}</span>
+          <select data-resource-type>
+            <option value="cpu" selected>CPU</option>
+            <option value="memory">Memory</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>{isZh ? 'Quantity' : 'Quantity'}</span>
+          <input
+            data-quantity-input
+            type="text"
+            inputmode="text"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            maxlength="256"
+            value={initialInput}
+            aria-describedby={`quantity-help-${idSuffix}`}
+          />
+        </label>
+
+        <div class="quantity-examples">
+          <span class="quantity-examples-label" data-examples-heading>
+            {isZh ? '示例' : 'Examples'}
+          </span>
+          <div class="quantity-example-list" data-example-list>
+            {['500m', '0.5', '1', '1500m'].map((example) => (
+              <button class="quantity-example" type="button" data-quantity-example={example}>
+                {example}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <p class="quantity-input-help" id={`quantity-help-${idSuffix}`}>
+          {isZh
+            ? '输入 CPU 或 Memory 的 Kubernetes Quantity。只处理本浏览器中的输入。'
+            : 'Enter a Kubernetes CPU or Memory quantity. Your input stays in this browser.'}
+        </p>
+      </div>
+
+      <div class="calculator-error quantity-error" data-quantity-error role="alert" hidden></div>
+
+      <button class="button primary calculator-submit" type="submit">
+        {isZh ? '换算' : 'Convert'}
+      </button>
+    </form>
+
+    <div class="calculator-output quantity-output" aria-live="polite">
+      <div class="summary-block">
+        <span class="section-label">{isZh ? '换算结果' : 'CONVERSION RESULT'}</span>
+        <h2>{isZh ? '解析这个 Quantity' : 'Understand the quantity'}</h2>
+        <p data-quantity-summary>
+          {isZh
+            ? '500m CPU = 0.5 CPU cores = 500 mCPU。'
+            : '500m CPU = 0.5 CPU cores = 500 mCPU.'}
+        </p>
+      </div>
+
+      <div class="results-block">
+        <div class="results-heading">
+          <div>
+            <span class="section-label">{isZh ? '解析详情' : 'PARSED VALUE'}</span>
+            <h2>{isZh ? '换算详情' : 'Conversions'}</h2>
+          </div>
+          <span class="quantity-status" data-quantity-status data-status-level="valid" role="status" aria-live="polite">
+            <span data-status-text>{isZh ? '有效' : 'Valid'}</span>
+          </span>
+        </div>
+
+        <dl class="result-list">
+          <div class="result-row">
+            <dt>{isZh ? '解析输入' : 'Parsed input'}</dt>
+            <dd><strong data-parsed-value>{initialInput}</strong></dd>
+          </div>
+
+          <div class="result-row" data-cpu-row>
+            <dt>{isZh ? 'CPU cores' : 'CPU cores'}</dt>
+            <dd><strong data-cpu-cores>{formatQuantityValue(initialResult.cpuCores)}</strong></dd>
+          </div>
+          <div class="result-row" data-cpu-row>
+            <dt>mCPU</dt>
+            <dd><strong data-millicpu>{formatQuantityValue(initialResult.milliCpu)}</strong></dd>
+          </div>
+
+          <div class="result-row" data-memory-row hidden>
+            <dt>{isZh ? 'Exact bytes' : 'Exact bytes'}</dt>
+            <dd><strong data-exact-bytes>—</strong></dd>
+          </div>
+          <div class="result-row" data-memory-row hidden>
+            <dt>Mi</dt>
+            <dd><strong data-mebibytes>—</strong></dd>
+          </div>
+          <div class="result-row" data-memory-row hidden>
+            <dt>Gi</dt>
+            <dd><strong data-gibibytes>—</strong></dd>
+          </div>
+          <div class="result-row" data-memory-row hidden>
+            <dt>MB / GB</dt>
+            <dd><strong data-decimal-memory>—</strong></dd>
+          </div>
+
+          <div class="result-row result-row-recommended">
+            <dt>{isZh ? '推荐的 Kubernetes Quantity' : 'Recommended Kubernetes quantity'}</dt>
+            <dd><strong data-recommended>{initialResult.recommendedQuantity}</strong></dd>
+          </div>
+        </dl>
+
+        <div class="quantity-warning" data-quantity-warning role="status" hidden>
+          <strong data-warning-heading>{isZh ? '请检查这个值' : 'Review this value'}</strong>
+          <p data-warning-text></p>
+          <p class="quantity-suggestions" data-warning-suggestions hidden></p>
+          <a
+            class="quantity-warning-doc"
+            data-warning-doc
+            href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+            target="_blank"
+            rel="noopener noreferrer"
+            hidden
+          >
+            {isZh ? '查看 Kubernetes 官方文档 →' : 'View Kubernetes documentation →'}
+          </a>
+        </div>
+      </div>
+
+      <div class="resource-yaml-block quantity-yaml-block">
+        <div class="resource-yaml-heading">
+          <div>
+            <span class="resource-group-label">{isZh ? 'KUBERNETES YAML 参考' : 'KUBERNETES YAML REFERENCE'}</span>
+            <h3>{isZh ? '请求配置示例' : 'Request example'}</h3>
+          </div>
+          <button class="button secondary resource-copy-button" type="button" data-copy-quantity-yaml>
+            {isZh ? '复制 YAML' : 'Copy YAML'}
+          </button>
+        </div>
+        <pre class="resource-yaml"><code data-quantity-yaml>{initialYaml}</code></pre>
+        <p class="resource-copy-status" data-quantity-copy-status aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+
+  <p class="calculator-privacy">
+    {isZh
+      ? '所有解析和换算均在浏览器本地完成，不会连接 Kubernetes Cluster，也不会上传输入。'
+      : 'Parsing and conversion run locally in your browser. No Kubernetes cluster is contacted and no input is uploaded.'}
+  </p>
+</section>
+
+<script>
+  import {
+    analyzeCpuQuantity,
+    analyzeMemoryQuantity,
+    formatQuantityValue
+  } from '../../lib/kubernetesQuantity.js';
+
+  (() => {
+    const root = document.querySelector('[data-kubernetes-quantity-converter]');
+    if (!root) return;
+
+    const isZh = root.dataset.locale === 'zh';
+    const form = root.querySelector('[data-quantity-form]');
+    const typeSelect = root.querySelector('[data-resource-type]');
+    const quantityInput = root.querySelector('[data-quantity-input]');
+    const exampleList = root.querySelector('[data-example-list]');
+    const errorNode = root.querySelector('[data-quantity-error]');
+    const statusNode = root.querySelector('[data-quantity-status]');
+    const statusText = root.querySelector('[data-status-text]');
+    const summaryNode = root.querySelector('[data-quantity-summary]');
+    const parsedNode = root.querySelector('[data-parsed-value]');
+    const cpuRows = [...root.querySelectorAll('[data-cpu-row]')];
+    const memoryRows = [...root.querySelectorAll('[data-memory-row]')];
+    const cpuCoresNode = root.querySelector('[data-cpu-cores]');
+    const milliCpuNode = root.querySelector('[data-millicpu]');
+    const bytesNode = root.querySelector('[data-exact-bytes]');
+    const mebibytesNode = root.querySelector('[data-mebibytes]');
+    const gibibytesNode = root.querySelector('[data-gibibytes]');
+    const decimalMemoryNode = root.querySelector('[data-decimal-memory]');
+    const recommendedNode = root.querySelector('[data-recommended]');
+    const warningNode = root.querySelector('[data-quantity-warning]');
+    const warningText = root.querySelector('[data-warning-text]');
+    const suggestionsNode = root.querySelector('[data-warning-suggestions]');
+    const warningDoc = root.querySelector('[data-warning-doc]');
+    const yamlNode = root.querySelector('[data-quantity-yaml]');
+    const copyButton = root.querySelector('[data-copy-quantity-yaml]');
+    const copyStatus = root.querySelector('[data-quantity-copy-status]');
+
+    const examples = {
+      cpu: ['500m', '0.5', '1', '1500m'],
+      memory: ['512Mi', '1Gi', '1G', '400m']
+    };
+
+    const messages = isZh
+      ? {
+          valid: '有效',
+          warning: '警告',
+          error: '错误',
+          cpuSummary: (input, cores, milli) => `${input} CPU = ${cores} CPU cores = ${milli} mCPU。`,
+          memorySummary: (input, bytes) => `${input} Memory = ${bytes} bytes。`,
+          empty: '请输入 Kubernetes Quantity。',
+          invalid: 'Quantity 格式无效。请检查数字和后缀。',
+          suffix: '不支持这个后缀。Kubernetes 使用 M 表示十进制 megabytes，使用 Mi 表示 mebibytes。',
+          case: 'Quantity 后缀区分大小写。请确认使用了正确的大小写，例如 Mi 和 M。',
+          negative: 'CPU 和 Memory resource quantity 不能为负数。',
+          cpuPrecision: 'CPU resource 的精度不能细于 1m。',
+          range: 'Quantity 超出工具支持的 magnitude 或 exponent 范围。',
+          normalized: 'Kubernetes Quantity 的 base-unit 精度最多为 3 位小数；此值已按正方向归一化到 0.001。',
+          fractional: '这个 Memory 值不是整数 bytes。请确认你确实需要 fractional byte。',
+          suspicious: '400m 表示 0.4 bytes。这很可能不是你想要的值。',
+          suspiciousSuggestions: '你可能想写：400Mi 或 400M。工具不会自动更改输入。',
+          unusualCpu: '这个 suffix 可用于 Kubernetes Quantity，但不常用于 CPU resource。请确认单位和值。',
+          warningYaml: '存在警告时不会生成可复制的 YAML。请先确认输入单位和值。',
+          invalidYaml: '无效输入不会生成 YAML。',
+          noRecommendation: '暂不提供推荐值',
+          copied: '已复制',
+          copyFailed: '复制失败',
+          copyValidOnly: '只有无警告的有效值可以复制为 YAML。'
+        }
+      : {
+          valid: 'Valid',
+          warning: 'Warning',
+          error: 'Error',
+          cpuSummary: (input, cores, milli) => `${input} CPU = ${cores} CPU cores = ${milli} mCPU.`,
+          memorySummary: (input, bytes) => `${input} Memory = ${bytes} bytes.`,
+          empty: 'Enter a Kubernetes quantity.',
+          invalid: 'The quantity format is invalid. Check the number and suffix.',
+          suffix: 'This suffix is not supported. Kubernetes uses M for decimal megabytes and Mi for mebibytes.',
+          case: 'Quantity suffixes are case-sensitive. Check the capitalization, such as Mi versus M.',
+          negative: 'CPU and Memory resource quantities cannot be negative.',
+          cpuPrecision: 'CPU resource precision cannot be finer than 1m.',
+          range: 'The quantity exceeds this converter’s supported magnitude or exponent range.',
+          normalized: 'Kubernetes Quantity precision is limited to three decimal places in the base unit; this value was normalized upward to 0.001.',
+          fractional: 'This Memory value is not a whole number of bytes. Confirm that you intend to use a fractional byte.',
+          suspicious: '400m means 0.4 bytes. This is probably not what you intended.',
+          suspiciousSuggestions: 'Did you mean 400Mi or 400M? The input has not been changed.',
+          unusualCpu: 'This suffix is valid for Kubernetes quantities but uncommon for CPU resources. Confirm the unit and value.',
+          warningYaml: 'YAML is not offered while a warning is present. Confirm the input unit and value first.',
+          invalidYaml: 'Invalid input does not produce YAML.',
+          noRecommendation: 'No recommendation available',
+          copied: 'Copied',
+          copyFailed: 'Copy failed',
+          copyValidOnly: 'Only warning-free valid values can be copied as YAML.'
+        };
+
+    const currentType = () => typeSelect.value;
+    const updateExamples = () => {
+      const values = examples[currentType()];
+      exampleList.replaceChildren();
+
+      values.forEach((value) => {
+        const button = document.createElement('button');
+        button.className = 'quantity-example';
+        button.type = 'button';
+        button.dataset.quantityExample = value;
+        button.textContent = value;
+        exampleList.append(button);
+      });
+    };
+
+    const clearResults = () => {
+      parsedNode.textContent = '—';
+      cpuCoresNode.textContent = '—';
+      milliCpuNode.textContent = '—';
+      bytesNode.textContent = '—';
+      mebibytesNode.textContent = '—';
+      gibibytesNode.textContent = '—';
+      decimalMemoryNode.textContent = '—';
+      recommendedNode.textContent = messages.noRecommendation;
+      warningNode.hidden = true;
+      warningText.textContent = '';
+      suggestionsNode.hidden = true;
+      suggestionsNode.textContent = '';
+      warningDoc.hidden = true;
+      copyButton.disabled = true;
+    };
+
+    const showError = (code) => {
+      const type = currentType();
+      cpuRows.forEach((row) => { row.hidden = type !== 'cpu'; });
+      memoryRows.forEach((row) => { row.hidden = type !== 'memory'; });
+      const text = code === 'empty'
+        ? messages.empty
+        : code === 'suffix-case'
+          ? messages.case
+          : code === 'decimal-memory-suffix'
+            ? messages.suffix
+            : code === 'negative'
+              ? messages.negative
+              : code === 'cpu-precision'
+                ? messages.cpuPrecision
+                : code === 'out-of-range'
+                  ? messages.range
+                  : code === 'invalid-number'
+                    ? messages.invalid
+                    : messages.suffix;
+
+      errorNode.textContent = text;
+      errorNode.hidden = false;
+      quantityInput.setAttribute('aria-invalid', 'true');
+      statusNode.dataset.statusLevel = 'error';
+      statusText.textContent = messages.error;
+      summaryNode.textContent = text;
+      clearResults();
+      yamlNode.textContent = messages.invalidYaml;
+      copyStatus.textContent = '';
+    };
+
+    const displayApproximation = (value) => `${value.approximate ? '≈ ' : ''}${value.text}`;
+
+    const renderWarning = (result) => {
+      if (!result.warnings.length) {
+        warningNode.hidden = true;
+        warningText.textContent = '';
+        suggestionsNode.hidden = true;
+        suggestionsNode.textContent = '';
+        warningDoc.hidden = true;
+        return;
+      }
+
+      const warningMessages = result.warnings.map((warning) => ({
+        'precision-normalized': messages.normalized,
+        'fractional-byte': messages.fractional,
+        'suspicious-millicpu-memory': messages.suspicious,
+        'unusual-cpu-suffix': messages.unusualCpu
+      })[warning]).filter(Boolean);
+
+      warningNode.hidden = false;
+      warningText.textContent = warningMessages.join(' ');
+      const suspicious = result.warnings.includes('suspicious-millicpu-memory');
+      suggestionsNode.hidden = !suspicious;
+      suggestionsNode.textContent = suspicious ? messages.suspiciousSuggestions : '';
+      warningDoc.hidden = !suspicious;
+    };
+
+    const renderCpu = (result, input) => {
+      const cores = formatQuantityValue(result.cpuCores);
+      const milliCpu = formatQuantityValue(result.milliCpu);
+      parsedNode.textContent = input;
+      cpuCoresNode.textContent = cores;
+      milliCpuNode.textContent = milliCpu;
+      recommendedNode.textContent = result.recommendedQuantity || messages.noRecommendation;
+      summaryNode.textContent = messages.cpuSummary(input, cores, milliCpu);
+    };
+
+    const renderMemory = (result, input) => {
+      parsedNode.textContent = input;
+      bytesNode.textContent = result.exactBytes;
+      mebibytesNode.textContent = displayApproximation(result.mebibytes);
+      gibibytesNode.textContent = displayApproximation(result.gibibytes);
+      decimalMemoryNode.textContent = `${displayApproximation(result.megabytes)} MB / ${displayApproximation(result.gigabytes)} GB`;
+      recommendedNode.textContent = result.recommendedQuantity || messages.noRecommendation;
+      summaryNode.textContent = messages.memorySummary(input, result.exactBytes);
+    };
+
+    const convert = () => {
+      const input = quantityInput.value.trim();
+      const type = currentType();
+      const result = type === 'cpu'
+        ? analyzeCpuQuantity(input)
+        : analyzeMemoryQuantity(input);
+
+      errorNode.hidden = true;
+      errorNode.textContent = '';
+      quantityInput.removeAttribute('aria-invalid');
+      copyStatus.textContent = '';
+
+      if (!result.ok) {
+        showError(result.error);
+        return;
+      }
+
+      cpuRows.forEach((row) => { row.hidden = type !== 'cpu'; });
+      memoryRows.forEach((row) => { row.hidden = type !== 'memory'; });
+
+      if (type === 'cpu') renderCpu(result, input);
+      else renderMemory(result, input);
+
+      statusNode.dataset.statusLevel = result.status.toLowerCase();
+      statusText.textContent = result.status === 'Warning'
+        ? messages.warning
+        : messages.valid;
+      renderWarning(result);
+
+      if (result.safeForYaml) {
+        const resourceName = type === 'cpu' ? 'cpu' : 'memory';
+        yamlNode.textContent = `resources:\n  requests:\n    ${resourceName}: "${result.recommendedQuantity}"`;
+        copyButton.disabled = false;
+      } else {
+        yamlNode.textContent = result.status === 'Warning'
+          ? messages.warningYaml
+          : messages.invalidYaml;
+        copyButton.disabled = true;
+      }
+    };
+
+    typeSelect.addEventListener('change', () => {
+      updateExamples();
+      convert();
+    });
+
+    quantityInput.addEventListener('input', convert);
+
+    exampleList.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const button = target.closest('[data-quantity-example]');
+      if (!button) return;
+      quantityInput.value = button.dataset.quantityExample || '';
+      convert();
+      quantityInput.focus();
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      convert();
+    });
+
+    copyButton.addEventListener('click', async () => {
+      if (copyButton.disabled) return;
+
+      try {
+        if (!navigator.clipboard) throw new Error('Clipboard API unavailable');
+        await navigator.clipboard.writeText(yamlNode.textContent);
+        copyStatus.textContent = messages.copied;
+      } catch {
+        copyStatus.textContent = messages.copyFailed;
+      }
+    });
+
+    updateExamples();
+    convert();
+  })();
+</script>

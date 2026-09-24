@@ -143,24 +143,27 @@ export const toolsCatalog = [
   {
     id: 'kubernetes-quantity-converter',
     category: 'Converter',
-    status: 'planned',
-    featured: false,
+    status: 'available',
+    featured: true,
     title: {
       en: 'Kubernetes Quantity Converter',
-      zh: 'Kubernetes Quantity Converter'
+      zh: 'Kubernetes Quantity 换算器'
     },
     description: {
-      en: 'Convert Kubernetes resource quantities into readable values and units.',
-      zh: '在 mCPU、CPU cores、MiB、GiB 等常用 Kubernetes 资源单位之间快速换算。'
+      en: 'Parse and convert Kubernetes CPU and memory quantities, with warnings for suspicious values and units.',
+      zh: '解析并换算 Kubernetes CPU 与 Memory Quantity，并提示可疑的单位和值。'
     },
     path: {
-      en: null,
-      zh: null
+      en: '/tools/kubernetes-quantity-converter/',
+      zh: '/zh/tools/kubernetes-quantity-converter/'
     },
     keywords: {
       en: [
         'Kubernetes',
         'quantity',
+        'quantity parser',
+        'parse',
+        'warnings',
         'resource quantity',
         'resources',
         'k8s',
@@ -175,6 +178,8 @@ export const toolsCatalog = [
       zh: [
         'Kubernetes',
         '资源数量',
+        '解析',
+        '警告',
         'resource quantity',
         '转换',
         '单位',

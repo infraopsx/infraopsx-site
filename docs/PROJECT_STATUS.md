@@ -53,7 +53,7 @@ Completed detailed case studies:
 
 The Tools section uses a centralized catalog shared by the English and Chinese Tools pages. The catalog drives localized metadata, Featured and Browse All sections, category filtering, and browser-local search across titles, descriptions, categories, and keywords.
 
-The current public catalog contains the two completed calculators below and the planned Kubernetes Quantity Converter. Planned entries are shown as Coming Soon and do not generate links.
+The current public catalog contains the three completed tools below. Planned entries are shown as Coming Soon and do not generate links.
 
 ### Completed
 
@@ -105,11 +105,30 @@ Current capabilities:
 - bilingual interface
 - local browser calculation
 
+#### Kubernetes Quantity Converter
+
+Routes:
+
+- `/tools/kubernetes-quantity-converter/`
+- `/zh/tools/kubernetes-quantity-converter/`
+
+Current capabilities:
+
+- exact CPU and mCPU conversion
+- decimal SI and binary SI memory conversion
+- exact fixed-point quantity parsing with precision normalization warnings
+- suspicious quantity and unit warnings
+- CPU precision validation
+- recommended Kubernetes quantity and YAML reference
+- bilingual interface
+- browser-local conversion
+- cross-link to the Kubernetes Resource Calculator
+
 ## Planned Tools
 
-Near-term priorities:
+Next planned tool:
 
-1. Kubernetes Quantity Converter
+`To be selected`
 
 Possible later tools:
 
@@ -180,7 +199,7 @@ Current website focus:
 
 Next planned tool:
 
-`Kubernetes Quantity Converter`
+`To be selected`
 
 Reuse the layout and development conventions established by the Ceph Capacity Calculator for the next tool.
 
