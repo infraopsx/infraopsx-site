@@ -176,7 +176,7 @@ The shared header provides System, Light, and Dark appearance preferences in Eng
 
 Current website focus:
 
-`Services / Expertise positioning`
+`Tool development`
 
 Next planned tool:
 
