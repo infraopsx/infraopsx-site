@@ -57,7 +57,6 @@ import KubernetesQuantityConverter from '../../../../components/tools/Kubernetes
             <li>400m Memory 表示 0.4 bytes，很可能不是你想要的值。</li>
             <li>Kubernetes CPU resource 的精度不能细于 1m。</li>
             <li>本工具使用精确 fixed-point 算术，不会连接 Kubernetes Cluster。</li>
-            <li>所有输入都在浏览器本地处理，不会上传。</li>
           </ul>
         </article>
       </section>
@@ -95,10 +94,6 @@ import KubernetesQuantityConverter from '../../../../components/tools/Kubernetes
         <details>
           <summary>0.5m CPU 有效吗？</summary>
           <p>无效。Kubernetes CPU resource requests 和 limits 的精度不能细于 1m。</p>
-        </details>
-        <details>
-          <summary>输入会被上传吗？</summary>
-          <p>不会。解析和换算都在浏览器本地完成，工具不会将输入发送到服务器。</p>
         </details>
       </section>
 

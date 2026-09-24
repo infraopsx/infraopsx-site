@@ -58,8 +58,8 @@ const idSuffix = isZh ? 'zh' : 'en';
 
         <p class="quantity-input-help" id={`quantity-help-${idSuffix}`}>
           {isZh
-            ? '输入 CPU 或 Memory 的 Kubernetes Quantity。只处理本浏览器中的输入。'
-            : 'Enter a Kubernetes CPU or Memory quantity. Your input stays in this browser.'}
+            ? '输入 CPU 或 Memory 的 Kubernetes Quantity。'
+            : 'Enter a Kubernetes CPU or Memory quantity.'}
         </p>
       </div>
 
@@ -166,7 +166,7 @@ const idSuffix = isZh ? 'zh' : 'en';
   <p class="calculator-privacy">
     {isZh
       ? '所有解析和换算均在浏览器本地完成，不会连接 Kubernetes Cluster，也不会上传输入。'
-      : 'Parsing and conversion run locally in your browser. No Kubernetes cluster is contacted and no input is uploaded.'}
+      : 'Parsing and conversion run locally in your browser. No Kubernetes cluster is contacted, and no input is uploaded.'}
   </p>
 </section>
 
@@ -420,12 +420,15 @@ const idSuffix = isZh ? 'zh' : 'en';
       }
     };
 
-    typeSelect.addEventListener('change', () => {
-      updateExamples();
-      convert();
-    });
+    const clearInputFeedback = () => {
+      quantityInput.removeAttribute('aria-invalid');
+      errorNode.hidden = true;
+      errorNode.textContent = '';
+      copyStatus.textContent = '';
+    };
 
-    quantityInput.addEventListener('input', convert);
+    typeSelect.addEventListener('change', updateExamples);
+    quantityInput.addEventListener('input', clearInputFeedback);
 
     exampleList.addEventListener('click', (event) => {
       const target = event.target;
@@ -433,7 +436,7 @@ const idSuffix = isZh ? 'zh' : 'en';
       const button = target.closest('[data-quantity-example]');
       if (!button) return;
       quantityInput.value = button.dataset.quantityExample || '';
-      convert();
+      clearInputFeedback();
       quantityInput.focus();
     });
 

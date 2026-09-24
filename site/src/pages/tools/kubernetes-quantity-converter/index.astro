@@ -57,7 +57,6 @@ import KubernetesQuantityConverter from '../../../components/tools/KubernetesQua
             <li>400m Memory means 0.4 bytes and is probably not the intended value.</li>
             <li>Kubernetes CPU resource precision cannot be finer than 1m.</li>
             <li>This converter uses exact fixed-point arithmetic and does not connect to a Kubernetes cluster.</li>
-            <li>All input is processed locally in your browser and is not uploaded.</li>
           </ul>
         </article>
       </section>
@@ -95,10 +94,6 @@ import KubernetesQuantityConverter from '../../../components/tools/KubernetesQua
         <details>
           <summary>Is 0.5m CPU valid?</summary>
           <p>No. Kubernetes CPU resource requests and limits cannot use precision finer than 1m.</p>
-        </details>
-        <details>
-          <summary>Does this upload my values?</summary>
-          <p>No. Parsing and conversion happen locally in your browser; the tool does not send your input to a server.</p>
         </details>
       </section>
 
