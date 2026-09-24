@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/ArticleLayout.astro
-title: "Kubernetes Node NotReady: Why Pods Don't Reschedule to Another Node"
-description: "A practical Kubernetes troubleshooting note: a Node is already NotReady, but the workload Pod does not recover on another Node as expected. It records several easy-to-miss checks around NoSchedule, NoExecute, tolerationSeconds, nodeName, and DaemonSets."
+title: "Kubernetes Node NotReady: Why Pods Aren't Rescheduled"
+description: "A real Kubernetes troubleshooting note for when a Node is NotReady but the workload does not recover elsewhere. Check taints, tolerationSeconds, nodeName, and DaemonSet behavior."
 pubDate: "2026-09-24"
 category: Kubernetes
 tags:
@@ -478,7 +478,7 @@ That is a much more ordinary Pending-Pod investigation.
 
 If that is where you end up, the related InfraOpsX note [Kubernetes Pod Pending: a practical troubleshooting path](/blog/kubernetes-pod-pending/) is the next place to look.
 
-## The few details worth remembering
+## What I'd check first next time
 
 `NoSchedule` mainly affects new scheduling. It does not evict Pods that are already running.
 
