@@ -13,6 +13,14 @@ const cases = [
     href: '/zh/case-studies/kubernetes-pod-pending/'
   },
   {
+    title: 'Rook Ceph RBD FailedMount 恢复',
+    area: 'Kubernetes · Rook Ceph · 存储',
+    problem: '某个有状态 Pod 卡在 ContainerCreating，CSI 持续提示 RBD image is still being used。',
+    diagnosis: '扫描 RBD nodeplugin 后发现目标 image 仍残留在旧节点的 mapping 中；清理前先确认旧 workload 已停止使用该 volume。',
+    outcome: '安全解除旧 mount 和 RBD mapping 后，CSI 可以重新 map volume，Pod 恢复。',
+    href: '/zh/case-studies/rook-ceph-rbd-failedmount/'
+  },
+  {
     title: 'PostgreSQL WAL 空间增长排查',
     area: 'PostgreSQL · 存储',
     problem: 'PostgreSQL 数据目录的磁盘占用异常增长，主要空间集中在 pg_wal。',

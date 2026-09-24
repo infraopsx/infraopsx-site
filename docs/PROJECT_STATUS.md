@@ -1,6 +1,6 @@
 # InfraOpsX Project Status
 
-Last updated: 2026-09-23
+Last updated: 2026-09-24
 
 ## Production Site
 
@@ -39,6 +39,13 @@ Available sections include:
 - About
 - Contact
 - Privacy
+
+## Case Studies
+
+Completed detailed case studies:
+
+- Kubernetes Pod Scheduling Failure
+- Rook Ceph RBD FailedMount Recovery
 
 ## Tools
 
@@ -169,7 +176,7 @@ The shared header provides System, Light, and Dark appearance preferences in Eng
 
 Current website focus:
 
-`Services / Expertise positioning and one high-value Case Study`
+`Services / Expertise positioning`
 
 Next planned tool:
 

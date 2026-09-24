@@ -45,6 +45,8 @@ rbd unmap
 
 如果还没搞清楚旧客户端到底活没活，就直接删 `VolumeAttachment`、强制 unmap 或 blocklist，都可能把一个本来只是“挂不上”的问题变成双写或文件系统损坏。
 
+如果想先看这次故障的简化闭环，可以阅读 [Rook Ceph RBD FailedMount 案例](/zh/case-studies/rook-ceph-rbd-failedmount/)。
+
 > 文中的 PVC、RBD image、节点名和地址都使用通用示例，不对应真实生产环境。
 
 ## 这个报错是什么意思
