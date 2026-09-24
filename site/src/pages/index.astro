@@ -166,20 +166,34 @@ const skills = [
           <h2>Real problems. Practical notes.</h2>
 
           <p>
-            Technical articles and anonymized case studies covering Kubernetes,
-            Docker, Linux, storage, networking and production troubleshooting
-            are being prepared.
+            Practical troubleshooting notes from real Linux, Kubernetes, storage
+            and database incidents, with commands, evidence and diagnosis paths
+            that can be reused in similar environments.
           </p>
         </div>
 
         <div class="article-preview">
-          <span>COMING NEXT</span>
+          <span>SELECTED ARTICLES</span>
 
           <ul>
-            <li>Kubernetes Pods Stuck in Pending</li>
-            <li>Docker Containers That Keep Restarting</li>
-            <li>Finding Linux Disk Space Problems</li>
+            <li>
+              <a href="/blog/kubernetes-ceph-rbd-high-iowait-latency/">
+                Kubernetes High iowait, Low Throughput: Ceph RBD/OSD Latency
+              </a>
+            </li>
+            <li>
+              <a href="/blog/rook-ceph-rbd-image-still-being-used-failedmount/">
+                Kubernetes + Rook Ceph: Troubleshooting FailedMount 'RBD image is still being used'
+              </a>
+            </li>
+            <li>
+              <a href="/blog/postgresql-pg-wal-growth-patroni-replication-lag/">
+                Why PostgreSQL pg_wal Keeps Growing: Patroni Replication Lag and Replication Slot Troubleshooting
+              </a>
+            </li>
           </ul>
+
+          <p class="article-all"><a href="/blog/">Browse all articles →</a></p>
         </div>
       </div>
     </section>
@@ -193,9 +207,12 @@ const skills = [
             <p>Reliable systems, clear configuration and practical operations.</p>
           </div>
 
-          <div class="status">
-            <span class="status-dot"></span>
-            Project-based work
+          <div class="cta-actions">
+            <div class="status">
+              <span class="status-dot"></span>
+              Project-based work
+            </div>
+            <a class="button primary" href="/contact/">Contact →</a>
           </div>
         </div>
       </div>

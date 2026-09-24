@@ -484,6 +484,42 @@ nav a:hover {
   border-bottom: 1px solid var(--line);
 }
 
+.article-preview li a {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 4px;
+  transition: color .2s ease;
+}
+
+.article-preview li a:hover,
+.article-preview li a:focus-visible {
+  color: var(--cyan);
+}
+
+.article-all {
+  margin: 20px 0 0;
+}
+
+.article-all a {
+  color: var(--cyan);
+  font-weight: 650;
+  transition: color .2s ease;
+}
+
+.article-all a:hover,
+.article-all a:focus-visible {
+  color: var(--text);
+}
+
+.cta-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
 .cta {
   padding: 90px 0;
 }

@@ -166,19 +166,33 @@ const skills = [
           <h2>真实问题，实用记录。</h2>
 
           <p>
-            后续将持续整理 Kubernetes、Docker、Linux、存储、网络以及
-            生产环境故障排查相关的技术文章和匿名化案例。
+            记录来自真实 Linux、Kubernetes、存储和数据库环境的故障排查过程，
+            保留关键命令、现场证据和定位思路，方便在类似环境中复用。
           </p>
         </div>
 
         <div class="article-preview">
-          <span>即将发布</span>
+          <span>精选文章</span>
 
           <ul>
-            <li>Kubernetes Pod 一直 Pending 如何排查</li>
-            <li>Docker 容器不断重启的排查方法</li>
-            <li>Linux 磁盘空间异常占用定位</li>
+            <li>
+              <a href="/zh/blog/kubernetes-ceph-rbd-high-iowait-latency/">
+                Kubernetes iowait 很高但吞吐不高：Ceph RBD 与 OSD 延迟排查
+              </a>
+            </li>
+            <li>
+              <a href="/zh/blog/rook-ceph-rbd-image-still-being-used-failedmount/">
+                Kubernetes + Rook Ceph：FailedMount 提示 RBD image is still being used 怎么排查
+              </a>
+            </li>
+            <li>
+              <a href="/zh/blog/postgresql-pg-wal-growth-patroni-replication-lag/">
+                PostgreSQL pg_wal 一直增长：Patroni 副本落后 230GB 时该怎么排查
+              </a>
+            </li>
           </ul>
+
+          <p class="article-all"><a href="/zh/blog/">查看全部技术文章 →</a></p>
         </div>
       </div>
     </section>
@@ -192,9 +206,12 @@ const skills = [
             <p>可靠的系统、清晰的配置以及可持续维护的基础设施。</p>
           </div>
 
-          <div class="status">
-            <span class="status-dot"></span>
-            项目制技术服务
+          <div class="cta-actions">
+            <div class="status">
+              <span class="status-dot"></span>
+              项目制技术服务
+            </div>
+            <a class="button primary" href="/zh/contact/">联系我 →</a>
           </div>
         </div>
       </div>
