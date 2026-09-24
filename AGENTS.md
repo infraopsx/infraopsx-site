@@ -141,18 +141,117 @@ Tool pages should generally contain:
 
 ## SEO
 
-Every important English/Chinese page pair should have correct:
+SEO work must follow current Google Search Central best practices and remain people-first. Do not treat SEO checks as a guarantee of ranking, indexing, snippets, or rich results.
 
-- title
-- description
-- canonical URL
-- `hreflang="en"`
-- `hreflang="zh-CN"`
-- `x-default`
+### SEO Acceptance Checklist
 
-Important content should be present in generated HTML and should not depend entirely on client-side JavaScript.
+For every new or materially changed important public page, verify the following before completion.
 
-Do not use keyword stuffing or low-value AI-generated SEO content.
+#### Content and search intent
+
+- Write for users first. The page must provide useful, reliable, original value for the intended audience.
+- Do not create pages primarily to manipulate rankings.
+- Do not use keyword stuffing, boilerplate SEO text, doorway-style pages, or large volumes of low-value near-duplicate content.
+- Use relevant search terms naturally where they help users understand the page.
+- Technical claims, examples, and page copy must accurately describe what the page actually provides.
+
+#### Title, H1, and description
+
+- Give each important page a descriptive, concise, and reasonably unique `<title>`.
+- Use a clear primary H1 that matches the page topic and visible content.
+- Keep the title, H1, description, and body aligned without mechanically repeating keywords.
+- Provide a useful, page-specific meta description for important pages.
+- Treat the meta description as a suggestion to search engines; Google may generate a different search snippet.
+
+#### Canonical URLs
+
+- Important indexable pages should have the intended canonical URL.
+- Normal standalone pages should generally use a self-referential canonical.
+- Canonical URLs must point to real, indexable final URLs.
+- Do not use URL fragments as canonical URLs.
+- Treat `rel="canonical"` as a canonicalization signal, not a guarantee that Google will select that URL.
+
+#### English / Chinese localization
+
+For important EN/ZH page pairs:
+
+- Provide reciprocal alternates for the English and Chinese versions.
+- Each page must also reference itself in the hreflang set.
+- Follow the current project convention:
+  - `hreflang="en"`
+  - `hreflang="zh-CN"`
+  - `hreflang="x-default"`
+- Alternate URLs must resolve to real corresponding pages.
+- Do not create a nominal localization where only navigation or chrome is translated while the primary content remains untranslated.
+- Use hreflang to describe language/region alternatives; do not describe it as preventing another language page from being indexed.
+
+#### Crawlability and indexability
+
+- Important public pages must not accidentally contain `noindex`.
+- Do not accidentally block important pages through `robots.txt`.
+- Important internal navigation must use crawlable `<a href="...">` links.
+- Use concise, descriptive anchor text instead of vague text such as "click here".
+- Important new pages should be discoverable through normal site navigation, relevant internal links, or both.
+- Include pages intended for search discovery in the sitemap according to the existing site build.
+- Do not create fake links to unfinished destinations.
+- A sitemap helps discovery and crawling; it does not guarantee crawling or indexing.
+
+#### Static HTML
+
+- Important SEO content must exist in generated HTML.
+- Titles, descriptions, H1s, introductions, documentation, important considerations, FAQ content, and other essential explanatory copy must not depend entirely on client-side JavaScript.
+- Browser JavaScript may power calculators and tools, but the page must remain understandable and useful from its generated HTML.
+
+#### Structured data
+
+- Add structured data only when the visible page genuinely matches the selected type.
+- Structured data must describe content visible to users and must not be misleading.
+- Do not fabricate authors, publication dates, modification dates, ratings, reviews, or other properties.
+- For article content, prefer an appropriate supported `Article` or `BlogPosting` model when implemented.
+- When a visible breadcrumb exists and structured data is added, use `BreadcrumbList` accurately.
+- Prefer JSON-LD when it fits the current implementation.
+- Structured data can make a page eligible for supported search features; it does not guarantee a rich result.
+
+#### Internal and external links
+
+- Add internal links only when they are useful and contextually relevant.
+- Prefer descriptive anchors that explain the destination.
+- Connect related Articles, Tools, Case Studies, Services, and Portfolio pages when the relationship is genuine.
+- Avoid repetitive or artificial link blocks created only for SEO.
+- Link to trustworthy external references when they materially help the reader.
+- Do not add `nofollow` merely because a link is external; use link qualifications only when their actual semantics require them.
+
+#### Page experience
+
+- Public pages must work on mobile and desktop.
+- Avoid obvious horizontal overflow, broken controls, intrusive UI, and layouts that obscure the main content.
+- Avoid unnecessary large dependencies and client-side JavaScript.
+- Consider Core Web Vitals and overall page experience when changes can materially affect loading, responsiveness, or visual stability.
+- Do not claim that any single performance metric guarantees rankings.
+
+#### InfraOpsX search integration
+
+- Important searchable content should follow the project's Pagefind conventions.
+- Dynamic user-input areas may be excluded from Pagefind, but useful static explanations should remain searchable.
+- Confirm that new public routes, sitemap output, Pagefind behavior, and localized routes follow the existing project conventions.
+
+#### SEO validation before completion
+
+For a new or materially changed important public page, verify as applicable:
+
+- generated HTML contains the intended title and meta description
+- canonical URL is correct
+- EN/ZH hreflang and x-default references are correct
+- no accidental `noindex` or crawl blocking exists
+- important internal links use real `href` values
+- intended indexable routes appear in the sitemap
+- meaningful explanatory content exists in generated HTML
+- Pagefind includes or excludes content intentionally
+- desktop and mobile layouts have no obvious regressions
+- browser console has no relevant errors
+- Docker production build succeeds
+
+Do not describe these checks as a promise of Google ranking or indexing.
 
 ## Styling
 
@@ -207,23 +306,31 @@ git diff --stat main...HEAD
 git status --short
 ```
 
-For site changes, use Docker-first validation by default. Host Node/npm is not required, and do not run `npm install` or `npm run` directly on the host by default. Use npm scripts inside containers as the build and test entry points.
+For site changes, validation is Docker-first by default.
+
+- Do not require Node/npm to be installed on the host.
+- Do not run `npm install`, `npm ci`, `npm run ...`, or `npx ...` directly on the host by default.
+- The presence of host Node/npm is not a reason to use it.
+- Keep npm scripts as project entry points, but run the relevant scripts inside the Docker builder image.
+- Use host Node/npm only when the user explicitly requests it.
 
 Prefer the repository's Docker workflow:
 
 ```bash
-# Run tests inside the builder image (replace the script as appropriate).
+# Build the reusable builder image.
 docker build --target builder -t infraopsx-site:builder .
-docker run --rm infraopsx-site:builder npm run test:quantity
 
-# Validate the complete production site build.
+# Run the test or validation script relevant to the current task.
+docker run --rm infraopsx-site:builder npm run <relevant-script>
+
+# Validate the complete production image.
 docker build -t infraopsx-site:ci .
 
 # Start the local site for browser acceptance checks.
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-Use host Node/npm only when the user explicitly requests it.
+If a task needs multiple npm scripts, run each relevant script inside the builder container rather than falling back to host npm.
 
 For user-facing tools, also verify default values, formulas, invalid inputs, language switch, English and Chinese routes, desktop layout, mobile layout, console errors, and links using the local Docker Compose site.
 
