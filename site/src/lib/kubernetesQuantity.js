@@ -35,7 +35,8 @@ const decimalMemoryUnits = [
   ['T', 1000000000000n],
   ['G', 1000000000n],
   ['M', 1000000n],
-  ['k', 1000n]
+  ['k', 1000n],
+  ['m', 1n, 1000n]
 ];
 
 const abs = (value) => value < 0n ? -value : value;
@@ -321,14 +322,28 @@ export function analyzeCpuQuantity(input) {
   });
 }
 
-const memoryRecommendation = (bytes) => {
+const memoryRecommendation = (bytes, parsed) => {
   if (bytes.denominator !== 1n) return null;
   if (bytes.numerator === 0n) return '0';
 
+  const family = parsed.notation === 'exponent'
+    ? 'decimal'
+    : binaryMemoryUnits.some(([suffix]) => suffix === parsed.suffix)
+      ? 'binary'
+      : decimalMemoryUnits.some(([suffix]) => suffix === parsed.suffix)
+        ? 'decimal'
+        : null;
+  const units = family === 'binary'
+    ? binaryMemoryUnits
+    : family === 'decimal'
+      ? decimalMemoryUnits
+      : [...binaryMemoryUnits, ...decimalMemoryUnits];
   const candidates = [bytes.numerator.toString()];
-  for (const [suffix, factor] of [...binaryMemoryUnits, ...decimalMemoryUnits]) {
-    if (bytes.numerator % factor === 0n) {
-      candidates.push(`${bytes.numerator / factor}${suffix}`);
+
+  for (const [suffix, numerator, denominator = 1n] of units) {
+    const quantity = rational(bytes.numerator * denominator, numerator);
+    if (quantity.denominator === 1n) {
+      candidates.push(`${quantity.numerator}${suffix}`);
     }
   }
 
@@ -372,7 +387,7 @@ export function analyzeMemoryQuantity(input) {
     gibibytes: displayValue(1n << 30n),
     megabytes: displayValue(1000000n),
     gigabytes: displayValue(1000000000n),
-    recommendedQuantity: memoryRecommendation(bytes)
+    recommendedQuantity: memoryRecommendation(bytes, parsed)
   });
 }
 

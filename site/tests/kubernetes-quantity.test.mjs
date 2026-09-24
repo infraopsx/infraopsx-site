@@ -89,6 +89,13 @@ test('decimal and binary suffixes retain their exact meanings', () => {
   assert.equal(analyzeMemoryQuantity('400M').recommendedQuantity, '400M');
 });
 
+test('Memory recommendations preserve the input SI family', () => {
+  assert.equal(analyzeMemoryQuantity('1000Ki').recommendedQuantity, '1000Ki');
+  assert.equal(analyzeMemoryQuantity('1000k').recommendedQuantity, '1M');
+  assert.equal(analyzeMemoryQuantity('1024e0').recommendedQuantity, '1024');
+  assert.equal(analyzeMemoryQuantity('1024').recommendedQuantity, '1Ki');
+});
+
 test('decimal exponent and documented near-equivalent quantities parse correctly', () => {
   const expectedBytes = '128,974,848';
   const quantities = ['128974848', '128974848000m', '123Mi'];
@@ -125,6 +132,12 @@ test('precision normalization uses exact rational arithmetic and is reported', (
   assert.equal(parsed.precisionNormalized, true);
   assert.equal(formatQuantityValue(parsed.value), '0.0001');
   assert.equal(formatQuantityValue(parsed.normalizedValue), '0.001');
+
+  for (const [input, expected] of [['1.0001', '1.001'], ['2.3456', '2.346']]) {
+    const rounded = parseQuantity(input);
+    assert.equal(rounded.ok, true, input);
+    assert.equal(formatQuantityValue(rounded.normalizedValue), expected, input);
+  }
 
   const memory = analyzeMemoryQuantity('0.0001');
   assert.equal(memory.status, 'Warning');

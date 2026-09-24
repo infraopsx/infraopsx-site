@@ -222,12 +222,13 @@ const idSuffix = isZh ? 'zh' : 'en';
           memorySummary: (input, bytes) => `${input} Memory = ${bytes} bytes。`,
           empty: '请输入 Kubernetes Quantity。',
           invalid: 'Quantity 格式无效。请检查数字和后缀。',
-          suffix: '不支持这个后缀。Kubernetes 使用 M 表示十进制 megabytes，使用 Mi 表示 mebibytes。',
+          suffix: 'Kubernetes 使用 M 表示十进制 megabytes，使用 Mi 表示 mebibytes。',
+          unsupported: '不支持的 Kubernetes Quantity 后缀。',
           case: 'Quantity 后缀区分大小写。请确认使用了正确的大小写，例如 Mi 和 M。',
           negative: 'CPU 和 Memory resource quantity 不能为负数。',
           cpuPrecision: 'CPU resource 的精度不能细于 1m。',
           range: 'Quantity 超出工具支持的 magnitude 或 exponent 范围。',
-          normalized: 'Kubernetes Quantity 的 base-unit 精度最多为 3 位小数；此值已按正方向归一化到 0.001。',
+          normalized: 'Kubernetes Quantity 的基准单位最多保留 3 位小数；该值已向上取整到最接近的 0.001 基准单位。',
           fractional: '这个 Memory 值不是整数 bytes。请确认你确实需要 fractional byte。',
           suspicious: '400m 表示 0.4 bytes。这很可能不是你想要的值。',
           suspiciousSuggestions: '你可能想写：400Mi 或 400M。工具不会自动更改输入。',
@@ -247,12 +248,13 @@ const idSuffix = isZh ? 'zh' : 'en';
           memorySummary: (input, bytes) => `${input} Memory = ${bytes} bytes.`,
           empty: 'Enter a Kubernetes quantity.',
           invalid: 'The quantity format is invalid. Check the number and suffix.',
-          suffix: 'This suffix is not supported. Kubernetes uses M for decimal megabytes and Mi for mebibytes.',
+          suffix: 'Kubernetes uses M for decimal megabytes and Mi for mebibytes.',
+          unsupported: 'Unsupported Kubernetes Quantity suffix.',
           case: 'Quantity suffixes are case-sensitive. Check the capitalization, such as Mi versus M.',
           negative: 'CPU and Memory resource quantities cannot be negative.',
           cpuPrecision: 'CPU resource precision cannot be finer than 1m.',
           range: 'The quantity exceeds this converter’s supported magnitude or exponent range.',
-          normalized: 'Kubernetes Quantity precision is limited to three decimal places in the base unit; this value was normalized upward to 0.001.',
+          normalized: 'Kubernetes Quantity precision is limited to three decimal places in the base unit; this value was rounded upward to the nearest 0.001 base unit.',
           fractional: 'This Memory value is not a whole number of bytes. Confirm that you intend to use a fractional byte.',
           suspicious: '400m means 0.4 bytes. This is probably not what you intended.',
           suspiciousSuggestions: 'Did you mean 400Mi or 400M? The input has not been changed.',
@@ -307,15 +309,17 @@ const idSuffix = isZh ? 'zh' : 'en';
           ? messages.case
           : code === 'decimal-memory-suffix'
             ? messages.suffix
-            : code === 'negative'
-              ? messages.negative
-              : code === 'cpu-precision'
-                ? messages.cpuPrecision
-                : code === 'out-of-range'
-                  ? messages.range
-                  : code === 'invalid-number'
-                    ? messages.invalid
-                    : messages.suffix;
+            : code === 'unsupported-suffix'
+              ? messages.unsupported
+              : code === 'negative'
+                ? messages.negative
+                : code === 'cpu-precision'
+                  ? messages.cpuPrecision
+                  : code === 'out-of-range'
+                    ? messages.range
+                    : code === 'invalid-number'
+                      ? messages.invalid
+                      : messages.unsupported;
 
       errorNode.textContent = text;
       errorNode.hidden = false;
