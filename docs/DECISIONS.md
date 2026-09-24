@@ -167,12 +167,17 @@ At minimum:
 git diff --check
 ```
 
-For site changes:
+For site changes, use the repository's Docker-first workflow. Do not require host Node/npm by default.
 
 ```bash
-cd site
-npm run build
+docker build --target builder -t infraopsx-site:builder .
+docker run --rm infraopsx-site:builder npm run <relevant-script>
+docker build -t infraopsx-site:ci .
 ```
+
+Use `docker compose -f docker-compose.dev.yml up -d --build` when browser acceptance is needed.
+
+Use host Node/npm only when the user explicitly requests it.
 
 Use a PR for changes going into `main`.
 
