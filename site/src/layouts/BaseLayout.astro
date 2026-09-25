@@ -11,7 +11,9 @@ const {
   enPath = '/',
   zhPath = '/zh/',
   pagefindType,
-  noindex = false
+  noindex = false,
+  ogType = 'website',
+  structuredData
 } = Astro.props as {
   title?: string;
   description?: string;
@@ -21,6 +23,8 @@ const {
   zhPath?: string;
   pagefindType?: PagefindType;
   noindex?: boolean;
+  ogType?: 'website' | 'article';
+  structuredData?: Record<string, unknown>;
 };
 
 const site = 'https://infra.oeax.de';
@@ -28,6 +32,9 @@ const site = 'https://infra.oeax.de';
 const canonicalUrl = new URL(canonicalPath, site).toString();
 const enUrl = new URL(enPath, site).toString();
 const zhUrl = new URL(zhPath, site).toString();
+const structuredDataJson = structuredData
+  ? JSON.stringify(structuredData).replace(/</g, '\\u003c')
+  : undefined;
 ---
 
 <!doctype html>
@@ -178,7 +185,14 @@ const zhUrl = new URL(zhPath, site).toString();
       href={lang === 'zh-CN' ? '/zh/rss.xml' : '/rss.xml'}
     />
 
-    <meta property="og:type" content="website" />
+    {structuredDataJson && (
+      <script
+        type="application/ld+json"
+        set:html={structuredDataJson}
+      />
+    )}
+
+    <meta property="og:type" content={ogType} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
