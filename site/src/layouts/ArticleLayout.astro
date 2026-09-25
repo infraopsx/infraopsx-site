@@ -103,6 +103,9 @@ const tocHeadings = headings.filter(
     heading.depth === 2
 );
 const showToc = tocHeadings.length >= 4;
+const tocHasExplicitNumbers = tocHeadings.some(
+  (heading: { text: string }) => /^\d+[.)]\s+/.test(heading.text)
+);
 ---
 
 <BaseLayout
@@ -179,7 +182,7 @@ const showToc = tocHeadings.length >= 4;
             <div class="article-toc-title">
               {isZh ? '本文目录' : 'Table of contents'}
             </div>
-            <ol>
+            <ol class={tocHasExplicitNumbers ? 'has-explicit-numbers' : undefined}>
               {tocHeadings.map(
                 (heading: { depth: number; slug: string; text: string }) => (
                   <li>
@@ -227,6 +230,11 @@ const showToc = tocHeadings.length >= 4;
     column-gap: 36px;
     margin: 16px 0 0;
     padding-left: 22px;
+  }
+
+  .article-toc ol.has-explicit-numbers {
+    list-style: none;
+    padding-left: 0;
   }
 
   .article-toc li {
