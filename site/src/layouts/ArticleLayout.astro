@@ -49,6 +49,61 @@ const categoryLabels: Record<string, string> = isZh
 const displayCategory = categoryLabels[category] ?? category;
 const switchHref = isZh ? enPath : zhPath;
 
+const site = 'https://infra.oeax.de';
+const canonicalUrl = new URL(currentPath, site).toString();
+const homeUrl = new URL(isZh ? '/zh/' : '/', site).toString();
+const articlesUrl = new URL(isZh ? '/zh/blog/' : '/blog/', site).toString();
+const datePublished =
+  pubDate instanceof Date
+    ? pubDate.toISOString().slice(0, 10)
+    : String(pubDate);
+
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'BlogPosting',
+      headline: title,
+      description,
+      datePublished,
+      inLanguage: locale,
+      url: canonicalUrl,
+      mainEntityOfPage: {
+        '@type': 'WebPage',
+        '@id': canonicalUrl
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'InfraOpsX',
+        url: site
+      }
+    },
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: isZh ? '首页' : 'Home',
+          item: homeUrl
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: isZh ? '技术文章' : 'Articles',
+          item: articlesUrl
+        },
+        {
+          '@type': 'ListItem',
+          position: 3,
+          name: title,
+          item: canonicalUrl
+        }
+      ]
+    }
+  ]
+};
+
 const tocHeadings = headings.filter(
   (heading: { depth: number; slug: string; text: string }) =>
     heading.depth === 2
@@ -64,6 +119,8 @@ const showToc = tocHeadings.length >= 4;
   enPath={enPath}
   zhPath={zhPath}
   pagefindType="Article"
+  ogType="article"
+  structuredData={structuredData}
 >
   <Header
     locale={isZh ? 'zh' : 'en'}

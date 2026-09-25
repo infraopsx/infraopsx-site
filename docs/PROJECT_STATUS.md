@@ -1,6 +1,6 @@
 # InfraOpsX Project Status
 
-Last updated: 2026-09-24
+Last updated: 2026-09-25
 
 ## Production Site
 
@@ -173,6 +173,9 @@ Current pages use:
 - robots.txt
 - RSS
 - Pagefind
+- BlogPosting JSON-LD on article pages
+- BreadcrumbList JSON-LD on article pages
+- article Open Graph type on article pages
 
 Google Search Console verification has been completed.
 
