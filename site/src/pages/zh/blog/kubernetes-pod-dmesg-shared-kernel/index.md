@@ -189,7 +189,7 @@ kernel.dmesg_restrict = 0
 再执行：
 
 ```bash
-kubectl exec -it ubuntu-dmesg -- dmesg | head -n 2
+kubectl exec ubuntu-dmesg -- dmesg | head -n 2
 ```
 
 可能看到：
@@ -214,7 +214,7 @@ kernel.dmesg_restrict = 1
 普通 Pod 再执行：
 
 ```bash
-kubectl exec -it ubuntu-dmesg -- dmesg | head
+kubectl exec ubuntu-dmesg -- dmesg | head
 ```
 
 可能得到：
@@ -242,7 +242,7 @@ kernel.dmesg_restrict = 1
 
 ## 6. 如果确实需要在 Pod 中读取 dmesg
 
-Linux Kernel 文档推荐的 Capability 是：
+用于特权 kernel log / syslog 操作的专用 Capability 是：
 
 ```text
 CAP_SYSLOG
@@ -271,7 +271,7 @@ spec:
 然后测试：
 
 ```bash
-kubectl exec -it ubuntu-dmesg-syslog -- dmesg | head
+kubectl exec ubuntu-dmesg-syslog -- dmesg | head
 ```
 
 是否能够成功，还取决于容器运行时、seccomp、LSM 和 Kubernetes Admission / Pod Security 策略。
