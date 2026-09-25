@@ -13,8 +13,6 @@ enPath: "/blog/kubernetes-pod-dmesg-shared-kernel/"
 zhPath: "/zh/blog/kubernetes-pod-dmesg-shared-kernel/"
 ---
 
-# Kubernetes Pod 里的 dmesg 为什么和宿主机一样？
-
 在 Kubernetes 中，Pod 看起来拥有独立的文件系统、进程、网络和运行环境，因此第一次在 Pod 内执行 `dmesg` 时，很多人都会产生一个疑问：
 
 > Pod 不是和宿主机隔离的吗？为什么 Pod 里看到的 `dmesg` 和宿主机几乎一样？

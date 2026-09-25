@@ -113,11 +113,11 @@ kind: Pod
 metadata:
   name: test-nodename
 spec:
-  containers:
-  - image: nginx
-    imagePullPolicy: IfNotPresent
-    name: backup
   nodeName: node2-192-168-240-101
+  containers:
+    - name: nginx
+      image: nginx
+      imagePullPolicy: IfNotPresent
 ```
 
 事情就不一样了。

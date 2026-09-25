@@ -13,8 +13,6 @@ enPath: "/blog/kubernetes-pod-dmesg-shared-kernel/"
 zhPath: "/zh/blog/kubernetes-pod-dmesg-shared-kernel/"
 ---
 
-# Why Does dmesg Inside a Kubernetes Pod Show the Host Kernel Log?
-
 Kubernetes Pods provide isolated process, filesystem, network, and runtime environments. Because of that, seeing the same `dmesg` output inside a Pod and on the host can be surprising:
 
 > If the Pod is isolated from the host, why can it see host kernel messages?
