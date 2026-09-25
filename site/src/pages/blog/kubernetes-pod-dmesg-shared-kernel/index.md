@@ -171,7 +171,7 @@ kernel.dmesg_restrict = 0
 Now run:
 
 ```bash
-kubectl exec -it ubuntu-dmesg -- dmesg | head -n 2
+kubectl exec ubuntu-dmesg -- dmesg | head -n 2
 ```
 
 You may see output such as:
@@ -196,7 +196,7 @@ kernel.dmesg_restrict = 1
 a normal Pod may fail with:
 
 ```bash
-kubectl exec -it ubuntu-dmesg -- dmesg | head
+kubectl exec ubuntu-dmesg -- dmesg | head
 ```
 
 Result:
@@ -253,7 +253,7 @@ spec:
 Then test:
 
 ```bash
-kubectl exec -it ubuntu-dmesg-syslog -- dmesg | head
+kubectl exec ubuntu-dmesg-syslog -- dmesg | head
 ```
 
 Whether this succeeds also depends on the container runtime, seccomp profile, LSM policy, and Kubernetes admission or Pod Security policy.
