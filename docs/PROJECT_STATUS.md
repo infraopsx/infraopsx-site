@@ -1,6 +1,6 @@
 # InfraOpsX Project Status
 
-Last updated: 2026-09-25
+Last updated: 2026-09-28
 
 ## Production Site
 
@@ -19,6 +19,13 @@ Current infrastructure includes:
 - GHCR
 - Cloudflare
 - Pagefind
+
+Production ingress is separated from the site container:
+
+- a host-level Edge Nginx stack owns public ports 80/443 and origin TLS
+- the InfraOpsX container serves internal HTTP on port 80
+- Edge Nginx reaches InfraOpsX through the external Docker `edge` network
+- the InfraOpsX deployment workflow changes only the image tag and does not replace host Edge, Compose, or TLS configuration
 
 The site supports both English and Chinese.
 

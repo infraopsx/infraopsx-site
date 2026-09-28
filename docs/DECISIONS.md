@@ -255,3 +255,26 @@ The shared site appearance control supports `system`, `light`, and `dark` prefer
 ### Why
 
 This provides a consistent, bilingual appearance control while preserving operating-system behavior and keeping the static site free of account storage, backend services, and theme dependencies.
+
+---
+
+## ADR-014: Separate public Edge ingress from InfraOpsX deployment
+
+### Decision
+
+Public HTTP/HTTPS ingress is owned by a separate host-level Edge Nginx stack.
+
+The InfraOpsX container:
+
+- serves internal HTTP on port 80
+- joins the external Docker `edge` network
+- does not publish host ports 80/443
+- does not own origin TLS certificates
+
+The site Nginx configuration is packaged into the application image.
+
+The production deployment workflow changes only `IMAGE_TAG` and must not upload or replace the host's Edge Nginx configuration, TLS material, production Compose file, or other host infrastructure configuration.
+
+### Why
+
+This allows multiple services and domains to share the same VPS without competing for ports 80/443. It also prevents a normal InfraOpsX site deployment from overwriting shared ingress or TLS configuration and keeps rollback limited to the application image version.
