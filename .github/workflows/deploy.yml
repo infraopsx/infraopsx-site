@@ -23,11 +23,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout deployed revision
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
@@ -39,21 +34,7 @@ jobs:
           printf '%s\n' "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Upload production config
-        run: |
-          scp \
-            -i ~/.ssh/deploy_key \
-            -P "${{ secrets.VPS_PORT }}" \
-            docker-compose.yml \
-            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/compose/infraopsx/.docker-compose.yml.new"
-
-          scp \
-            -i ~/.ssh/deploy_key \
-            -P "${{ secrets.VPS_PORT }}" \
-            nginx.conf \
-            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/compose/infraopsx/.nginx.conf.new"
-
-      - name: Deploy and verify
+      - name: Deploy image and verify
         env:
           FULL_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
@@ -82,76 +63,37 @@ jobs:
           echo "Current tag: ${OLD_TAG}"
           echo "New tag:     ${NEW_TAG}"
 
-          #
-          # Validate incoming Docker Compose configuration.
-          #
-          echo "Validating docker-compose.yml..."
+          echo "Validating production docker-compose.yml..."
 
-          if ! IMAGE_TAG="${NEW_TAG}" \
-            docker compose \
-              -f .docker-compose.yml.new \
-              config -q; then
-
-            echo "ERROR: New docker-compose.yml is invalid."
-            rm -f .docker-compose.yml.new .nginx.conf.new
+          if ! IMAGE_TAG="${OLD_TAG}" docker compose config -q; then
+            echo "ERROR: Production docker-compose.yml is invalid."
             exit 1
           fi
 
-          #
-          # Pull the exact image before changing production.
-          #
+          if ! docker network inspect edge >/dev/null 2>&1; then
+            echo "ERROR: Required external Docker network 'edge' does not exist."
+            exit 1
+          fi
+
           echo "Pulling ${IMAGE}..."
 
           if ! docker pull "${IMAGE}"; then
             echo "ERROR: Unable to pull ${IMAGE}."
-            rm -f .docker-compose.yml.new .nginx.conf.new
             exit 1
           fi
-
-          #
-          # Validate incoming Nginx configuration using the new image.
-          #
-          echo "Validating nginx.conf..."
-
-          if ! docker run --rm \
-            --entrypoint nginx \
-            -v "$PWD/.nginx.conf.new:/etc/nginx/conf.d/default.conf:ro" \
-            -v "$PWD/ssl:/etc/nginx/ssl:ro" \
-            "${IMAGE}" \
-            -t; then
-
-            echo "ERROR: New nginx.conf is invalid."
-            rm -f .docker-compose.yml.new .nginx.conf.new
-            exit 1
-          fi
-
-          #
-          # Save current production configuration for rollback.
-          #
-          cp -a docker-compose.yml .docker-compose.yml.rollback
-          cp -a nginx.conf .nginx.conf.rollback
 
           rollback() {
             echo "Rolling back to ${OLD_TAG}..."
 
-            cp -f .docker-compose.yml.rollback docker-compose.yml
-            cp -f .nginx.conf.rollback nginx.conf
             printf 'IMAGE_TAG=%s\n' "${OLD_TAG}" > .env
 
             docker compose pull || true
 
             if docker compose up -d --wait --wait-timeout 60; then
-              if curl -fsS --max-time 3 \
-                -H 'Host: infra.oeax.de' \
-                http://127.0.0.1/healthz >/dev/null; then
+              if docker compose exec -T website \
+                wget -qO- http://127.0.0.1/healthz | grep -qx 'ok'; then
 
                 echo "Rollback successful. Production restored to ${OLD_TAG}."
-
-                rm -f \
-                  .docker-compose.yml.rollback \
-                  .nginx.conf.rollback \
-                  .docker-compose.yml.new \
-                  .nginx.conf.new
               else
                 echo "ERROR: Rollback container is healthy but /healthz failed."
                 docker compose ps || true
@@ -163,15 +105,8 @@ jobs:
               docker logs --tail 100 infraopsx || true
             fi
 
-            # New deployment failed, even if rollback succeeded.
             exit 1
           }
-
-          #
-          # Activate the validated configuration.
-          #
-          mv .docker-compose.yml.new docker-compose.yml
-          mv .nginx.conf.new nginx.conf
 
           printf 'IMAGE_TAG=%s\n' "${NEW_TAG}" > .env
 
@@ -182,21 +117,16 @@ jobs:
             rollback
           fi
 
-          echo "Checking origin health..."
+          echo "Checking internal site health..."
 
-          if ! curl -fsS --max-time 3 \
-            -H 'Host: infra.oeax.de' \
-            http://127.0.0.1/healthz >/dev/null; then
+          if ! docker compose exec -T website \
+            wget -qO- http://127.0.0.1/healthz | grep -qx 'ok'; then
 
-            echo "ERROR: Origin health check failed."
+            echo "ERROR: Internal health check failed."
             rollback
           fi
 
           echo "Deployment successful: ${NEW_TAG}"
 
           docker compose ps
-
-          rm -f \
-            .docker-compose.yml.rollback \
-            .nginx.conf.rollback
           REMOTE
