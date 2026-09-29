@@ -7,7 +7,8 @@
     "dev": "astro dev",
     "build": "astro build && pagefind --site dist",
     "preview": "astro preview",
-    "test:quantity": "node --test tests/kubernetes-quantity.test.mjs"
+    "test:quantity": "node --test tests/kubernetes-quantity.test.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "astro": "latest",
@@ -15,6 +16,7 @@
     "@astrojs/rss": "latest"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.0",
     "pagefind": "latest"
   }
 }
