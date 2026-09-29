@@ -42,6 +42,24 @@ test.describe('core site', () => {
     });
   }
 
+
+  test('does not load production analytics on local E2E host', async ({ page }) => {
+    const analyticsRequests = [];
+
+    page.on('request', (request) => {
+      if (request.url().startsWith('https://analytics.plainmile.com/')) {
+        analyticsRequests.push(request.url());
+      }
+    });
+
+    await page.goto('/');
+
+    await expect(
+      page.locator('script[src="https://analytics.plainmile.com/count.js"]')
+    ).toHaveCount(0);
+    expect(analyticsRequests).toEqual([]);
+  });
+
   test('article language switch preserves the matching article', async ({ page }) => {
     await page.goto('/blog/rook-ceph-osd-high-memory-osd-memory-target/');
 
