@@ -1,17 +1,17 @@
 import { expect, test } from '@playwright/test';
 
 const routes = [
-  ['/', 'InfraOpsX'],
-  ['/zh/', 'InfraOpsX'],
+  ['/', /Infrastructure that stays/],
+  ['/zh/', /让基础设施保持/],
   ['/blog/', 'Real problems. Practical notes.'],
   ['/zh/blog/', '真实问题，实用记录。'],
-  ['/tools/', 'Infrastructure tools'],
-  ['/zh/tools/', '基础设施工具'],
+  ['/tools/', 'Practical infrastructure tools for real-world systems.'],
+  ['/zh/tools/', '面向真实基础设施的实用工具。'],
   ['/tools/ceph-capacity-calculator/', 'Ceph Capacity Calculator'],
   ['/tools/kubernetes-resource-calculator/', 'Kubernetes Resource Calculator'],
   ['/tools/kubernetes-quantity-converter/', 'Kubernetes Quantity Converter'],
-  ['/blog/rook-ceph-osd-high-memory-osd-memory-target/', 'Rook Ceph OSD High Memory Usage'],
-  ['/zh/blog/rook-ceph-osd-high-memory-osd-memory-target/', 'Rook Ceph OSD 内存占用过高']
+  ['/blog/rook-ceph-osd-high-memory-osd-memory-target/', /Rook Ceph OSD High Memory Usage/],
+  ['/zh/blog/rook-ceph-osd-high-memory-osd-memory-target/', /Rook Ceph OSD 内存占用过高/]
 ];
 
 const collectBrowserErrors = (page) => {
@@ -80,7 +80,7 @@ test.describe('core site', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
 
-    await page.getByRole('button', { name: 'Open navigation menu' }).click();
+    await page.locator('.mobile-menu-toggle').click();
     await expect(page.locator('.mobile-nav')).toBeVisible();
     await expect(page.locator('.mobile-nav').getByRole('link', { name: 'Tools' })).toBeVisible();
     await expect(page.locator('.mobile-nav').getByRole('link', { name: 'Articles' })).toBeVisible();
