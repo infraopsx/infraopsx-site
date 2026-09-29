@@ -1,6 +1,6 @@
 # InfraOpsX Project Status
 
-Last updated: 2026-09-28
+Last updated: 2026-09-29
 
 ## Production Site
 
@@ -19,6 +19,7 @@ Current infrastructure includes:
 - GHCR
 - Cloudflare
 - Pagefind
+- Playwright browser E2E tests
 
 Production ingress is separated from the site container:
 
@@ -26,6 +27,21 @@ Production ingress is separated from the site container:
 - the InfraOpsX container serves internal HTTP on port 80
 - Edge Nginx reaches InfraOpsX through the external Docker `edge` network
 - the InfraOpsX deployment workflow changes only the image tag and does not replace host Edge, Compose, or TLS configuration
+
+Pull request CI validates the production Docker image, Nginx configuration, and a Chromium-based Playwright E2E suite against the built production image.
+
+The E2E suite currently covers:
+
+- important English and Chinese routes
+- article language switching
+- desktop theme persistence
+- mobile navigation
+- Pagefind site search
+- Ceph Capacity Calculator
+- Kubernetes Resource Calculator
+- Kubernetes Quantity Converter
+- browser console and page errors on core smoke routes
+- failure screenshots, video, and Playwright traces
 
 The site supports both English and Chinese.
 
@@ -205,7 +221,7 @@ The shared header provides System, Light, and Dark appearance preferences in Eng
 
 Current website focus:
 
-`Tool development`
+`Tool development and browser regression coverage`
 
 Next planned tool:
 

@@ -278,3 +278,30 @@ The production deployment workflow changes only `IMAGE_TAG` and must not upload 
 ### Why
 
 This allows multiple services and domains to share the same VPS without competing for ports 80/443. It also prevents a normal InfraOpsX site deployment from overwriting shared ingress or TLS configuration and keeps rollback limited to the application image version.
+
+
+---
+
+## ADR-015: Production-image browser E2E in pull request CI
+
+### Decision
+
+InfraOpsX uses Playwright for browser-level regression testing in pull request CI.
+
+The E2E suite runs against the built production Nginx image rather than an Astro development server. Browser tests run inside the official Playwright container, keeping the repository's Docker-first validation model and avoiding a host Node/browser requirement.
+
+The initial suite focuses on stable user-facing behavior:
+
+- critical English and Chinese routes
+- navigation and language switching
+- appearance persistence
+- Pagefind search
+- browser-local infrastructure tools
+- mobile navigation
+- browser console and page errors
+
+Failure artifacts retain screenshots, video, and traces for debugging.
+
+### Why
+
+Docker build success and `nginx -t` cannot detect broken client-side interactions, missing routes, JavaScript regressions, or layout/navigation behavior. Running a small real-browser suite against the production image catches those failures while keeping CI close to the deployed runtime.
