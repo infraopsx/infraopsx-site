@@ -47,7 +47,7 @@ test.describe('core site', () => {
     const analyticsRequests = [];
 
     page.on('request', (request) => {
-      if (request.url().startsWith('https://analytics.plainmile.com/')) {
+      if (request.url().startsWith('https://analytics.oeax.de/')) {
         analyticsRequests.push(request.url());
       }
     });
@@ -55,7 +55,7 @@ test.describe('core site', () => {
     await page.goto('/');
 
     await expect(
-      page.locator('script[src="https://analytics.plainmile.com/count.js"]')
+      page.locator('script[src="https://analytics.oeax.de/count.js"]')
     ).toHaveCount(0);
     expect(analyticsRequests).toEqual([]);
   });
