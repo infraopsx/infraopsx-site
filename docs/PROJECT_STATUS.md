@@ -41,6 +41,8 @@ The E2E suite currently covers:
 - Kubernetes Resource Calculator
 - Kubernetes Quantity Converter
 - browser console and page errors on core smoke routes
+- home-page Organization / WebSite structured data
+- article author attribution and BlogPosting author metadata
 - failure screenshots, video, and Playwright traces
 
 The site supports both English and Chinese.
@@ -196,7 +198,10 @@ Current pages use:
 - robots.txt
 - RSS
 - Pagefind
+- WebSite and Organization JSON-LD on the home page
 - BlogPosting JSON-LD on article pages
+- visible article author attribution linked to About
+- BlogPosting author metadata
 - BreadcrumbList JSON-LD on article pages
 - article Open Graph type on article pages
 
