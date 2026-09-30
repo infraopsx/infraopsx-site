@@ -55,6 +55,8 @@ const homeUrl = new URL(isZh ? '/zh/' : '/', site).toString();
 const articlesUrl = new URL(isZh ? '/zh/blog/' : '/blog/', site).toString();
 const authorHref = isZh ? '/zh/about/' : '/about/';
 const authorUrl = new URL('/about/', site).toString();
+const ogImagePath = '/og-default.png';
+const ogImageUrl = new URL(ogImagePath, site).toString();
 const datePublished =
   pubDate instanceof Date
     ? pubDate.toISOString().slice(0, 10)
@@ -68,6 +70,7 @@ const structuredData = {
       headline: title,
       description,
       datePublished,
+      image: ogImageUrl,
       inLanguage: locale,
       url: canonicalUrl,
       mainEntityOfPage: {
@@ -124,6 +127,7 @@ const tocHasExplicitNumbers = tocHeadings.some(
   zhPath={zhPath}
   pagefindType="Article"
   ogType="article"
+  ogImage={ogImagePath}
   structuredData={structuredData}
 >
   <Header
