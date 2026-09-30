@@ -43,6 +43,7 @@ The E2E suite currently covers:
 - browser console and page errors on core smoke routes
 - home-page Organization / WebSite structured data
 - article author attribution and BlogPosting author metadata
+- Open Graph / Twitter social image metadata and asset delivery
 - failure screenshots, video, and Playwright traces
 
 The site supports both English and Chinese.
@@ -204,6 +205,9 @@ Current pages use:
 - BlogPosting author metadata
 - BreadcrumbList JSON-LD on article pages
 - article Open Graph type on article pages
+- default 1200×630 PNG social sharing image
+- og:image and Twitter summary_large_image metadata
+- BlogPosting image metadata
 
 Google Search Console verification has been completed.
 
