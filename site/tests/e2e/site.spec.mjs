@@ -14,6 +14,14 @@ const routes = [
   ['/zh/blog/rook-ceph-osd-high-memory-osd-memory-target/', /Rook Ceph OSD 内存占用过高/]
 ];
 
+
+const readStructuredData = async (page) => {
+  const payloads = await page.locator('script[type="application/ld+json"]').allTextContents();
+  return payloads
+    .map((payload) => JSON.parse(payload))
+    .flatMap((payload) => payload['@graph'] || [payload]);
+};
+
 const collectBrowserErrors = (page) => {
   const errors = [];
 
@@ -58,6 +66,50 @@ test.describe('core site', () => {
       page.locator('script[src="https://analytics.oeax.de/count.js"]')
     ).toHaveCount(0);
     expect(analyticsRequests).toEqual([]);
+  });
+
+
+  test('homepage exposes Organization and WebSite structured data', async ({ page }) => {
+    await page.goto('/');
+
+    const structuredData = await readStructuredData(page);
+    const organization = structuredData.find((node) => node['@type'] === 'Organization');
+    const website = structuredData.find((node) => node['@type'] === 'WebSite');
+
+    expect(organization).toMatchObject({
+      name: 'InfraOpsX',
+      url: 'https://infra.oeax.de/'
+    });
+    expect(website).toMatchObject({
+      name: 'InfraOpsX',
+      url: 'https://infra.oeax.de/'
+    });
+    expect(website.publisher).toEqual({
+      '@id': 'https://infra.oeax.de/#organization'
+    });
+  });
+
+  test('articles expose visible and structured author identity', async ({ page }) => {
+    await page.goto('/blog/rook-ceph-osd-high-memory-osd-memory-target/');
+
+    const authorLink = page.locator('.article-meta .article-author a');
+    await expect(authorLink).toHaveText('InfraOpsX');
+    await expect(authorLink).toHaveAttribute('href', '/about/');
+
+    const structuredData = await readStructuredData(page);
+    const article = structuredData.find((node) => node['@type'] === 'BlogPosting');
+
+    expect(article.author).toMatchObject({
+      '@type': 'Organization',
+      name: 'InfraOpsX',
+      url: 'https://infra.oeax.de/about/'
+    });
+
+    await page.goto('/zh/blog/rook-ceph-osd-high-memory-osd-memory-target/');
+    await expect(page.locator('.article-meta .article-author a')).toHaveAttribute(
+      'href',
+      '/zh/about/'
+    );
   });
 
   test('article language switch preserves the matching article', async ({ page }) => {

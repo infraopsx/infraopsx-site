@@ -3,6 +3,30 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 
+const site = 'https://infra.oeax.de';
+const homeStructuredData = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${site}/#organization`,
+      name: 'InfraOpsX',
+      url: `${site}/`,
+      description:
+        'Practical infrastructure engineering focused on Linux, Docker, Kubernetes, storage, networking and production troubleshooting.'
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${site}/#website`,
+      name: 'InfraOpsX',
+      url: `${site}/`,
+      publisher: {
+        '@id': `${site}/#organization`
+      }
+    }
+  ]
+};
+
 const services = [
   {
     title: 'Docker & Self-hosted Deployment',
@@ -43,6 +67,7 @@ const skills = [
   canonicalPath="/"
   enPath="/"
   zhPath="/zh/"
+  structuredData={homeStructuredData}
 >
   <Header locale="en" />
 
