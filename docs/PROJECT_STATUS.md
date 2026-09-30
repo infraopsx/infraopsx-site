@@ -1,6 +1,6 @@
 # InfraOpsX Project Status
 
-Last updated: 2026-09-29
+Last updated: 2026-09-30
 
 ## Production Site
 
@@ -44,6 +44,8 @@ The E2E suite currently covers:
 - home-page Organization / WebSite structured data
 - article author attribution and BlogPosting author metadata
 - Open Graph / Twitter social image metadata and asset delivery
+- sitemap-driven SEO regression checks for canonical URLs, title/description, reciprocal hreflang, x-default and indexability
+- explicit search-page noindex and sitemap-exclusion checks
 - failure screenshots, video, and Playwright traces
 
 The site supports both English and Chinese.
@@ -208,6 +210,7 @@ Current pages use:
 - default 1200×630 PNG social sharing image
 - og:image and Twitter summary_large_image metadata
 - BlogPosting image metadata
+- automated SEO regression coverage in Playwright for sitemap-discovered public routes
 
 Google Search Console verification has been completed.
 
