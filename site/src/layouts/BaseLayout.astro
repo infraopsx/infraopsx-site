@@ -13,6 +13,7 @@ const {
   pagefindType,
   noindex = false,
   ogType = 'website',
+  ogImage = '/og-default.png',
   structuredData
 } = Astro.props as {
   title?: string;
@@ -24,6 +25,7 @@ const {
   pagefindType?: PagefindType;
   noindex?: boolean;
   ogType?: 'website' | 'article';
+  ogImage?: string;
   structuredData?: Record<string, unknown>;
 };
 
@@ -32,6 +34,7 @@ const site = 'https://infra.oeax.de';
 const canonicalUrl = new URL(canonicalPath, site).toString();
 const enUrl = new URL(enPath, site).toString();
 const zhUrl = new URL(zhPath, site).toString();
+const ogImageUrl = new URL(ogImage, site).toString();
 const structuredDataJson = structuredData
   ? JSON.stringify(structuredData).replace(/</g, '\\u003c')
   : undefined;
@@ -210,8 +213,15 @@ const structuredDataJson = structuredData
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:site_name" content="InfraOpsX" />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="InfraOpsX — Linux, Docker, Kubernetes, Infrastructure & Troubleshooting" />
 
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl} />
   </head>
 
   <body

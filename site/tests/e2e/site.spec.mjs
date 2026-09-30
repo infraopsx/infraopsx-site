@@ -112,6 +112,39 @@ test.describe('core site', () => {
     );
   });
 
+
+  test('pages expose large social sharing metadata', async ({ page }) => {
+    await page.goto('/');
+
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://infra.oeax.de/og-default.png'
+    );
+    await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute('content', '1200');
+    await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute('content', '630');
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      'content',
+      'summary_large_image'
+    );
+    await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute(
+      'content',
+      'https://infra.oeax.de/og-default.png'
+    );
+
+    const imageResponse = await page.request.get('/og-default.png');
+    expect(imageResponse.ok()).toBeTruthy();
+    expect(imageResponse.headers()['content-type']).toContain('image/png');
+  });
+
+  test('BlogPosting structured data includes the social image', async ({ page }) => {
+    await page.goto('/blog/rook-ceph-osd-high-memory-osd-memory-target/');
+
+    const structuredData = await readStructuredData(page);
+    const article = structuredData.find((node) => node['@type'] === 'BlogPosting');
+
+    expect(article.image).toBe('https://infra.oeax.de/og-default.png');
+  });
+
   test('article language switch preserves the matching article', async ({ page }) => {
     await page.goto('/blog/rook-ceph-osd-high-memory-osd-memory-target/');
 
