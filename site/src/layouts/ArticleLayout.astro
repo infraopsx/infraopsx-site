@@ -53,6 +53,8 @@ const site = 'https://infra.oeax.de';
 const canonicalUrl = new URL(currentPath, site).toString();
 const homeUrl = new URL(isZh ? '/zh/' : '/', site).toString();
 const articlesUrl = new URL(isZh ? '/zh/blog/' : '/blog/', site).toString();
+const authorHref = isZh ? '/zh/about/' : '/about/';
+const authorUrl = new URL('/about/', site).toString();
 const datePublished =
   pubDate instanceof Date
     ? pubDate.toISOString().slice(0, 10)
@@ -71,6 +73,11 @@ const structuredData = {
       mainEntityOfPage: {
         '@type': 'WebPage',
         '@id': canonicalUrl
+      },
+      author: {
+        '@type': 'Organization',
+        name: 'InfraOpsX',
+        url: authorUrl
       },
       publisher: {
         '@type': 'Organization',
@@ -149,6 +156,11 @@ const tocHasExplicitNumbers = tocHeadings.some(
           >
             {displayCategory}
           </span>
+          <span>·</span>
+          <span class="article-author" data-pagefind-ignore>
+            {isZh ? '作者：' : 'By '}
+            <a href={authorHref}>InfraOpsX</a>
+          </span>
         </div>
 
         <h1 data-pagefind-meta="title">{title}</h1>
@@ -210,6 +222,16 @@ const tocHasExplicitNumbers = tocHeadings.some(
 </BaseLayout>
 
 <style>
+  .article-author a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .article-author a:hover,
+  .article-author a:focus-visible {
+    color: var(--cyan);
+  }
+
   .article-toc {
     display: block;
     margin: 0 0 48px;
