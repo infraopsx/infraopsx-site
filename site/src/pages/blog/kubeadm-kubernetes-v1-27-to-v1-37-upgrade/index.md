@@ -194,16 +194,14 @@ kubectl get pods -A \
   -o custom-columns='NAMESPACE:.metadata.namespace,POD:.metadata.name,IMAGE:.spec.containers[*].image' \
   > "$BACKUP_DIR/config/images-before.txt"
 
-tar -C / \
-  -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
-  etc/kubernetes
+tar -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
+  /etc/kubernetes
 
-tar -C / \
-  -czf "$BACKUP_DIR/kubelet-config.tar.gz" \
-  lib/systemd/system/kubelet.service \
-  usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf \
-  var/lib/kubelet/config.yaml \
-  var/lib/kubelet/kubeadm-flags.env
+tar -czf "$BACKUP_DIR/kubelet-config.tar.gz" \
+  /lib/systemd/system/kubelet.service \
+  /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf \
+  /var/lib/kubelet/config.yaml \
+  /var/lib/kubelet/kubeadm-flags.env
 ~~~
 
 Before taking the snapshot, check etcd health:
@@ -315,6 +313,23 @@ Relevant results:
 ./kubelet-config.tar.gz: OK
 ~~~
 
+Before replacing kubeadm, use the current `kubeadm v1.27.0` once to inspect the v1.27.16 image list:
+
+~~~bash
+kubeadm config images list \
+  --kubernetes-version v1.27.16 \
+  --image-repository registry.aliyuncs.com/google_containers
+~~~
+
+The etcd mapping fell back to:
+
+~~~text
+could not find officially supported version of etcd for Kubernetes v1.27.16,
+falling back to the nearest etcd version (3.5.7-0)
+...
+registry.aliyuncs.com/google_containers/etcd:3.5.7-0
+~~~
+
 ## Update the kubeadm tool, then run the upgrade plan
 
 This step updates only the kubeadm tool on the control-plane node. The cluster itself is still on v1.27.0.
@@ -370,47 +385,45 @@ Server Version: ... GitVersion:"v1.27.0" ...
 
 These are two different things: kubeadm is now v1.27.16, but the Kubernetes control-plane is still v1.27.0 because `kubeadm upgrade apply` has not run yet.
 
-Now the plan is meaningful:
+After confirming that the local kubeadm binary is v1.27.16 while the cluster is still v1.27.0, generate the upgrade plan:
 
 ~~~bash
-kubeadm upgrade plan
+kubeadm upgrade plan "$TARGET"
 ~~~
 
-It describes what the v1.27.16 kubeadm tool intends to change in the still-v1.27.0 cluster:
+The original plan output is lengthy. The table below is a summary of the version information shown by that plan, not a verbatim kubeadm output block:
 
-~~~text
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.27.0   v1.27.16
-kube-controller-manager   v1.27.0   v1.27.16
-kube-scheduler            v1.27.0   v1.27.16
-kube-proxy                v1.27.0   v1.27.16
-CoreDNS                   v1.10.1   v1.10.1
-etcd                      3.5.7-0   3.5.12-0
+| Component | Current | Target |
+| --- | --- | --- |
+| kube-apiserver | v1.27.0 | v1.27.16 |
+| kube-controller-manager | v1.27.0 | v1.27.16 |
+| kube-scheduler | v1.27.0 | v1.27.16 |
+| kube-proxy | v1.27.0 | v1.27.16 |
+| CoreDNS | v1.10.1 | v1.10.1 |
+| etcd | 3.5.7-0 | 3.5.12-0 |
+| kubelet | 5 × v1.27.0 | v1.27.16 (upgraded node by node later) |
 
-COMPONENT   CURRENT       TARGET
-kubelet     5 x v1.27.0   v1.27.16
-~~~
-
-Before replacing kubeadm, the old v1.27.0 binary had been used to query the target images:
-
-~~~bash
-kubeadm config images list \
-  --kubernetes-version v1.27.16 \
-  --image-repository registry.aliyuncs.com/google_containers
-~~~
-
-It fell back to the older etcd mapping:
-
-~~~text
-could not find officially supported version of etcd for Kubernetes v1.27.16,
-falling back to the nearest etcd version (3.5.7-0)
-...
-registry.aliyuncs.com/google_containers/etcd:3.5.7-0
-~~~
-
-The target kubeadm's upgrade plan selected etcd `3.5.12-0`, so the later upgrade decisions used that plan.
+This differs from the earlier `config images list` run with kubeadm v1.27.0: the old binary fell back to etcd 3.5.7-0, while the v1.27.16 kubeadm upgrade plan selected etcd 3.5.12-0. The later upgrade steps therefore followed the target kubeadm's upgrade plan.
 
 ## Upgrade the control-plane
+
+Before apply, check the ClusterConfiguration stored by kubeadm:
+
+~~~bash
+kubectl -n kube-system get cm kubeadm-config \
+  -o jsonpath='{.data.ClusterConfiguration}'
+~~~
+
+The image repository setting was:
+
+~~~yaml
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+imageRepository: registry.aliyuncs.com/google_containers
+kubernetesVersion: v1.27.0
+~~~
+
+That is why `kubeadm upgrade apply` below does not pass a separate `--image-repository` flag. kubeadm reads the stored cluster configuration, and this cluster already has `imageRepository` set to `registry.aliyuncs.com/google_containers`. Without a custom image repository, kubeadm defaults to `registry.k8s.io`.
 
 First run a dry run:
 
@@ -418,12 +431,13 @@ First run a dry run:
 kubeadm upgrade apply v1.27.16 --dry-run
 ~~~
 
-The recorded dry-run result was:
+The kubeadm dry-run output ended with:
 
 ~~~text
 [upgrade/successful] Finished dryrunning successfully!
-kubeadm upgrade dry-run exit code: 0
 ~~~
+
+The shell wrapper recorded the command return code separately as `0`; that line is not kubeadm output.
 
 Then apply the upgrade:
 
@@ -431,14 +445,15 @@ Then apply the upgrade:
 kubeadm upgrade apply v1.27.16 --yes
 ~~~
 
-The important end of the output was:
+The kubeadm output ended with:
 
 ~~~text
 [upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.27.16". Enjoy!
 
 [upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.
-kubeadm upgrade apply exit code: 0
 ~~~
+
+The shell wrapper separately recorded the apply command return code as `0`.
 
 At this point the control-plane static Pods and etcd were already on the target versions. The images showed:
 
