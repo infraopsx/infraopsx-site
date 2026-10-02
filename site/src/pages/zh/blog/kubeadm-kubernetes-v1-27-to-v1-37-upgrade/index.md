@@ -24,7 +24,7 @@ zhPath: "/zh/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/"
 | Kernel | 6.1.0-52-amd64 |
 | Runtime | containerd 1.6.20 |
 | 起始版本 | Kubernetes v1.27.0 |
-| Kubernetes 二进制 | 手工放在 `/usr/local/bin` |
+| Kubernetes 二进制路径 | `/usr/local/bin` |
 
 3 个 control-plane 的 HA 集群在 control-plane 升级顺序、etcd 拓扑、负载均衡和可用性检查上会不同，因此不能把本文 control-plane 操作部分机械照搬到 HA 集群。
 
@@ -168,9 +168,27 @@ sha256sum \
   "$BACKUP_DIR/bin/kubectl"
 ~~~
 
-同时保存 Kubernetes 和 kubelet 配置：
+同时保存 kubeadm/kubelet 配置和当前 workload 状态：
 
 ~~~bash
+kubectl -n kube-system get cm kubeadm-config -o yaml \
+  > "$BACKUP_DIR/config/kubeadm-config.yaml"
+
+kubectl -n kube-system get cm kubelet-config -o yaml \
+  > "$BACKUP_DIR/config/kubelet-config.yaml"
+
+kubectl get nodes -o yaml \
+  > "$BACKUP_DIR/config/nodes.yaml"
+
+kubectl get deploy,ds,sts -A -o yaml \
+  > "$BACKUP_DIR/config/workloads.yaml"
+
+kubectl get pv -o yaml \
+  > "$BACKUP_DIR/config/pv.yaml"
+
+kubectl get pvc -A -o yaml \
+  > "$BACKUP_DIR/config/pvc.yaml"
+
 tar -C / \
   -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
   etc/kubernetes
@@ -264,17 +282,72 @@ sha256sum "$BACKUP_DIR/etcd/$SNAP"
 128caa1e419caffa7ea030e850dfd3bfa01105e5622338bb6a27dc8ffd82f967  /root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/etcd/etcd-before-v1.27.16-20261002-155639.db
 ~~~
 
+最后对整个 checkpoint 生成并验证校验清单：
+
+~~~bash
+(
+  cd "$BACKUP_DIR"
+  find . -type f ! -name SHA256SUMS -print0 \
+    | sort -z \
+    | xargs -0 sha256sum \
+    > SHA256SUMS
+)
+
+cd "$BACKUP_DIR"
+sha256sum -c SHA256SUMS
+~~~
+
+裁剪后的结果：
+
+~~~text
+./bin/kubeadm: OK
+./bin/kubectl: OK
+./bin/kubelet: OK
+./config/kubeadm-config.yaml: OK
+./config/kubelet-config.yaml: OK
+./config/nodes.yaml: OK
+./config/workloads.yaml: OK
+./etc-kubernetes.tar.gz: OK
+./etcd/etcd-before-v1.27.16-20261002-155639.db: OK
+./kubelet-config.tar.gz: OK
+~~~
+
 ## 先更新 kubeadm 工具，再执行 upgrade plan
 
 这一步只更新 control-plane 节点上的 kubeadm 工具本身，集群还没有开始升级。
 
-这批日志没有保留下当时下载 kubeadm 的那条命令，所以这里不补写一个“看起来像原始输入”的 curl/wget 命令。可以确认的是：目标二进制是 `v1.27.16`，下载后做了 SHA256 校验，然后替换现有的 `/usr/local/bin/kubeadm`。
+当时先下载目标版本 kubeadm 和官方 SHA256 文件：
 
-校验记录：
+~~~bash
+TARGET=v1.27.16
+ARCH=amd64
+
+curl -L \
+  "https://dl.k8s.io/release/${TARGET}/bin/linux/${ARCH}/kubeadm" \
+  -o "/tmp/kubeadm-${TARGET}"
+
+curl -L \
+  "https://dl.k8s.io/release/${TARGET}/bin/linux/${ARCH}/kubeadm.sha256" \
+  -o "/tmp/kubeadm-${TARGET}.sha256"
+
+cd /tmp
+EXPECTED="$(cat kubeadm-${TARGET}.sha256)"
+echo "${EXPECTED}  kubeadm-${TARGET}" | sha256sum -c -
+~~~
+
+校验结果：
 
 ~~~text
 kubeadm-v1.27.16: OK
 33622018f83515331ac70c2041eba5d814a6d78a40b8869f089ea502f63a1421  kubeadm-v1.27.16
+~~~
+
+然后替换 kubeadm：
+
+~~~bash
+install -o root -g root -m 0755 \
+  "/tmp/kubeadm-${TARGET}" \
+  /usr/local/bin/kubeadm
 ~~~
 
 替换后先确认工具版本和集群版本：
@@ -347,7 +420,14 @@ registry.aliyuncs.com/google_containers/etcd:3.5.7-0
 kubeadm upgrade apply v1.27.16 --dry-run
 ~~~
 
-dry-run 正常后再执行：
+dry-run 的记录结果是：
+
+~~~text
+[upgrade/successful] Finished dryrunning successfully!
+kubeadm upgrade dry-run exit code: 0
+~~~
+
+然后再执行：
 
 ~~~bash
 kubeadm upgrade apply v1.27.16 --yes
