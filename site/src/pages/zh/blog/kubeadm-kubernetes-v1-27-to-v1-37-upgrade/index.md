@@ -26,7 +26,7 @@ zhPath: "/zh/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/"
 | 起始版本 | Kubernetes v1.27.0 |
 | Kubernetes 二进制路径 | `/usr/local/bin` |
 
-3 个 control-plane 的 HA 集群在 control-plane 升级顺序、etcd 拓扑、负载均衡和可用性检查上会不同，因此不能把本文 control-plane 操作部分机械照搬到 HA 集群。
+对于 3 个 control-plane 的 HA 集群，control-plane 的升级顺序、etcd 拓扑、负载均衡和可用性检查都会不同，因此不能把本文 control-plane 操作部分机械照搬到 HA 集群。
 
 ## 为什么第一步是 v1.27.16
 
@@ -41,7 +41,7 @@ v1.27.16
 
 当前集群是 `v1.27.0`。这次先不跨到 1.28，而是先把 1.27.0 补到 1.27 系列最后一个 patch：`v1.27.16`。
 
-Kubernetes 官方发布记录显示，1.27 系列的 final patch 是 1.27.16。kubeadm 升级也不支持跳过 minor version，所以后面的路线会按 1.28、1.29……逐个 minor 往前走。
+Kubernetes 官方发布记录显示，1.27 系列最后一个 patch 版本是 1.27.16。kubeadm 不支持跳过 minor 版本升级，例如不能从 1.27 直接跳到 1.29，所以后面的路线会按 1.28、1.29……逐个 minor 往前走。
 
 ~~~text
 1.27.0
@@ -52,7 +52,7 @@ Kubernetes 官方发布记录显示，1.27 系列的 final patch 是 1.27.16。k
 → 1.37.x
 ~~~
 
-这里不是说“升级到 1.28 前必须先到 1.27.16”。选择 1.27.16 只是为了先把当前 1.27 系列补到最后一个 patch，再开始跨 minor。
+1.27.16 并不是升级到 1.28 的硬性前置条件。这里选择它，是为了先把 1.27 系列补到最后一个 patch，再开始跨 minor。
 
 参考：
 
@@ -563,7 +563,7 @@ control-plane 处理完后，再逐台升级 worker。worker 侧的基本顺序�
 → uncordon
 ~~~
 
-下面只保留这次实际遇到问题、或者有回传输出的部分，不把每台 worker 的重复步骤全部展开。
+各 worker 的重复步骤不再逐台展开，下面只记录 drain 过程中出现的差异。
 
 ### node1：第一次 drain 被 emptyDir 挡住
 
@@ -700,9 +700,11 @@ prometheus-k8s-db => emptyDir={}
 
 所以这个 Prometheus 的 TSDB 当时并没有放在 PVC 上，而是在 `emptyDir`。如果这个 Pod 在 drain 过程中被删除并重新创建，原来的历史数据不会跟着 Pod 一起迁移。
 
-这里先保存了原 PDB：
+这里先保存了原 PDB。当时本轮日志目录是：
 
 ~~~bash
+RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
+
 kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
