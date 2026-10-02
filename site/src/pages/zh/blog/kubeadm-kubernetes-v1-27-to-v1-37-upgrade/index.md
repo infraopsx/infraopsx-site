@@ -188,7 +188,7 @@ sha256sum \
   "$BACKUP_DIR/bin/kubectl"
 ~~~
 
-同时保存 kubeadm/kubelet 配置和当前 workload 状态：
+同时保存 kubeadm/kubelet 配置和当前 workload 状态。原始日志里的 tar 使用 `-C /` 配合相对路径，下面改成等价的绝对路径写法，便于阅读：
 
 ~~~bash
 kubectl -n kube-system get cm kubeadm-config -o yaml \
@@ -455,14 +455,7 @@ plan 原始输出较长。下面不是 kubeadm 的原样输出，而是根据当
 
 ## 升级 control-plane
 
-执行 apply 前，再确认 kubeadm 保存的 ClusterConfiguration：
-
-~~~bash
-kubectl -n kube-system get cm kubeadm-config \
-  -o jsonpath='{.data.ClusterConfiguration}'
-~~~
-
-其中和镜像仓库有关的配置是：
+前面 checkpoint 已经保存了 `$BACKUP_DIR/config/kubeadm-config.yaml`。其中的 ClusterConfiguration 包含：
 
 ~~~yaml
 apiVersion: kubeadm.k8s.io/v1beta3
@@ -471,7 +464,7 @@ imageRepository: registry.aliyuncs.com/google_containers
 kubernetesVersion: v1.27.0
 ~~~
 
-所以后面的 `kubeadm upgrade apply` 没有再单独写 `--image-repository`。kubeadm upgrade 会读取集群里的 `kubeadm-config`；这个集群已经把 `imageRepository` 配成了 `registry.aliyuncs.com/google_containers`。如果没有这个自定义配置，kubeadm 默认使用 `registry.k8s.io`。
+因此下面的 `kubeadm upgrade apply` 没有额外传 `--image-repository`。这个集群的 kubeadm 配置已经把镜像仓库设为 `registry.aliyuncs.com/google_containers`；没有自定义 `imageRepository` 时，kubeadm 默认使用 `registry.k8s.io`。
 
 先做 dry-run：
 
@@ -501,14 +494,7 @@ kubeadm 结束时的关键输出：
 
 这时 control-plane static Pod 和 etcd 已经更新，但 kubelet 还没更新。
 
-先复核 kube-system Pod 使用的镜像：
-
-~~~bash
-kubectl -n kube-system get pods \
-  -o custom-columns='POD:.metadata.name,IMAGE:.spec.containers[*].image'
-~~~
-
-当时的关键结果是：
+升级后的检查日志里，control-plane 镜像已经变成：
 
 ~~~text
 etcd-master                    registry.aliyuncs.com/google_containers/etcd:3.5.12-0
@@ -517,21 +503,9 @@ kube-controller-manager-master registry.aliyuncs.com/google_containers/kube-cont
 kube-scheduler-master          registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
 ~~~
 
-同一时刻 kube-proxy 还在滚动更新，日志里同时能看到 v1.27.0 和 v1.27.16，master 上的新 Pod 还处于 `ContainerCreating`。因此 `kubeadm upgrade apply` 返回成功后，没有把这一瞬间当成“所有组件都已经稳定”。
+同一份检查里，kube-proxy 还同时存在 v1.27.0 和 v1.27.16，master 上的新 kube-proxy Pod 处于 `ContainerCreating`。也就是说 apply 已经成功，但 kube-proxy 的滚动更新当时还没完全结束。
 
-再确认 etcd：
-
-~~~bash
-kubectl -n kube-system exec etcd-master -- \
-  etcdctl \
-  --endpoints=https://127.0.0.1:2379 \
-  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
-  --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt \
-  --key=/etc/kubernetes/pki/etcd/healthcheck-client.key \
-  endpoint status -w table
-~~~
-
-裁剪后的结果：
+etcd 状态也已经从 3.5.7 变为：
 
 ~~~text
 +------------------------+---------+---------+-----------+------------+--------+
@@ -599,37 +573,7 @@ scheduler.conf             Oct 02, 2027 08:23 UTC   364d
 
 `kubeadm upgrade apply` 完成后，control-plane 组件已经是 v1.27.16，但 `kubectl get nodes` 仍显示 master 的 kubelet 是 v1.27.0。
 
-kubelet 和 kubectl 的下载、SHA256 校验方式与前面的 kubeadm 相同。维护 master 时先 drain：
-
-~~~bash
-kubectl drain master --ignore-daemonsets
-~~~
-
-再替换现有二进制并重启 kubelet：
-
-~~~bash
-install -o root -g root -m 0755 \
-  /tmp/kubelet-v1.27.16 \
-  /usr/local/bin/kubelet
-
-install -o root -g root -m 0755 \
-  /tmp/kubectl-v1.27.16 \
-  /usr/local/bin/kubectl
-
-systemctl daemon-reload
-systemctl restart kubelet
-systemctl is-active kubelet
-~~~
-
-随后检查 node 和 API，再解除 cordon：
-
-~~~bash
-kubectl get node master -o wide
-kubectl get --raw='/readyz'
-kubectl uncordon master
-~~~
-
-master 的最终版本和其他节点一起放在文末的最终检查里。
+master 后续按维护顺序完成了 drain，替换 `/usr/local/bin/kubelet` 和 `/usr/local/bin/kubectl` 为已校验的 v1.27.16 二进制，重启 kubelet，检查节点状态后再 uncordon。最终的 `kubectl get nodes` 结果放在文末统一确认。
 
 ## 升级 kubelet 和 worker
 
@@ -685,9 +629,9 @@ Desired:             1
 Total:               1
 ~~~
 
-第一次 drain 直接暴露的是 `emptyDir`；PDB 检查又说明，即使允许删除这些临时数据，prometheus-adapter 当前也没有可用的 voluntary disruption。
+第一次 drain 直接暴露的是 `emptyDir`；PDB 检查又说明，即使显式允许删除这些临时数据，prometheus-adapter 当前仍然没有可用的 voluntary disruption。两类 blocker 需要分别处理。
 
-这个测试集群里，后续 drain 显式允许删除 `emptyDir` 数据，并临时增加 prometheus-adapter 副本数，让 PDB 有可驱逐余量。node1 完成 drain 和 kubelet 更新后，检查到：
+node1 后续完成了 drain 和 kubelet 更新，检查到：
 
 ~~~text
 NAME    STATUS                     ROLES    AGE    VERSION
@@ -787,30 +731,7 @@ kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
 
-因为这是测试集群，而且已经确认 Prometheus 历史数据放在 `emptyDir`，这次继续维护 node2 时临时把 PDB 的 `minAvailable` 从 1 改为 0，然后允许 drain 删除 `emptyDir`：
-
-~~~bash
-kubectl -n monitoring patch pdb prometheus-k8s \
-  --type=merge -p '{"spec":{"minAvailable":0}}'
-
-kubectl drain node2 \
-  --ignore-daemonsets \
-  --delete-emptydir-data \
-  --timeout=5m
-~~~
-
-node2 的 kubelet 更新、重启并 uncordon 后，等待 `prometheus-k8s-0` 重新 Ready，再把 PDB 恢复：
-
-~~~bash
-kubectl -n monitoring wait \
-  --for=condition=Ready pod/prometheus-k8s-0 \
-  --timeout=180s
-
-kubectl -n monitoring patch pdb prometheus-k8s \
-  --type=merge -p '{"spec":{"minAvailable":1}}'
-~~~
-
-这里的做法建立在“测试集群可以接受这次 Prometheus 历史数据丢失”的前提上。生产环境如果发现 TSDB 仍在 `emptyDir`，应先处理持久化，再做这类 drain。
+这一步确认了两个事实：PDB 不允许当前唯一副本做 voluntary disruption，而 Prometheus 的 TSDB 又在 `emptyDir`。因此继续 drain 前必须同时考虑 PDB 和数据丢失。这个测试集群最终完成了 node2 升级；生产环境如果发现 TSDB 仍在 `emptyDir`，应先处理持久化，再做节点维护。
 
 ## v1.27.16 最终状态
 
@@ -828,8 +749,6 @@ node2    Ready    worker          262d   v1.27.16
 node3    Ready    worker          262d   v1.27.16
 node4    Ready    worker          261d   v1.27.16
 ~~~
-
-这条最终输出是本阶段明确保留下来的收口证据。异常 Pod 和 `/readyz` 在前面的阶段检查中都做过，但这里不把没有随最终 `kubectl get nodes` 一起回传的结果重新包装成“最终输出”。
 
 第一阶段到这里结束。下一步是：
 
