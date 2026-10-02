@@ -550,7 +550,7 @@ update kubeadm / kubectl
 → uncordon
 ~~~
 
-The repeated happy-path steps are not expanded for every worker below. This section keeps the parts that either changed the next decision or were preserved in the returned output.
+The repeated worker steps are not expanded node by node below. Only the drain differences are kept.
 
 ### node1: the first drain was blocked by emptyDir
 
@@ -687,9 +687,11 @@ prometheus-k8s-db => emptyDir={}
 
 So the Prometheus TSDB was not stored on a PVC. If that Pod were deleted and recreated during drain, the existing `emptyDir` contents would not move with it.
 
-The original PDB was saved first:
+The original PDB was saved first. The log directory for this upgrade was:
 
 ~~~bash
+RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
+
 kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
