@@ -24,7 +24,7 @@ This cluster has 1 control-plane node and 4 workers. It is not an HA control-pla
 | Kernel | 6.1.0-52-amd64 |
 | Runtime | containerd 1.6.20 |
 | Starting version | Kubernetes v1.27.0 |
-| Kubernetes binaries | Manually managed under `/usr/local/bin` |
+| Kubernetes binary path | `/usr/local/bin` |
 
 A three-control-plane HA cluster has a different control-plane upgrade sequence and different checks around etcd topology, load balancing, and control-plane availability. The control-plane operations in this article should not be copied mechanically into an HA cluster.
 
@@ -169,9 +169,27 @@ sha256sum \
   "$BACKUP_DIR/bin/kubectl"
 ~~~
 
-Save Kubernetes and kubelet configuration:
+Save kubeadm/kubelet configuration and the current workload state:
 
 ~~~bash
+kubectl -n kube-system get cm kubeadm-config -o yaml \
+  > "$BACKUP_DIR/config/kubeadm-config.yaml"
+
+kubectl -n kube-system get cm kubelet-config -o yaml \
+  > "$BACKUP_DIR/config/kubelet-config.yaml"
+
+kubectl get nodes -o yaml \
+  > "$BACKUP_DIR/config/nodes.yaml"
+
+kubectl get deploy,ds,sts -A -o yaml \
+  > "$BACKUP_DIR/config/workloads.yaml"
+
+kubectl get pv -o yaml \
+  > "$BACKUP_DIR/config/pv.yaml"
+
+kubectl get pvc -A -o yaml \
+  > "$BACKUP_DIR/config/pvc.yaml"
+
 tar -C / \
   -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
   etc/kubernetes
@@ -263,17 +281,72 @@ sha256sum "$BACKUP_DIR/etcd/$SNAP"
 128caa1e419caffa7ea030e850dfd3bfa01105e5622338bb6a27dc8ffd82f967  /root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/etcd/etcd-before-v1.27.16-20261002-155639.db
 ~~~
 
+Generate and verify a checksum list for the whole checkpoint:
+
+~~~bash
+(
+  cd "$BACKUP_DIR"
+  find . -type f ! -name SHA256SUMS -print0 \
+    | sort -z \
+    | xargs -0 sha256sum \
+    > SHA256SUMS
+)
+
+cd "$BACKUP_DIR"
+sha256sum -c SHA256SUMS
+~~~
+
+Relevant results:
+
+~~~text
+./bin/kubeadm: OK
+./bin/kubectl: OK
+./bin/kubelet: OK
+./config/kubeadm-config.yaml: OK
+./config/kubelet-config.yaml: OK
+./config/nodes.yaml: OK
+./config/workloads.yaml: OK
+./etc-kubernetes.tar.gz: OK
+./etcd/etcd-before-v1.27.16-20261002-155639.db: OK
+./kubelet-config.tar.gz: OK
+~~~
+
 ## Update the kubeadm tool, then run the upgrade plan
 
 This step updates only the kubeadm tool on the control-plane node. The cluster itself is still on v1.27.0.
 
-The download command was not preserved in this batch of logs, so this article does not invent a curl or wget line after the fact. What the logs do preserve is the target version, SHA256 verification, and the binary path that was replaced.
+Download the target kubeadm binary and its official SHA256 file:
 
-Verification record:
+~~~bash
+TARGET=v1.27.16
+ARCH=amd64
+
+curl -L \
+  "https://dl.k8s.io/release/${TARGET}/bin/linux/${ARCH}/kubeadm" \
+  -o "/tmp/kubeadm-${TARGET}"
+
+curl -L \
+  "https://dl.k8s.io/release/${TARGET}/bin/linux/${ARCH}/kubeadm.sha256" \
+  -o "/tmp/kubeadm-${TARGET}.sha256"
+
+cd /tmp
+EXPECTED="$(cat kubeadm-${TARGET}.sha256)"
+echo "${EXPECTED}  kubeadm-${TARGET}" | sha256sum -c -
+~~~
+
+Verification result:
 
 ~~~text
 kubeadm-v1.27.16: OK
 33622018f83515331ac70c2041eba5d814a6d78a40b8869f089ea502f63a1421  kubeadm-v1.27.16
+~~~
+
+Then replace kubeadm:
+
+~~~bash
+install -o root -g root -m 0755 \
+  "/tmp/kubeadm-${TARGET}" \
+  /usr/local/bin/kubeadm
 ~~~
 
 After replacing `/usr/local/bin/kubeadm`, check both the local kubeadm version and the cluster version:
@@ -339,6 +412,13 @@ First run a dry run:
 
 ~~~bash
 kubeadm upgrade apply v1.27.16 --dry-run
+~~~
+
+The recorded dry-run result was:
+
+~~~text
+[upgrade/successful] Finished dryrunning successfully!
+kubeadm upgrade dry-run exit code: 0
 ~~~
 
 Then apply the upgrade:
