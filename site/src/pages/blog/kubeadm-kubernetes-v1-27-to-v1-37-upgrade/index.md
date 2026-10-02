@@ -43,6 +43,10 @@ So the migration strategy is:
 
 This is not the only theoretically possible way to start the journey, and kubeadm does not require every cluster to stop at the final patch of the current minor before moving to the next minor. I chose it because it gives us a clean, fully patched checkpoint before crossing each minor-version boundary.
 
+## Quick answer: why stop at v1.27.16 first?
+
+Because the starting cluster was on <code>v1.27.0</code>, and <code>v1.27.16</code> is the final patch release of the 1.27 series. Kubernetes does **not** require this exact patch stop before moving to 1.28, but it does recommend running the latest patch release and does not support skipping minor versions in a kubeadm upgrade. For this migration, using <code>v1.27.16</code> as the first checkpoint reduced the number of unknowns before crossing into 1.28.
+
 The official Kubernetes references behind that decision are:
 
 - <a href="https://kubernetes.io/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27 release page</a>
