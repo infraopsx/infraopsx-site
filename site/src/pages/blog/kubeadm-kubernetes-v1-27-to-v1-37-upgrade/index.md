@@ -1,51 +1,47 @@
 ---
 layout: ../../../layouts/ArticleLayout.astro
-title: "Kubernetes v1.27 to v1.37: A Real kubeadm Cluster Upgrade"
-description: "A real 5-node kubeadm upgrade from Kubernetes v1.27 to v1.37, covering backups, etcd changes, drain failures, PDB blockers, and verification."
+title: "Kubernetes v1.27 to v1.37: A kubeadm Cluster Upgrade Log"
+description: "A 5-node kubeadm cluster upgrade from Kubernetes v1.27 to v1.37. Part 1 covers v1.27.0 to v1.27.16, including backup, etcd, drain failures, PDBs, and verification."
 pubDate: "2026-10-02"
 category: Kubernetes
 tags:
   - Kubernetes
   - kubeadm
   - Upgrade
-  - Cluster Maintenance
-  - PodDisruptionBudget
   - etcd
-  - Troubleshooting
+  - PodDisruptionBudget
 enPath: "/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/"
 zhPath: "/zh/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/"
 ---
 
-This is a real upgrade log, not a clean-room kubeadm tutorial.
+This cluster has 1 control-plane node and 4 workers. It is not an HA control-plane cluster.
 
-## Migration plan and environment
-
-| Environment | Value |
+| Item | Environment |
 | --- | --- |
-| Cluster topology | 1 control-plane + 4 workers |
-| HA control plane | No |
+| control-plane | 1 |
+| workers | 4 |
 | OS | Debian 12 |
 | Kernel | 6.1.0-52-amd64 |
-| Container runtime | containerd 1.6.20 |
+| Runtime | containerd 1.6.20 |
 | Starting version | Kubernetes v1.27.0 |
-| Kubernetes binaries | Manually managed under /usr/local/bin |
-| Long-term target | Kubernetes v1.37 |
+| Kubernetes binaries | Manually managed under `/usr/local/bin` |
 
-This article records a **single-control-plane** kubeadm cluster. An HA cluster with three control-plane nodes needs a different control-plane maintenance sequence, including one-at-a-time control-plane upgrades and additional checks around load balancing, etcd topology, and control-plane availability. The worker-side observations in this article are still useful, but the exact control-plane procedure should not be copied mechanically into an HA cluster.
+A three-control-plane HA cluster has a different control-plane upgrade sequence and different checks around etcd topology, load balancing, and control-plane availability. The control-plane operations in this article should not be copied mechanically into an HA cluster.
 
-The cluster had been running for roughly 260 days on Kubernetes <code>v1.27.0</code>. The long-term goal is to bring it all the way to a current Kubernetes release without skipping minor versions. This first draft records the first checkpoint only:
+## Why the first target is v1.27.16
+
+A Kubernetes version number can be read as:
 
 ~~~text
-v1.27.0
-  ↓
 v1.27.16
+  │  │  └─ patch: 16
+  │  └──── minor: 27
+  └─────── major: 1
 ~~~
 
-That may look like an unnecessary detour. It was deliberate.
+The cluster starts at `v1.27.0`. Before moving to the next minor release, I first patched the 1.27 series to its final patch release, `v1.27.16`.
 
-Before attempting <code>v1.28</code>, I first moved the whole cluster to <code>v1.27.16</code>, the **final patch release in the Kubernetes 1.27 series**. Kubernetes lists <code>1.27.16</code> as the final 1.27 patch and marks 1.27 as end-of-life. The project also states that skipping minor versions during kubeadm upgrades is unsupported.
-
-So the migration strategy is:
+Kubernetes lists 1.27.16 as the final patch in the 1.27 series. kubeadm upgrades also do not support skipping minor releases, so the later path will move through 1.28, 1.29, and so on one minor release at a time.
 
 ~~~text
 1.27.0
@@ -56,63 +52,51 @@ So the migration strategy is:
 → 1.37.x
 ~~~
 
-This is not the only theoretically possible way to start the journey, and kubeadm does not require every cluster to stop at the final patch of the current minor before moving to the next minor. I chose it because it gives us a clean, fully patched checkpoint before crossing each minor-version boundary.
+This does not mean that 1.27.16 is mandatory before 1.28. I chose it as a clean checkpoint: finish the current minor series first, then cross the minor-version boundary.
 
-## Checkpoint 1: v1.27.0 → v1.27.16
+References:
 
-### Quick answer: why stop at v1.27.16 first?
-
-Because the starting cluster was on <code>v1.27.0</code>, and <code>v1.27.16</code> is the final patch release of the 1.27 series. Kubernetes does **not** require this exact patch stop before moving to 1.28, but it does recommend running the latest patch release and does not support skipping minor versions in a kubeadm upgrade. For this migration, using <code>v1.27.16</code> as the first checkpoint reduced the number of unknowns before crossing into 1.28.
-
-The official Kubernetes references behind that decision are:
-
-- <a href="https://kubernetes.io/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27 release page</a>
-- <a href="https://kubernetes.io/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes patch release history</a>
+- <a href="https://kubernetes.io/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27 release</a>
+- <a href="https://kubernetes.io/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes patch releases</a>
 - <a href="https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">Upgrading kubeadm clusters</a>
-- <a href="https://kubernetes.io/releases/version-skew-policy/" target="_blank" rel="noopener noreferrer">Kubernetes version skew policy</a>
 
-### How did I choose v1.27.16?
+## Pre-upgrade checks
 
-I did not pick the version number from a blog post or package repository listing.
+Start with the nodes:
 
-Kubernetes' own release history identifies:
-
-~~~text
-Kubernetes 1.27
-Final patch release: 1.27.16
-End of life: 2024-07-16
+~~~bash
+kubectl get nodes -o wide
 ~~~
 
-After replacing only the kubeadm binary with <code>v1.27.16</code>, the real cluster also confirmed the same target:
+The cluster looked like this:
 
 ~~~text
-[upgrade/versions] Cluster version: v1.27.0
-[upgrade/versions] kubeadm version: v1.27.16
-[upgrade/versions] Target version: v1.27.16
-[upgrade/versions] Latest version in the v1.27 series: v1.27.16
+NAME     STATUS   ROLES           AGE    VERSION   INTERNAL-IP    OS-IMAGE                         KERNEL-VERSION   CONTAINER-RUNTIME
+master   Ready    control-plane   262d   v1.27.0   10.10.10.100   Debian GNU/Linux 12 (bookworm)   6.1.0-52-amd64   containerd://1.6.20
+node1    Ready    worker          262d   v1.27.0   10.10.10.101   Debian GNU/Linux 12 (bookworm)   6.1.0-52-amd64   containerd://1.6.20
+node2    Ready    worker          262d   v1.27.0   10.10.10.102   Debian GNU/Linux 12 (bookworm)   6.1.0-52-amd64   containerd://1.6.20
+node3    Ready    worker          262d   v1.27.0   10.10.10.103   Debian GNU/Linux 12 (bookworm)   6.1.0-52-amd64   containerd://1.6.20
+node4    Ready    worker          260d   v1.27.0   10.10.10.104   Debian GNU/Linux 12 (bookworm)   6.1.0-52-amd64   containerd://1.6.20
 ~~~
 
-That gave us two independent checks: the Kubernetes release history and kubeadm's own upgrade plan.
+Then verify kubeadm, kubelet, and kubectl:
 
-There was another useful lesson here. Before replacing kubeadm, an earlier check with the old <code>v1.27.0</code> kubeadm binary produced an outdated fallback mapping for the target etcd image. After kubeadm itself was updated to <code>v1.27.16</code>, <code>kubeadm upgrade plan</code> correctly selected etcd <code>3.5.12-0</code>.
+~~~bash
+kubeadm version -o short
+kubelet --version
+kubectl version
+~~~
 
-For an old cluster, I would therefore avoid treating an old kubeadm binary as authoritative about the component versions bundled with a later patch. Upgrade the kubeadm binary first, verify it, and then generate the plan with the target kubeadm version.
+Relevant output:
 
-### Cluster before the upgrade
+~~~text
+v1.27.0
+Kubernetes v1.27.0
+Client Version: ... GitVersion:"v1.27.0" ...
+Server Version: ... GitVersion:"v1.27.0" ...
+~~~
 
-This was a five-node kubeadm cluster:
-
-| Node | Role | Kubernetes | OS | Runtime |
-| --- | --- | --- | --- | --- |
-| master | control-plane | v1.27.0 | Debian 12 | containerd 1.6.20 |
-| node1 | worker | v1.27.0 | Debian 12 | containerd 1.6.20 |
-| node2 | worker | v1.27.0 | Debian 12 | containerd 1.6.20 |
-| node3 | worker | v1.27.0 | Debian 12 | containerd 1.6.20 |
-| node4 | worker | v1.27.0 | Debian 12 | containerd 1.6.20 |
-
-All nodes were using kernel <code>6.1.0-52-amd64</code>.
-
-The Kubernetes binaries were not installed through apt or rpm. They were manually installed under:
+These binaries were not installed by apt. They were manually placed at:
 
 ~~~text
 /usr/local/bin/kubeadm
@@ -120,437 +104,13 @@ The Kubernetes binaries were not installed through apt or rpm. They were manuall
 /usr/local/bin/kubectl
 ~~~
 
-The kubelet systemd service also executed <code>/usr/local/bin/kubelet</code>.
-
-That matters because the official kubeadm upgrade documentation usually shows package-manager commands. In this cluster the workflow was the same at the kubeadm level, but binary replacement and rollback had to be handled manually.
-
-Other relevant baseline details:
-
-~~~text
-CNI: Calico v3.25.0 (manifest installation)
-CoreDNS: v1.10.1
-etcd: 3.5.7-0
-containerd: 1.6.20
-control-plane count: 1
-worker count: 4
-~~~
-
-The cluster was healthy before any change:
-
-~~~text
-master   Ready
-node1    Ready
-node2    Ready
-node3    Ready
-node4    Ready
-~~~
-
-The API <code>/readyz?verbose</code> check passed.
-
-There were already some <code>DNSConfigForming</code> warning events caused by the host resolver configuration. I recorded those before the upgrade so that I would not later mislabel them as an upgrade regression.
-
-### Create a recovery checkpoint before touching the cluster
-
-The first real step was not downloading Kubernetes. It was making a recovery point.
-
-For this lab cluster I saved the checkpoint locally on the control-plane node. For a production or otherwise valuable cluster I would also copy it off-host before continuing.
-
-The checkpoint included:
-
-- the existing kubeadm, kubelet, and kubectl binaries
-- kubeadm-config and kubelet configuration
-- node and workload manifests
-- <code>/etc/kubernetes</code>
-- kubelet configuration files
-- an etcd snapshot
-- SHA256 checksums for the backup files
-
-The etcd snapshot was successfully created before the upgrade. Its status was:
-
-~~~text
-revision: 38602084
-total keys: 1182
-total size: 19 MB
-~~~
-
-The snapshot itself was also checksummed.
-
-For a separate, deeper recovery example, see [Backing Up and Restoring etcd on Kubernetes: A Three-Member Recovery Test](/blog/etcd-backup-and-restore-on-kubernetes/).
-
-One small compatibility detail appeared here: the etcd image in this cluster did not include <code>etcdutl</code>, so snapshot status was checked with the older:
+API readiness was healthy before the upgrade:
 
 ~~~bash
-etcdctl snapshot status
+kubectl get --raw='/readyz?verbose'
 ~~~
 
-which printed a deprecation warning. The snapshot itself was healthy; the warning only affected the inspection command.
-
-I also archived <code>/etc/kubernetes</code>. That archive contains private PKI material, including CA keys, so it is a recovery artifact, not something that should be attached to a public article or committed to Git.
-
-### Replace kubeadm first and verify its checksum
-
-Because the binaries were manually managed, I downloaded the target kubeadm binary directly and verified it before replacing the old one.
-
-The recorded checksum validation was:
-
-~~~text
-kubeadm-v1.27.16: OK
-33622018f83515331ac70c2041eba5d814a6d78a40b8869f089ea502f63a1421  kubeadm-v1.27.16
-~~~
-
-After replacement:
-
-~~~text
-/usr/local/bin/kubeadm
-v1.27.16
-~~~
-
-I kept the old binary in the recovery checkpoint instead of overwriting it without a rollback path.
-
-### Run kubeadm upgrade plan before applying anything
-
-With target kubeadm in place, I ran the upgrade plan.
-
-This was one of the most useful outputs in the whole first checkpoint:
-
-~~~text
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.27.0   v1.27.16
-kube-controller-manager   v1.27.0   v1.27.16
-kube-scheduler            v1.27.0   v1.27.16
-kube-proxy                v1.27.0   v1.27.16
-CoreDNS                   v1.10.1   v1.10.1
-etcd                      3.5.7-0   3.5.12-0
-~~~
-
-And kubeadm separately told us what it would **not** upgrade for us:
-
-~~~text
-COMPONENT   CURRENT       TARGET
-kubelet     5 x v1.27.0   v1.27.16
-~~~
-
-The component configuration check also showed no manual config migration requirement:
-
-~~~text
-API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
-kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
-kubelet.config.k8s.io     v1beta1           v1beta1             no
-~~~
-
-The plan exited with code <code>0</code>.
-
-I also ran a dry run before the real change:
-
-~~~bash
-kubeadm upgrade apply v1.27.16 --dry-run
-~~~
-
-The dry run completed successfully.
-
-For a multi-hop upgrade, I want both of these artifacts for every checkpoint:
-
-~~~text
-upgrade plan
-dry run
-~~~
-
-That makes it much easier to separate "what kubeadm said it would do" from "what actually happened".
-
-### Apply the control-plane upgrade
-
-The real control-plane step was:
-
-~~~bash
-kubeadm upgrade apply v1.27.16 --yes
-~~~
-
-The command completed successfully.
-
-During the apply, kubeadm upgraded the static-Pod control plane and etcd. It also renewed control-plane certificates.
-
-The important component changes were:
-
-~~~text
-kube-apiserver             v1.27.0  → v1.27.16
-kube-controller-manager    v1.27.0  → v1.27.16
-kube-scheduler             v1.27.0  → v1.27.16
-kube-proxy                 v1.27.0  → v1.27.16
-etcd                       3.5.7-0  → 3.5.12-0
-CoreDNS                    v1.10.1  → v1.10.1
-~~~
-
-kubeadm also created a backup of the previous static Pod manifests under <code>/etc/kubernetes/tmp/</code>.
-
-#### The certificate lifetime changed too
-
-Before the upgrade, the non-CA Kubernetes certificates had roughly 102 days remaining.
-
-After <code>kubeadm upgrade apply</code>, they had roughly 364 days remaining.
-
-That was not a manual certificate operation. It happened as part of the kubeadm upgrade.
-
-This is a good example of why I prefer recording certificate state both before and after a control-plane change instead of assuming "a patch upgrade only changes binaries".
-
-### Why did kubectl get nodes still show v1.27.0?
-
-Immediately after the control-plane upgrade, this can look confusing.
-
-The API server and other control-plane components were already on <code>v1.27.16</code>, but:
-
-~~~bash
-kubectl get nodes
-~~~
-
-still showed the nodes as <code>v1.27.0</code>.
-
-That is expected.
-
-The <code>VERSION</code> column in <code>kubectl get nodes</code> reports the **kubelet version**, not the kube-apiserver version. We had not upgraded any kubelet yet.
-
-So at this stage the real state was approximately:
-
-~~~text
-control-plane static Pods: v1.27.16
-etcd:                      3.5.12
-kubelets:                  v1.27.0
-~~~
-
-This distinction is worth checking before declaring a control-plane upgrade "failed" based only on the node version column.
-
-### Wait for kube-proxy to finish rolling out
-
-Right after the control-plane apply, kube-proxy was in a real transitional state: some Pods already used the <code>v1.27.16</code> image while others were still on <code>v1.27.0</code>.
-
-I waited for the DaemonSet rollout instead of treating that intermediate snapshot as an error:
-
-~~~bash
-kubectl -n kube-system rollout status ds/kube-proxy --timeout=180s
-~~~
-
-Only after all kube-proxy Pods were Ready on the target image did I continue to kubelet upgrades.
-
-This is another reason the raw logs are useful: a snapshot taken in the middle of a rollout can look unhealthy even when the rollout is behaving normally.
-
-### Upgrade the control-plane kubelet and kubectl
-
-The target kubelet and kubectl binaries were downloaded and checksum-verified in the same way as kubeadm.
-
-Then I drained the control-plane node:
-
-~~~bash
-kubectl drain master --ignore-daemonsets
-~~~
-
-The drain succeeded.
-
-After replacing <code>/usr/local/bin/kubelet</code> and <code>/usr/local/bin/kubectl</code>, I restarted kubelet:
-
-~~~bash
-systemctl daemon-reload
-systemctl restart kubelet
-~~~
-
-The node came back as:
-
-~~~text
-master   Ready,SchedulingDisabled   ...   v1.27.16
-~~~
-
-The API readiness check still passed, so I uncordoned it:
-
-~~~bash
-kubectl uncordon master
-~~~
-
-At that point the control plane was fully on <code>v1.27.16</code>, while all four workers still reported <code>v1.27.0</code>.
-
-### Upgrade workers one at a time
-
-For each worker I used the same high-level sequence:
-
-~~~text
-copy verified binaries
-↓
-back up existing binaries and kubelet config
-↓
-replace kubeadm and kubectl
-↓
-kubeadm upgrade node
-↓
-drain
-↓
-replace kubelet
-↓
-restart kubelet
-↓
-verify Ready,SchedulingDisabled + target version
-↓
-uncordon
-↓
-verify again
-~~~
-
-Running:
-
-~~~bash
-kubeadm upgrade node
-~~~
-
-on the worker before replacing kubelet kept that node's kubelet configuration in sync with the cluster upgrade.
-
-The first worker, however, showed why a real upgrade log is more useful than a perfect command list.
-
-### Drain failure #1: emptyDir data
-
-The first drain attempt on <code>node1</code> failed:
-
-~~~text
-cannot delete Pods with local storage
-(use --delete-emptydir-data to override):
-  kube-system/metrics-server-...
-  kubernetes-dashboard/kubernetes-dashboard-...
-  monitoring/prometheus-adapter-...
-
-drain exit code: 1
-~~~
-
-The node was already cordoned, but the drain did not complete.
-
-I did not immediately add every override flag. First I inspected the workloads and confirmed that these were controller-managed Pods and that the blocked local volumes were <code>emptyDir</code> data that could be recreated in this test cluster.
-
-Then the retry used:
-
-~~~bash
-kubectl drain node1 \
-  --ignore-daemonsets \
-  --delete-emptydir-data \
-  --timeout=5m
-~~~
-
-That exposed the next blocker.
-
-### Drain failure #2: a PodDisruptionBudget that allowed zero disruptions
-
-<code>prometheus-adapter</code> had one replica and this PDB:
-
-~~~text
-MIN AVAILABLE          1
-CURRENT                1
-DESIRED                1
-ALLOWED DISRUPTIONS    0
-~~~
-
-That combination does exactly what it says: eviction of the only healthy replica would violate the PDB.
-
-Instead of bypassing the Eviction API, I temporarily scaled the Deployment to two replicas and waited for both to become Ready. With two healthy replicas, the PDB allowed one disruption and the drain could complete.
-
-After <code>node1</code> was upgraded and uncordoned, I restored <code>prometheus-adapter</code> to its original single replica.
-
-The important point is not "always scale to two". The important point is:
-
-> Read the PDB and workload topology before deciding how to make a voluntary disruption safe.
-
-For another application, changing replicas may be the wrong answer.
-
-### The same drain blocker followed us to node3 and node4
-
-Worker maintenance is not isolated.
-
-After a Pod is evicted from one node, its controller schedules a replacement somewhere else. In this cluster, some of the same single-replica workloads moved onto nodes that had not been upgraded yet.
-
-That meant later drains on <code>node3</code> and <code>node4</code> encountered the same kind of <code>emptyDir</code> blocker again.
-
-This was a useful operational lesson:
-
-> When upgrading workers sequentially, keep watching where singleton and stateful workloads are being rescheduled. A blocker can move with the workload.
-
-If a replacement Pod cannot find a new home after eviction, the related [Kubernetes Pod Stuck in Pending: A Practical Troubleshooting Workflow](/blog/kubernetes-pod-pending/) covers the scheduler-side checks.
-
-After the relevant Pods had moved away and each node contained only expected DaemonSet Pods such as Calico, kube-proxy, and node-exporter, I upgraded the kubelet and uncordoned the node.
-
-### node2 exposed a more serious Prometheus storage problem
-
-I deliberately left <code>node2</code> for last because it hosted:
-
-~~~text
-prometheus-k8s-0
-~~~
-
-The Prometheus PDB showed:
-
-~~~text
-MIN AVAILABLE          1
-ALLOWED DISRUPTIONS    0
-~~~
-
-The StatefulSet had one replica.
-
-Before changing the PDB, I checked storage.
-
-The result was more important than the upgrade itself:
-
-~~~text
-No PVCs in namespace monitoring
-No StorageClasses
-No PVs
-~~~
-
-And the Prometheus Pod showed:
-
-~~~text
-prometheus-k8s-db => emptyDir={}
-~~~
-
-So this Prometheus instance had been running for months, but its TSDB was not on persistent storage.
-
-A container restart does not automatically delete an existing Pod's <code>emptyDir</code>, but deleting or evicting the Pod does. Draining the node would therefore discard the existing Prometheus history.
-
-For this disposable test cluster, that data loss was acceptable and explicitly understood before proceeding. In a production environment, I would stop here and fix Prometheus persistence before continuing the maintenance.
-
-To make the voluntary disruption possible, I first saved the original PDB YAML and then temporarily changed:
-
-~~~text
-minAvailable: 1
-~~~
-
-to:
-
-~~~text
-minAvailable: 0
-~~~
-
-After the PDB reported that one disruption was allowed, I drained <code>node2</code> with <code>--delete-emptydir-data</code>, upgraded its kubelet, uncordoned it, waited for Prometheus to become Ready again, and restored the original PDB behavior.
-
-Prometheus came back as a fresh Pod on another worker.
-
-That incident turned the upgrade into a useful storage audit: the cluster upgrade did not create the Prometheus persistence problem, but the maintenance procedure exposed it.
-
-### Final v1.27.16 verification
-
-After the final worker upgrade, all five nodes were on the same patch:
-
-~~~text
-NAME     STATUS   ROLES           VERSION
-master   Ready    control-plane   v1.27.16
-node1    Ready    worker          v1.27.16
-node2    Ready    worker          v1.27.16
-node3    Ready    worker          v1.27.16
-node4    Ready    worker          v1.27.16
-~~~
-
-The client and server versions also matched:
-
-~~~text
-kubeadm:            v1.27.16
-kubelet:            v1.27.16
-kubectl client:     v1.27.16
-Kubernetes server:  v1.27.16
-~~~
-
-The final kube-system check showed all system Pods Running.
-
-The verbose API readiness check passed, including etcd readiness:
+Relevant output:
 
 ~~~text
 [+]ping ok
@@ -560,75 +120,286 @@ The verbose API readiness check passed, including etcd readiness:
 readyz check passed
 ~~~
 
-<code>kubectl top nodes</code> also returned metrics for all five nodes.
+There were already `DNSConfigForming` warnings before the upgrade, so those warnings should not be attributed to the upgrade later.
 
-At the final checkpoint, Prometheus had been recreated and was <code>2/2 Running</code>, and its PDB had been restored to <code>minAvailable: 1</code>.
+## Backup and etcd snapshot
 
-## Lessons from checkpoint 1
+The backup directory was:
 
-The first step of the long migration ended with:
+~~~text
+/root/k8s-upgrade-backup/20261002-155639-before-v1.27.16
+~~~
 
-| Item | Before | After |
-| --- | --- | --- |
-| Kubernetes control plane | v1.27.0 | v1.27.16 |
-| kubelet on 5 nodes | v1.27.0 | v1.27.16 |
-| kube-proxy | v1.27.0 | v1.27.16 |
-| etcd | 3.5.7-0 | 3.5.12-0 |
-| CoreDNS | v1.10.1 | v1.10.1 |
-| non-CA cert lifetime | ~102 days remaining | ~364 days remaining |
-| node health | all Ready | all Ready |
-| API readiness | passed | passed |
+It included the old kubeadm, kubelet, and kubectl binaries, kubeadm and kubelet configuration, `/etc/kubernetes`, and an etcd snapshot.
 
-And, just as importantly, the maintenance exposed three operational risks:
+After saving the snapshot, I checked its status:
 
-1. <code>emptyDir</code> workloads can block <code>kubectl drain</code>.
-2. A single replica protected by <code>minAvailable: 1</code> can make a voluntary eviction impossible.
-3. A stateful-looking workload can still be using ephemeral storage; check the actual volume source before draining it.
+~~~bash
+kubectl -n kube-system exec etcd-master --   etcdctl snapshot status /var/lib/etcd/etcd-before-v1.27.16-20261002-155639.db -w table
+~~~
 
-## FAQ
+The etcd image did not contain `etcdutl`, so the check fell back to `etcdctl snapshot status`:
 
-### Can kubeadm skip Kubernetes minor versions?
+~~~text
+Deprecated: Use `etcdutl snapshot status` instead.
 
-No. The kubeadm upgrade documentation treats skipping minor versions as unsupported. This migration therefore moves forward one minor release at a time.
++----------+----------+------------+------------+
+|   HASH   | REVISION | TOTAL KEYS | TOTAL SIZE |
++----------+----------+------------+------------+
+| 4d3d67ac | 38602084 |       1182 |      19 MB |
++----------+----------+------------+------------+
+~~~
 
-### Was v1.27.16 mandatory before moving to v1.28?
+The snapshot was also checksummed:
 
-Not strictly. The important rule is not to skip the 1.28 minor release. I chose <code>v1.27.16</code> because it is the final 1.27 patch and gives this migration a fully patched checkpoint before crossing the minor-version boundary.
+~~~text
+128caa1e419caffa7ea030e850dfd3bfa01105e5622338bb6a27dc8ffd82f967
+~~~
 
-### Does kubeadm upgrade apply also upgrade kubelet?
+The `/etc/kubernetes` backup contains PKI private keys. It is a recovery artifact and should not be published or committed to Git.
 
-No. In this run, <code>kubeadm upgrade apply</code> upgraded the control-plane static Pods and etcd, but the node <code>VERSION</code> values stayed on <code>v1.27.0</code> until each kubelet binary was upgraded separately.
+## Upgrade kubeadm first, then run the plan
 
-### Why did kubectl drain fail?
+Because this cluster uses manually managed binaries, I replaced only kubeadm first. kubelet stayed on v1.27.0.
 
-Two independent safeguards appeared. Some Pods used <code>emptyDir</code>, so drain required an explicit decision about deleting local ephemeral data. Separately, a single-replica workload had a PodDisruptionBudget with <code>minAvailable: 1</code>, leaving zero allowed voluntary disruptions.
+After replacement:
 
-### Does draining a node delete emptyDir data?
-
-It can. A normal drain refuses to evict Pods with local <code>emptyDir</code> data unless that loss is explicitly acknowledged with <code>--delete-emptydir-data</code>. If the Pod is deleted and recreated elsewhere, the old Pod's <code>emptyDir</code> contents do not follow it.
-
-## Next checkpoint: v1.27.16 → v1.28.15
-
-The cluster is now consistently on <code>v1.27.16</code>.
-
-The next step in this same migration is:
+~~~bash
+kubeadm version -o short
+~~~
 
 ~~~text
 v1.27.16
-  ↓
-v1.28.15
 ~~~
 
-Before that jump, I will create a fresh recovery checkpoint and review version-specific changes for Kubernetes 1.28 instead of assuming the exact same behavior will repeat.
+Then:
 
-This article will continue to grow from the actual upgrade logs rather than from a reconstructed happy-path procedure.
+~~~bash
+kubeadm upgrade plan
+~~~
+
+The relevant part of the plan was:
+
+~~~text
+COMPONENT                 CURRENT   TARGET
+kube-apiserver            v1.27.0   v1.27.16
+kube-controller-manager   v1.27.0   v1.27.16
+kube-scheduler            v1.27.0   v1.27.16
+kube-proxy                v1.27.0   v1.27.16
+CoreDNS                   v1.10.1   v1.10.1
+etcd                      3.5.7-0   3.5.12-0
+
+COMPONENT   CURRENT       TARGET
+kubelet     5 x v1.27.0   v1.27.16
+~~~
+
+This also exposed a difference between the old and target kubeadm binaries. An earlier check with kubeadm v1.27.0 still mapped the target patch to etcd 3.5.7-0. After replacing kubeadm with v1.27.16, the upgrade plan selected etcd 3.5.12-0.
+
+## Upgrade the control-plane
+
+First run a dry run:
+
+~~~bash
+kubeadm upgrade apply v1.27.16 --dry-run
+~~~
+
+Then apply the upgrade:
+
+~~~bash
+kubeadm upgrade apply v1.27.16 --yes
+~~~
+
+The important end of the output was:
+
+~~~text
+[upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.27.16". Enjoy!
+
+[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.
+kubeadm upgrade apply exit code: 0
+~~~
+
+At this point the control-plane static Pods and etcd were already on the target versions. The images showed:
+
+~~~text
+etcd-master                       registry.aliyuncs.com/google_containers/etcd:3.5.12-0
+kube-apiserver-master             registry.aliyuncs.com/google_containers/kube-apiserver:v1.27.16
+kube-controller-manager-master    registry.aliyuncs.com/google_containers/kube-controller-manager:v1.27.16
+kube-scheduler-master             registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
+~~~
+
+But the node versions were still unchanged:
+
+~~~bash
+kubectl get nodes
+~~~
+
+~~~text
+NAME     STATUS   ROLES           AGE    VERSION
+master   Ready    control-plane   262d   v1.27.0
+node1    Ready    worker          262d   v1.27.0
+node2    Ready    worker          262d   v1.27.0
+node3    Ready    worker          262d   v1.27.0
+node4    Ready    worker          260d   v1.27.0
+~~~
+
+The VERSION column in `kubectl get nodes` is the kubelet version, so it remains v1.27.0 until the kubelet is upgraded separately.
+
+### Certificate renewal
+
+Before the upgrade:
+
+~~~bash
+kubeadm certs check-expiration
+~~~
+
+Relevant rows:
+
+~~~text
+admin.conf                 Jan 13, 2027 05:58 UTC   102d
+apiserver                  Jan 13, 2027 05:58 UTC   102d
+apiserver-etcd-client      Jan 13, 2027 05:58 UTC   102d
+...
+scheduler.conf             Jan 13, 2027 05:58 UTC   102d
+~~~
+
+After `kubeadm upgrade apply`:
+
+~~~bash
+kubeadm certs check-expiration
+~~~
+
+~~~text
+admin.conf                 Oct 02, 2027 08:24 UTC   364d
+apiserver                  Oct 02, 2027 08:22 UTC   364d
+apiserver-etcd-client      Oct 02, 2027 08:22 UTC   364d
+...
+scheduler.conf             Oct 02, 2027 08:23 UTC   364d
+~~~
+
+## Upgrade kubelet and workers
+
+After the control-plane kubelet was updated to v1.27.16, the workers were handled one at a time:
+
+~~~text
+replace kubeadm / kubectl
+→ kubeadm upgrade node
+→ drain
+→ replace kubelet
+→ restart kubelet
+→ verify
+→ uncordon
+~~~
+
+The main work was around drain failures.
+
+### node1: emptyDir and PDB
+
+First attempt:
+
+~~~bash
+kubectl drain node1 --ignore-daemonsets --timeout=5m
+~~~
+
+It failed:
+
+~~~text
+node/node1 cordoned
+cannot delete Pods with local storage (use --delete-emptydir-data to override):
+  kube-system/metrics-server-...
+  kubernetes-dashboard/kubernetes-dashboard-...
+  monitoring/prometheus-adapter-...
+
+drain exit code: 1
+~~~
+
+After confirming that the local storage was disposable `emptyDir` data in this test cluster, I retried with `--delete-emptydir-data`.
+
+The next blocker was the prometheus-adapter PDB:
+
+~~~bash
+kubectl -n monitoring get pdb prometheus-adapter -o wide
+~~~
+
+~~~text
+NAME                 MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
+prometheus-adapter   1               N/A               0
+~~~
+
+prometheus-adapter had one replica with `minAvailable: 1`, so there was no voluntary disruption available. In this test environment I temporarily scaled it to two replicas, waited for the second replica to become Ready, and then drained the node.
+
+The same type of blocker later appeared on node3 and node4 because replacement Pods moved onto nodes that had not yet been maintained.
+
+### node2: Prometheus had no persistent storage
+
+node2 was left until last because it hosted:
+
+~~~text
+prometheus-k8s-0
+~~~
+
+The PDB was:
+
+~~~bash
+kubectl -n monitoring get pdb prometheus-k8s -o wide
+~~~
+
+~~~text
+NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
+prometheus-k8s   1               N/A               0
+~~~
+
+Storage checks:
+
+~~~bash
+kubectl -n monitoring get pvc
+kubectl get storageclass
+kubectl get pv
+~~~
+
+All returned:
+
+~~~text
+No resources found
+~~~
+
+The Pod volume showed:
+
+~~~text
+prometheus-k8s-db => emptyDir={}
+~~~
+
+So the Prometheus TSDB was not on persistent storage. This test cluster could accept losing the existing history during drain. I saved the original PDB, temporarily changed `minAvailable` from 1 to 0, drained node2, and restored the PDB afterward.
+
+In a production cluster I would stop here and fix Prometheus persistence before draining the node.
+
+## Final v1.27.16 state
+
+After all nodes were done:
+
+~~~bash
+kubectl get nodes
+~~~
+
+~~~text
+NAME     STATUS   ROLES           AGE    VERSION
+master   Ready    control-plane   262d   v1.27.16
+node1    Ready    worker          262d   v1.27.16
+node2    Ready    worker          262d   v1.27.16
+node3    Ready    worker          262d   v1.27.16
+node4    Ready    worker          261d   v1.27.16
+~~~
+
+The next step is:
+
+~~~text
+v1.27.16 → v1.28.15
+~~~
+
+The later checkpoints will keep the same format: commands where they matter, cropped output that supports the decision, and only enough explanation to show why the next step was taken.
 
 ## References
 
-- <a href="https://kubernetes.io/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27 release status</a>
+- <a href="https://kubernetes.io/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27 release</a>
 - <a href="https://kubernetes.io/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes patch releases</a>
 - <a href="https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">Upgrading kubeadm clusters</a>
-- <a href="https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/" target="_blank" rel="noopener noreferrer">Upgrading Linux nodes</a>
-- <a href="https://kubernetes.io/releases/version-skew-policy/" target="_blank" rel="noopener noreferrer">Kubernetes version skew policy</a>
-- <a href="https://kubernetes.io/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain reference</a>
-- <a href="https://kubernetes.io/docs/concepts/workloads/pods/disruptions/" target="_blank" rel="noopener noreferrer">Pod disruption budgets and voluntary disruptions</a>
+- <a href="https://kubernetes.io/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain</a>
