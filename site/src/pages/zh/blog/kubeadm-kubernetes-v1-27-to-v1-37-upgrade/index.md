@@ -631,7 +631,7 @@ node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 
 当时 node1 上只剩下 Calico、kube-proxy、node-exporter 这类 DaemonSet Pod，然后再 uncordon。
 
-### node3 和 node4：相同 blocker 会跟着 Pod 移动
+### node3 和 node4：同样的 drain 问题再次出现
 
 node3 第一次 drain 也没有一次成功：
 
@@ -703,7 +703,13 @@ kubectl get storageclass
 kubectl get pv
 ~~~
 
-结果都没有资源。
+当时的输出分别是：
+
+~~~text
+No resources found in monitoring namespace.
+No resources found
+No resources found
+~~~
 
 继续检查 Prometheus Pod 的 volume：
 
