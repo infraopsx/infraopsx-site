@@ -580,7 +580,7 @@ The repeated worker steps are not expanded node by node below. Only the drain di
 The first attempt was:
 
 ~~~bash
-kubectl drain node1 --ignore-daemonsets --timeout=5m
+kubectl drain node1 --ignore-daemonsets
 ~~~
 
 It returned:
