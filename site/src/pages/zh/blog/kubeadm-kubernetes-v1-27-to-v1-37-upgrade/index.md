@@ -587,7 +587,7 @@ control-plane 处理完后，再逐台升级 worker。worker 侧的基本顺序�
 第一次执行：
 
 ~~~bash
-kubectl drain node1 --ignore-daemonsets --timeout=5m
+kubectl drain node1 --ignore-daemonsets
 ~~~
 
 返回：
