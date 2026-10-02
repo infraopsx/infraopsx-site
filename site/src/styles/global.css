@@ -801,6 +801,7 @@ html[lang="zh-CN"] body {
 
 .article-meta {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   color: var(--cyan);
   font-size: 12px;
@@ -836,6 +837,7 @@ html[lang="zh-CN"] body {
 }
 
 .article-content {
+  min-width: 0;
   padding-top: 55px;
   font-size: 17px;
   line-height: 1.82;
@@ -877,6 +879,7 @@ html[lang="zh-CN"] body {
 }
 
 .article-content pre {
+  max-width: 100%;
   overflow-x: auto;
   margin: 25px 0;
   padding: 22px;
@@ -910,9 +913,13 @@ html[lang="zh-CN"] body {
 }
 
 .article-content table {
+  display: block;
   width: 100%;
+  max-width: 100%;
   margin: 28px 0;
+  overflow-x: auto;
   border-collapse: collapse;
+  -webkit-overflow-scrolling: touch;
 }
 
 .article-content th,
@@ -940,6 +947,19 @@ html[lang="zh-CN"] body {
 @media (max-width: 600px) {
   .article-shell {
     padding-top: 60px;
+  }
+
+  .article-container {
+    min-width: 0;
+  }
+
+  .article-header,
+  .article-content {
+    max-width: 100%;
+  }
+
+  .article-content code {
+    overflow-wrap: anywhere;
   }
 
   .article-header h1 {
