@@ -393,7 +393,6 @@ Verification result:
 
 ~~~text
 kubeadm-v1.27.16: OK
-33622018f83515331ac70c2041eba5d814a6d78a40b8869f089ea502f63a1421  kubeadm-v1.27.16
 ~~~
 
 Then replace kubeadm:
@@ -470,6 +469,16 @@ Then apply the upgrade:
 
 ~~~bash
 kubeadm upgrade apply v1.27.16 --yes
+~~~
+
+The beginning of the output shows kubeadm reading the cluster configuration:
+
+~~~text
+[upgrade/config] Reading configuration from the cluster...
+[upgrade/version] You have chosen to change the cluster version to "v1.27.16"
+[upgrade/versions] Cluster version: v1.27.0
+[upgrade/versions] kubeadm version: v1.27.16
+[upgrade/prepull] Pulling images required for setting up a Kubernetes cluster
 ~~~
 
 The kubeadm output ended with:
