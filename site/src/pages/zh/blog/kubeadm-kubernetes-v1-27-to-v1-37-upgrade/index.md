@@ -56,6 +56,7 @@ Kubernetes 官方发布记录显示，1.27 系列的 final patch 是 1.27.16。k
 
 参考：
 
+- <a href="https://kubernetes.io/zh-cn/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27</a>
 - <a href="https://kubernetes.io/zh-cn/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes 补丁版本</a>
 - <a href="https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">升级 kubeadm 集群</a>
 
@@ -508,29 +509,29 @@ scheduler.conf             Oct 02, 2027 08:23 UTC   364d
 
 ## 升级 kubelet 和 worker
 
-control-plane 的 kubelet 更新到 v1.27.16 后，再逐台处理 worker。每台 worker 的顺序基本相同：
+control-plane 处理完后，再逐台升级 worker。worker 侧的基本顺序是：
 
 ~~~text
-替换 kubeadm / kubectl
+更新 kubeadm / kubectl
 → kubeadm upgrade node
 → drain
-→ 替换 kubelet
+→ 更新 kubelet
 → restart kubelet
-→ 验证
+→ 检查
 → uncordon
 ~~~
 
-真正花时间的是 drain。
+下面只保留这次实际遇到问题、或者有回传输出的部分，不把每台 worker 的重复步骤全部展开。
 
-### node1：emptyDir 和 PDB
+### node1：第一次 drain 被 emptyDir 挡住
 
-第一次：
+第一次执行：
 
 ~~~bash
 kubectl drain node1 --ignore-daemonsets --timeout=5m
 ~~~
 
-失败：
+返回：
 
 ~~~text
 node/node1 cordoned
@@ -542,34 +543,93 @@ cannot delete Pods with local storage (use --delete-emptydir-data to override):
 drain exit code: 1
 ~~~
 
-确认这些 local storage 是可以接受丢失的 `emptyDir` 后，重试时加 `--delete-emptydir-data`。
-
-接着又被 prometheus-adapter 的 PDB 挡住。检查：
+随后检查 prometheus-adapter 的 PDB：
 
 ~~~bash
 kubectl -n monitoring get pdb prometheus-adapter -o wide
+kubectl -n monitoring describe pdb prometheus-adapter
 ~~~
 
-当时是：
+当时的关键状态：
 
 ~~~text
 NAME                 MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
 prometheus-adapter   1               N/A               0
+
+Min available:        1
+Allowed disruptions: 0
+Current:             1
+Desired:             1
+Total:               1
 ~~~
 
-prometheus-adapter 只有 1 个副本，`minAvailable: 1`，所以没有可用的 voluntary disruption。
+因此这里实际上有两个独立问题：Pod 使用了 local `emptyDir`，同时 prometheus-adapter 的 PDB 也不允许驱逐当前唯一副本。
 
-这个测试环境里临时把 prometheus-adapter 扩到 2 个副本，等第二个副本 Ready 后再 drain。
-
-node3、node4 后面也遇到了类似情况，因为前一台节点上的 Pod 被驱逐后会重新调度到还没维护的节点。
-
-### node2：Prometheus 没有持久化
-
-node2 最后处理，因为上面有：
+后续 node1 完成 drain 和 kubelet 更新后，检查到：
 
 ~~~text
-prometheus-k8s-0
+NAME    STATUS                     ROLES    AGE    VERSION
+node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 ~~~
+
+当时 node1 上只剩下 Calico、kube-proxy、node-exporter 这类 DaemonSet Pod，然后再 uncordon。
+
+现有回传记录里没有保留 prometheus-adapter 中间处理动作的完整命令和输出，因此这里不补写那一段。
+
+### node3 和 node4：相同 blocker 会跟着 Pod 移动
+
+node3 第一次 drain 也没有一次成功：
+
+~~~bash
+kubectl drain node3 --ignore-daemonsets --timeout=5m
+~~~
+
+裁剪后的输出：
+
+~~~text
+node/node3 cordoned
+cannot delete Pods with local storage:
+  kubernetes-dashboard/kubernetes-dashboard-...
+  monitoring/prometheus-adapter-...
+
+drain exit code: 1
+~~~
+
+到了 node4，第一次 drain 又出现了同类情况：
+
+~~~bash
+kubectl drain node4 --ignore-daemonsets --timeout=5m
+~~~
+
+当时回传的输出在错误信息后被截断，但能确认 blocker 包括：
+
+~~~text
+kube-system/metrics-server-...
+monitoring/prometheus-adapter-...
+~~~
+
+处理后检查 node4：
+
+~~~text
+NAME    STATUS                     ROLES    AGE    VERSION
+node4   Ready,SchedulingDisabled   worker   260d   v1.27.0
+~~~
+
+而 node4 上只剩：
+
+~~~text
+calico-node-...
+kube-proxy-...
+node-exporter-...
+~~~
+
+后续 node4 的 kubelet 也完成了更新；在处理 node2 前再次检查集群时，node4 已经是 `Ready v1.27.16`。
+
+这些输出说明，前一台节点上的 Pod 被驱逐后会被重新调度到其他尚未维护的节点，所以后面的 drain 可能再次遇到相同 blocker。
+
+### node2：先确认 Prometheus 的数据放在哪里
+
+node2 最后处理。升级前，`prometheus-k8s-0` 正在 node2 上运行。
 
 先看 PDB：
 
@@ -582,7 +642,7 @@ NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
 prometheus-k8s   1               N/A               0
 ~~~
 
-再看存储：
+再看存储资源：
 
 ~~~bash
 kubectl -n monitoring get pvc
@@ -590,21 +650,24 @@ kubectl get storageclass
 kubectl get pv
 ~~~
 
-输出都是：
+结果都没有资源。
 
-~~~text
-No resources found
-~~~
-
-继续看 Pod volume，发现：
+继续检查 Prometheus Pod 的 volume，看到：
 
 ~~~text
 prometheus-k8s-db => emptyDir={}
 ~~~
 
-也就是说当前 Prometheus TSDB 没有 persistent storage。这个测试集群可以接受 drain 后丢掉历史数据，所以先保存原 PDB，再临时把 `minAvailable` 从 1 改成 0，完成 drain 后恢复。
+所以这个 Prometheus 的 TSDB 当时并没有放在 PVC 上，而是在 `emptyDir`。如果这个 Pod 在 drain 过程中被删除并重新创建，原来的历史数据不会跟着 Pod 一起迁移。
 
-生产环境遇到这种情况，我不会直接继续 drain，而是先处理 Prometheus persistence。
+这里先保存了原 PDB：
+
+~~~bash
+kubectl -n monitoring get pdb prometheus-k8s -o yaml \
+  > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
+~~~
+
+后续 node2 完成了升级。现有回传记录没有保留 PDB 临时调整和 drain 成功时的完整终端输出，所以正文只保留升级前确认到的 PDB、存储状态，以及最后的节点结果。
 
 ## v1.27.16 最终状态
 
