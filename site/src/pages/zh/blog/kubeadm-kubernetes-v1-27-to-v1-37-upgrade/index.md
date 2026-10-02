@@ -56,9 +56,8 @@ Kubernetes 官方发布记录显示，1.27 系列的 final patch 是 1.27.16。k
 
 参考：
 
-- <a href="https://kubernetes.io/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27 release</a>
-- <a href="https://kubernetes.io/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes patch releases</a>
-- <a href="https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">Upgrading kubeadm clusters</a>
+- <a href="https://kubernetes.io/zh-cn/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes 补丁版本</a>
+- <a href="https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">升级 kubeadm 集群</a>
 
 ## 升级前检查
 
@@ -96,13 +95,27 @@ Client Version: ... GitVersion:"v1.27.0" ...
 Server Version: ... GitVersion:"v1.27.0" ...
 ~~~
 
-这 3 个二进制不是 apt 管理，而是：
+再确认这次升级实际使用的二进制路径：
+
+~~~bash
+command -v kubeadm kubelet kubectl
+systemctl cat kubelet
+~~~
+
+裁剪后的输出：
 
 ~~~text
 /usr/local/bin/kubeadm
 /usr/local/bin/kubelet
 /usr/local/bin/kubectl
+
+[Service]
+ExecStart=/usr/local/bin/kubelet
+...
+ExecStart=/usr/local/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
 ~~~
+
+这里只记录升级前检查到的实际状态：三个二进制都在 `/usr/local/bin`，kubelet 的 systemd service 也从这个路径启动。本文不推断这个集群最初是怎样安装出来的；这次升级按现有路径直接替换二进制。
 
 升级前 API readiness 正常：
 
@@ -120,25 +133,116 @@ kubectl get --raw='/readyz?verbose'
 readyz check passed
 ~~~
 
-当时已经存在 `DNSConfigForming` Warning，所以后面再看到这类 Warning 时不能直接归因于升级。
-
 ## 先做备份和 etcd snapshot
 
-备份目录：
+先生成本次 checkpoint 的目录和 snapshot 文件名：
+
+~~~bash
+TS="$(date +%Y%m%d-%H%M%S)"
+BACKUP_DIR="/root/k8s-upgrade-backup/${TS}-before-v1.27.16"
+SNAP="etcd-before-v1.27.16-${TS}.db"
+
+mkdir -p \
+  "$BACKUP_DIR/logs" \
+  "$BACKUP_DIR/etcd" \
+  "$BACKUP_DIR/bin" \
+  "$BACKUP_DIR/config"
+~~~
+
+这次实际生成的是：
 
 ~~~text
 /root/k8s-upgrade-backup/20261002-155639-before-v1.27.16
 ~~~
 
-里面保存了原来的 kubeadm、kubelet、kubectl、kubeadm 配置、kubelet 配置、`/etc/kubernetes` 和 etcd snapshot。
-
-snapshot 保存后检查状态：
+先保存当前三个二进制并记录 SHA256：
 
 ~~~bash
-kubectl -n kube-system exec etcd-master --   etcdctl snapshot status /var/lib/etcd/etcd-before-v1.27.16-20261002-155639.db -w table
+cp -a /usr/local/bin/kubeadm "$BACKUP_DIR/bin/"
+cp -a /usr/local/bin/kubelet "$BACKUP_DIR/bin/"
+cp -a /usr/local/bin/kubectl "$BACKUP_DIR/bin/"
+
+sha256sum \
+  "$BACKUP_DIR/bin/kubeadm" \
+  "$BACKUP_DIR/bin/kubelet" \
+  "$BACKUP_DIR/bin/kubectl"
 ~~~
 
-当前 etcd 镜像里没有 `etcdutl`，所以这里回退到了 `etcdctl snapshot status`：
+同时保存 Kubernetes 和 kubelet 配置：
+
+~~~bash
+tar -C / \
+  -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
+  etc/kubernetes
+
+tar -C / \
+  -czf "$BACKUP_DIR/kubelet-config.tar.gz" \
+  lib/systemd/system/kubelet.service \
+  usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf \
+  var/lib/kubelet/config.yaml \
+  var/lib/kubelet/kubeadm-flags.env
+~~~
+
+etcd snapshot 前先检查 endpoint：
+
+~~~bash
+kubectl -n kube-system exec etcd-master -- \
+  etcdctl \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt \
+  --key=/etc/kubernetes/pki/etcd/healthcheck-client.key \
+  endpoint health -w table
+~~~
+
+输出：
+
+~~~text
++------------------------+--------+------------+-------+
+|        ENDPOINT        | HEALTH |    TOOK    | ERROR |
++------------------------+--------+------------+-------+
+| https://127.0.0.1:2379 |   true | 7.597329ms |       |
++------------------------+--------+------------+-------+
+~~~
+
+然后创建 snapshot：
+
+~~~bash
+kubectl -n kube-system exec etcd-master -- \
+  etcdctl \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt \
+  --key=/etc/kubernetes/pki/etcd/healthcheck-client.key \
+  snapshot save "/var/lib/etcd/$SNAP"
+~~~
+
+关键输出：
+
+~~~text
+Snapshot saved at /var/lib/etcd/etcd-before-v1.27.16-20261002-155639.db
+~~~
+
+这里的 `/var/lib/etcd/...` 是 snapshot 刚创建时的位置。随后把它复制进本次 checkpoint 目录：
+
+~~~bash
+cp -a "/var/lib/etcd/$SNAP" "$BACKUP_DIR/etcd/"
+~~~
+
+所以最后检查的备份文件是：
+
+~~~text
+/root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/etcd/etcd-before-v1.27.16-20261002-155639.db
+~~~
+
+再检查 snapshot 内容：
+
+~~~bash
+kubectl -n kube-system exec etcd-master -- \
+  etcdctl snapshot status "/var/lib/etcd/$SNAP" -w table
+~~~
+
+当前 etcd 镜像里没有 `etcdutl`，因此实际回退到了 `etcdctl snapshot status`：
 
 ~~~text
 Deprecated: Use `etcdutl snapshot status` instead.
@@ -150,35 +254,58 @@ Deprecated: Use `etcdutl snapshot status` instead.
 +----------+----------+------------+------------+
 ~~~
 
-snapshot 另外做了 SHA256：
+复制到 checkpoint 后再做 SHA256：
 
-~~~text
-128caa1e419caffa7ea030e850dfd3bfa01105e5622338bb6a27dc8ffd82f967
+~~~bash
+sha256sum "$BACKUP_DIR/etcd/$SNAP"
 ~~~
 
-`/etc/kubernetes` 备份里包含 PKI 私钥，所以这类备份只用于恢复，不应该上传到公开附件或 GitHub。
+~~~text
+128caa1e419caffa7ea030e850dfd3bfa01105e5622338bb6a27dc8ffd82f967  /root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/etcd/etcd-before-v1.27.16-20261002-155639.db
+~~~
 
-## 先升级 kubeadm，再看 upgrade plan
+## 先更新 kubeadm 工具，再执行 upgrade plan
 
-这个集群是手工管理二进制，所以先只替换 kubeadm 到 `v1.27.16`，kubelet 暂时不动。
+这一步只更新 control-plane 节点上的 kubeadm 工具本身，集群还没有开始升级。
 
-替换后确认：
+这批日志没有保留下当时下载 kubeadm 的那条命令，所以这里不补写一个“看起来像原始输入”的 curl/wget 命令。可以确认的是：目标二进制是 `v1.27.16`，下载后做了 SHA256 校验，然后替换现有的 `/usr/local/bin/kubeadm`。
+
+校验记录：
+
+~~~text
+kubeadm-v1.27.16: OK
+33622018f83515331ac70c2041eba5d814a6d78a40b8869f089ea502f63a1421  kubeadm-v1.27.16
+~~~
+
+替换后先确认工具版本和集群版本：
 
 ~~~bash
 kubeadm version -o short
+kubectl version
 ~~~
+
+裁剪后的输出：
 
 ~~~text
 v1.27.16
+...
+Server Version: ... GitVersion:"v1.27.0" ...
 ~~~
 
-然后再执行：
+这里的两个版本并不冲突：
+
+- `kubeadm v1.27.16`：刚刚替换的是本机升级工具；
+- `Server v1.27.0`：集群 control-plane 还没有执行 `kubeadm upgrade apply`。
+
+因此此时执行 plan 仍然成立：
 
 ~~~bash
 kubeadm upgrade plan
 ~~~
 
-plan 里最关键的是目标组件版本：
+它检查的是“当前 v1.27.0 集群，如果使用 v1.27.16 的 kubeadm 去升级，会改哪些组件”。
+
+关键输出：
 
 ~~~text
 COMPONENT                 CURRENT   TARGET
@@ -193,7 +320,24 @@ COMPONENT   CURRENT       TARGET
 kubelet     5 x v1.27.0   v1.27.16
 ~~~
 
-这里也解释了为什么不能只靠旧的 `kubeadm v1.27.0` 去判断目标 patch 的组件映射。旧 kubeadm 之前查询 `v1.27.16` 时，etcd 仍然落到了 3.5.7-0；换成目标版本 kubeadm 后，plan 给出的目标是 3.5.12-0。
+在替换 kubeadm 之前，旧的 `v1.27.0` kubeadm 曾执行：
+
+~~~bash
+kubeadm config images list \
+  --kubernetes-version v1.27.16 \
+  --image-repository registry.aliyuncs.com/google_containers
+~~~
+
+当时出现 fallback：
+
+~~~text
+could not find officially supported version of etcd for Kubernetes v1.27.16,
+falling back to the nearest etcd version (3.5.7-0)
+...
+registry.aliyuncs.com/google_containers/etcd:3.5.7-0
+~~~
+
+而目标版本 kubeadm 的 upgrade plan 给出的 etcd 目标是 `3.5.12-0`。所以后面的升级判断以目标版本 kubeadm 的 `upgrade plan` 为准。
 
 ## 升级 control-plane
 
@@ -409,7 +553,6 @@ v1.27.16 → v1.28.15
 
 ## 参考资料
 
-- <a href="https://kubernetes.io/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27 release</a>
-- <a href="https://kubernetes.io/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes patch releases</a>
-- <a href="https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">Upgrading kubeadm clusters</a>
-- <a href="https://kubernetes.io/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain</a>
+- <a href="https://kubernetes.io/zh-cn/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes 补丁版本</a>
+- <a href="https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">升级 kubeadm 集群</a>
+- <a href="https://kubernetes.io/zh-cn/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain 参考</a>
