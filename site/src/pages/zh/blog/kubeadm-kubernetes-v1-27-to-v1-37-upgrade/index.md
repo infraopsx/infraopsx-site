@@ -156,39 +156,7 @@ mkdir -p \
 /root/k8s-upgrade-backup/20261002-155639-before-v1.27.16
 ~~~
 
-保存配置后，还用当前的 `kubeadm v1.27.0` 记录了一次 v1.27.16 的镜像映射：
-
-~~~bash
-kubeadm config images list \
-  --kubernetes-version v1.27.16 \
-  --image-repository registry.aliyuncs.com/google_containers
-~~~
-
-其中 etcd 出现 fallback：
-
-~~~text
-could not find officially supported version of etcd for Kubernetes v1.27.16,
-falling back to the nearest etcd version (3.5.7-0)
-...
-registry.aliyuncs.com/google_containers/etcd:3.5.7-0
-~~~
-
-这个结果后面会和目标版本 kubeadm 的 `upgrade plan` 对照。
-
-先保存当前三个二进制并记录 SHA256：
-
-~~~bash
-cp -a /usr/local/bin/kubeadm "$BACKUP_DIR/bin/"
-cp -a /usr/local/bin/kubelet "$BACKUP_DIR/bin/"
-cp -a /usr/local/bin/kubectl "$BACKUP_DIR/bin/"
-
-sha256sum \
-  "$BACKUP_DIR/bin/kubeadm" \
-  "$BACKUP_DIR/bin/kubelet" \
-  "$BACKUP_DIR/bin/kubectl"
-~~~
-
-同时保存 kubeadm/kubelet 配置和当前 workload 状态。原始日志里的 tar 使用 `-C /` 配合相对路径，下面改成等价的绝对路径写法，便于阅读：
+先保存 kubeadm/kubelet 配置、节点和 workload 状态：
 
 ~~~bash
 kubectl -n kube-system get cm kubeadm-config -o yaml \
@@ -212,7 +180,41 @@ kubectl get pvc -A -o yaml \
 kubectl get pods -A \
   -o custom-columns='NAMESPACE:.metadata.namespace,POD:.metadata.name,IMAGE:.spec.containers[*].image' \
   > "$BACKUP_DIR/config/images-before.txt"
+~~~
 
+这时 kubeadm 还是 v1.27.0。用它记录一次 v1.27.16 的目标镜像：
+
+~~~bash
+kubeadm config images list \
+  --kubernetes-version v1.27.16 \
+  --image-repository registry.aliyuncs.com/google_containers
+~~~
+
+其中 etcd 出现 fallback：
+
+~~~text
+could not find officially supported version of etcd for Kubernetes v1.27.16,
+falling back to the nearest etcd version (3.5.7-0)
+...
+registry.aliyuncs.com/google_containers/etcd:3.5.7-0
+~~~
+
+再备份当前三个二进制并记录 SHA256：
+
+~~~bash
+cp -a /usr/local/bin/kubeadm "$BACKUP_DIR/bin/"
+cp -a /usr/local/bin/kubelet "$BACKUP_DIR/bin/"
+cp -a /usr/local/bin/kubectl "$BACKUP_DIR/bin/"
+
+sha256sum \
+  "$BACKUP_DIR/bin/kubeadm" \
+  "$BACKUP_DIR/bin/kubelet" \
+  "$BACKUP_DIR/bin/kubectl"
+~~~
+
+原始日志里的 tar 使用 `-C /` 配合相对路径。下面用等价的绝对路径写法表示同一批归档内容：
+
+~~~bash
 tar -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
   /etc/kubernetes
 
@@ -226,7 +228,7 @@ tar -tzf "$BACKUP_DIR/kubelet-config.tar.gz" >/dev/null \
   && echo "OK: kubelet configuration archive verified"
 ~~~
 
-实际检查结果：
+检查结果：
 
 ~~~text
 OK: kubelet configuration archive verified
@@ -244,7 +246,7 @@ kubectl -n kube-system exec etcd-master -- \
   endpoint status -w table
 ~~~
 
-当时 etcd 版本是 3.5.7：
+当时 etcd 是 3.5.7，DB 约 19 MB：
 
 ~~~text
 +------------------------+---------+---------+-----------+------------+--------+
@@ -266,8 +268,6 @@ kubectl -n kube-system exec etcd-master -- \
   endpoint health -w table
 ~~~
 
-输出：
-
 ~~~text
 +------------------------+--------+------------+-------+
 |        ENDPOINT        | HEALTH |    TOOK    | ERROR |
@@ -276,7 +276,7 @@ kubectl -n kube-system exec etcd-master -- \
 +------------------------+--------+------------+-------+
 ~~~
 
-然后创建 snapshot：
+创建 snapshot：
 
 ~~~bash
 kubectl -n kube-system exec etcd-master -- \
@@ -294,26 +294,20 @@ kubectl -n kube-system exec etcd-master -- \
 Snapshot saved at /var/lib/etcd/etcd-before-v1.27.16-20261002-155639.db
 ~~~
 
-这里的 `/var/lib/etcd/...` 是 snapshot 刚创建时的位置。随后把它复制进本次 checkpoint 目录：
+把 snapshot 复制到 checkpoint 目录：
 
 ~~~bash
 cp -a "/var/lib/etcd/$SNAP" "$BACKUP_DIR/etcd/"
 ~~~
 
-所以最后检查的备份文件是：
-
-~~~text
-/root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/etcd/etcd-before-v1.27.16-20261002-155639.db
-~~~
-
-再检查 snapshot 内容：
+检查 snapshot：
 
 ~~~bash
 kubectl -n kube-system exec etcd-master -- \
   etcdctl snapshot status "/var/lib/etcd/$SNAP" -w table
 ~~~
 
-当前 etcd 镜像里没有 `etcdutl`，因此实际回退到了 `etcdctl snapshot status`：
+当前镜像里没有 `etcdutl`，所以实际回退到 `etcdctl snapshot status`：
 
 ~~~text
 Deprecated: Use `etcdutl snapshot status` instead.
@@ -325,7 +319,7 @@ Deprecated: Use `etcdutl snapshot status` instead.
 +----------+----------+------------+------------+
 ~~~
 
-复制到 checkpoint 后再做 SHA256：
+备份副本的 SHA256：
 
 ~~~bash
 sha256sum "$BACKUP_DIR/etcd/$SNAP"
@@ -345,7 +339,7 @@ ls -lh \
 rm -f "/var/lib/etcd/$SNAP"
 ~~~
 
-最后对整个 checkpoint 生成并验证校验清单：
+最后为整个 checkpoint 生成并验证校验清单：
 
 ~~~bash
 (
@@ -366,9 +360,12 @@ sha256sum -c SHA256SUMS
 ./bin/kubeadm: OK
 ./bin/kubectl: OK
 ./bin/kubelet: OK
+./config/images-before.txt: OK
 ./config/kubeadm-config.yaml: OK
 ./config/kubelet-config.yaml: OK
 ./config/nodes.yaml: OK
+./config/pv.yaml: OK
+./config/pvc.yaml: OK
 ./config/workloads.yaml: OK
 ./etc-kubernetes.tar.gz: OK
 ./etcd/etcd-before-v1.27.16-20261002-155639.db: OK
