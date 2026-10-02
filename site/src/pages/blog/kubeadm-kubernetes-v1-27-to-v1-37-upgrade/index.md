@@ -116,7 +116,7 @@ ExecStart=/usr/local/bin/kubelet
 ExecStart=/usr/local/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
 ~~~
 
-This only describes the state observed before the upgrade: all three binaries were under `/usr/local/bin`, and the kubelet systemd service started kubelet from that path. It does not assume how the cluster was originally installed. For this upgrade, the existing binaries were replaced in place.
+Before the upgrade, all three binaries were under `/usr/local/bin`, and the kubelet systemd service started kubelet from that path. This upgrade therefore replaced the existing binaries in place.
 
 API readiness was healthy before the upgrade:
 
@@ -176,7 +176,7 @@ kubectl -n kube-system get cm kubeadm-config -o yaml \
   > "$BACKUP_DIR/config/kubeadm-config.yaml"
 
 kubectl -n kube-system get cm kubelet-config -o yaml \
-  > "$BACKUP_DIR/config/kubelet-config.yaml"
+  > "$BACKUP_DIR/config/kubelet-config.yaml" 2>/dev/null || true
 
 kubectl get nodes -o yaml \
   > "$BACKUP_DIR/config/nodes.yaml"
@@ -189,6 +189,10 @@ kubectl get pv -o yaml \
 
 kubectl get pvc -A -o yaml \
   > "$BACKUP_DIR/config/pvc.yaml"
+
+kubectl get pods -A \
+  -o custom-columns='NAMESPACE:.metadata.namespace,POD:.metadata.name,IMAGE:.spec.containers[*].image' \
+  > "$BACKUP_DIR/config/images-before.txt"
 
 tar -C / \
   -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
@@ -462,6 +466,44 @@ node4    Ready    worker          260d   v1.27.0
 
 The VERSION column in `kubectl get nodes` is the kubelet version, so it remains v1.27.0 until the kubelet is upgraded separately.
 
+### Update the control-plane kubelet and kubectl
+
+After `kubeadm upgrade apply`, the control-plane components were already on v1.27.16, but the master node kubelet was still on v1.27.0.
+
+Drain the master first:
+
+~~~bash
+kubectl drain master --ignore-daemonsets
+~~~
+
+The target kubelet and kubectl binaries had already been downloaded and verified. After replacing `/usr/local/bin/kubelet` and `/usr/local/bin/kubectl`, restart kubelet:
+
+~~~bash
+systemctl daemon-reload
+systemctl restart kubelet
+~~~
+
+Then check the master node:
+
+~~~bash
+kubectl get node master
+~~~
+
+Observed state:
+
+~~~text
+NAME     STATUS                     ROLES           AGE    VERSION
+master   Ready,SchedulingDisabled   control-plane   262d   v1.27.16
+~~~
+
+After confirming API readiness:
+
+~~~bash
+kubectl uncordon master
+~~~
+
+At this point the master node's own kubelet upgrade was complete.
+
 ### Certificate renewal
 
 Before the upgrade:
@@ -561,8 +603,6 @@ node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 
 At that point only expected DaemonSet Pods such as Calico, kube-proxy, and node-exporter remained on node1 before it was uncordoned.
 
-The returned log set does not preserve the complete intermediate prometheus-adapter handling commands and output, so that missing part is not reconstructed here.
-
 ### node3 and node4: the same blocker moved with the Pods
 
 The first node3 drain also failed:
@@ -654,7 +694,7 @@ kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
 
-node2 was later upgraded successfully. The returned log set does not preserve the full terminal output for the temporary PDB adjustment and successful drain, so this article keeps only the pre-change PDB/storage evidence and the final node result.
+node2 was later upgraded successfully; the final node state is shown in the next section.
 
 ## Final v1.27.16 state
 
@@ -673,13 +713,33 @@ node3    Ready    worker          262d   v1.27.16
 node4    Ready    worker          261d   v1.27.16
 ~~~
 
+Check for non-running Pods and API readiness as well:
+
+~~~bash
+kubectl get pods -A \
+  --field-selector=status.phase!=Running,status.phase!=Succeeded \
+  -o wide
+
+kubectl get --raw='/readyz?verbose'
+~~~
+
+Cropped result:
+
+~~~text
+No resources found
+
+[+]ping ok
+[+]etcd ok
+[+]etcd-readiness ok
+...
+readyz check passed
+~~~
+
 The next step is:
 
 ~~~text
 v1.27.16 → v1.28.15
 ~~~
-
-The later checkpoints will keep the same format: commands where they matter, cropped output that supports the decision, and only enough explanation to show why the next step was taken.
 
 ## References
 
