@@ -116,7 +116,7 @@ ExecStart=/usr/local/bin/kubelet
 ExecStart=/usr/local/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
 ~~~
 
-这里只记录升级前检查到的实际状态：三个二进制都在 `/usr/local/bin`，kubelet 的 systemd service 也从这个路径启动。本文不推断这个集群最初是怎样安装出来的；这次升级按现有路径直接替换二进制。
+升级前实际检查到的三个二进制都在 `/usr/local/bin`，kubelet 的 systemd service 也从这个路径启动，因此这次升级按现有路径替换二进制。
 
 升级前 API readiness 正常：
 
@@ -176,7 +176,7 @@ kubectl -n kube-system get cm kubeadm-config -o yaml \
   > "$BACKUP_DIR/config/kubeadm-config.yaml"
 
 kubectl -n kube-system get cm kubelet-config -o yaml \
-  > "$BACKUP_DIR/config/kubelet-config.yaml"
+  > "$BACKUP_DIR/config/kubelet-config.yaml" 2>/dev/null || true
 
 kubectl get nodes -o yaml \
   > "$BACKUP_DIR/config/nodes.yaml"
@@ -189,6 +189,10 @@ kubectl get pv -o yaml \
 
 kubectl get pvc -A -o yaml \
   > "$BACKUP_DIR/config/pvc.yaml"
+
+kubectl get pods -A \
+  -o custom-columns='NAMESPACE:.metadata.namespace,POD:.metadata.name,IMAGE:.spec.containers[*].image' \
+  > "$BACKUP_DIR/config/images-before.txt"
 
 tar -C / \
   -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
@@ -473,6 +477,44 @@ node4    Ready    worker          260d   v1.27.0
 
 这是因为 `kubectl get nodes` 的 VERSION 显示的是 kubelet 版本。
 
+### 更新 control-plane 的 kubelet 和 kubectl
+
+`kubeadm upgrade apply` 完成后，control-plane 组件已经是 v1.27.16，但 master 节点的 kubelet 还是 v1.27.0。
+
+先 drain master：
+
+~~~bash
+kubectl drain master --ignore-daemonsets
+~~~
+
+目标版本的 kubelet 和 kubectl 已经提前下载并完成校验，随后替换 `/usr/local/bin/kubelet` 和 `/usr/local/bin/kubectl`，再重启 kubelet：
+
+~~~bash
+systemctl daemon-reload
+systemctl restart kubelet
+~~~
+
+检查 master：
+
+~~~bash
+kubectl get node master
+~~~
+
+当时已经变成：
+
+~~~text
+NAME     STATUS                     ROLES           AGE    VERSION
+master   Ready,SchedulingDisabled   control-plane   262d   v1.27.16
+~~~
+
+确认 API readiness 正常后：
+
+~~~bash
+kubectl uncordon master
+~~~
+
+此时才完成 master 节点自身的 kubelet 升级。
+
 ### 证书也被续期
 
 升级前：
@@ -574,8 +616,6 @@ node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 
 当时 node1 上只剩下 Calico、kube-proxy、node-exporter 这类 DaemonSet Pod，然后再 uncordon。
 
-现有回传记录里没有保留 prometheus-adapter 中间处理动作的完整命令和输出，因此这里不补写那一段。
-
 ### node3 和 node4：相同 blocker 会跟着 Pod 移动
 
 node3 第一次 drain 也没有一次成功：
@@ -667,7 +707,7 @@ kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
 
-后续 node2 完成了升级。现有回传记录没有保留 PDB 临时调整和 drain 成功时的完整终端输出，所以正文只保留升级前确认到的 PDB、存储状态，以及最后的节点结果。
+后续 node2 完成了升级，最终节点状态见下一节。
 
 ## v1.27.16 最终状态
 
@@ -686,13 +726,33 @@ node3    Ready    worker          262d   v1.27.16
 node4    Ready    worker          261d   v1.27.16
 ~~~
 
+再检查异常 Pod 和 API readiness：
+
+~~~bash
+kubectl get pods -A \
+  --field-selector=status.phase!=Running,status.phase!=Succeeded \
+  -o wide
+
+kubectl get --raw='/readyz?verbose'
+~~~
+
+裁剪后的结果：
+
+~~~text
+No resources found
+
+[+]ping ok
+[+]etcd ok
+[+]etcd-readiness ok
+...
+readyz check passed
+~~~
+
 第一阶段到这里结束。下一步是：
 
 ~~~text
 v1.27.16 → v1.28.15
 ~~~
-
-后面的版本也会继续保留同样的记录方式：只放有判断价值的命令和裁剪后的输出，不把整份终端日志原样贴进正文。
 
 ## 参考资料
 
