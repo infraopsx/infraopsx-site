@@ -156,6 +156,25 @@ mkdir -p \
 /root/k8s-upgrade-backup/20261002-155639-before-v1.27.16
 ~~~
 
+保存配置后，还用当前的 `kubeadm v1.27.0` 记录了一次 v1.27.16 的镜像映射：
+
+~~~bash
+kubeadm config images list \
+  --kubernetes-version v1.27.16 \
+  --image-repository registry.aliyuncs.com/google_containers
+~~~
+
+其中 etcd 出现 fallback：
+
+~~~text
+could not find officially supported version of etcd for Kubernetes v1.27.16,
+falling back to the nearest etcd version (3.5.7-0)
+...
+registry.aliyuncs.com/google_containers/etcd:3.5.7-0
+~~~
+
+这个结果后面会和目标版本 kubeadm 的 `upgrade plan` 对照。
+
 先保存当前三个二进制并记录 SHA256：
 
 ~~~bash
@@ -202,9 +221,40 @@ tar -czf "$BACKUP_DIR/kubelet-config.tar.gz" \
   /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf \
   /var/lib/kubelet/config.yaml \
   /var/lib/kubelet/kubeadm-flags.env
+
+tar -tzf "$BACKUP_DIR/kubelet-config.tar.gz" >/dev/null \
+  && echo "OK: kubelet configuration archive verified"
 ~~~
 
-etcd snapshot 前先检查 endpoint：
+实际检查结果：
+
+~~~text
+OK: kubelet configuration archive verified
+~~~
+
+etcd snapshot 前先看 endpoint status：
+
+~~~bash
+kubectl -n kube-system exec etcd-master -- \
+  etcdctl \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt \
+  --key=/etc/kubernetes/pki/etcd/healthcheck-client.key \
+  endpoint status -w table
+~~~
+
+当时 etcd 版本是 3.5.7：
+
+~~~text
++------------------------+---------+---------+-----------+------------+--------+
+|        ENDPOINT        | VERSION | DB SIZE | IS LEADER | IS LEARNER | ERRORS |
++------------------------+---------+---------+-----------+------------+--------+
+| https://127.0.0.1:2379 |   3.5.7 |   19 MB |      true |      false |        |
++------------------------+---------+---------+-----------+------------+--------+
+~~~
+
+再检查 endpoint health：
 
 ~~~bash
 kubectl -n kube-system exec etcd-master -- \
@@ -285,6 +335,16 @@ sha256sum "$BACKUP_DIR/etcd/$SNAP"
 128caa1e419caffa7ea030e850dfd3bfa01105e5622338bb6a27dc8ffd82f967  /root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/etcd/etcd-before-v1.27.16-20261002-155639.db
 ~~~
 
+确认 host 上的临时 snapshot 和备份副本都存在后，删除 `/var/lib/etcd` 下的临时文件：
+
+~~~bash
+ls -lh \
+  "/var/lib/etcd/$SNAP" \
+  "$BACKUP_DIR/etcd/$SNAP"
+
+rm -f "/var/lib/etcd/$SNAP"
+~~~
+
 最后对整个 checkpoint 生成并验证校验清单：
 
 ~~~bash
@@ -313,23 +373,6 @@ sha256sum -c SHA256SUMS
 ./etc-kubernetes.tar.gz: OK
 ./etcd/etcd-before-v1.27.16-20261002-155639.db: OK
 ./kubelet-config.tar.gz: OK
-~~~
-
-在替换 kubeadm 之前，先用当前的 `kubeadm v1.27.0` 查看一次 v1.27.16 对应镜像：
-
-~~~bash
-kubeadm config images list \
-  --kubernetes-version v1.27.16 \
-  --image-repository registry.aliyuncs.com/google_containers
-~~~
-
-其中 etcd 出现了 fallback：
-
-~~~text
-could not find officially supported version of etcd for Kubernetes v1.27.16,
-falling back to the nearest etcd version (3.5.7-0)
-...
-registry.aliyuncs.com/google_containers/etcd:3.5.7-0
 ~~~
 
 ## 先更新 kubeadm 工具，再执行 upgrade plan
@@ -442,8 +485,6 @@ dry-run 的 kubeadm 结束输出是：
 [upgrade/successful] Finished dryrunning successfully!
 ~~~
 
-命令返回码另外由 shell 记录为 `0`；这不是 kubeadm 自己打印的内容。
-
 然后再执行：
 
 ~~~bash
@@ -458,20 +499,49 @@ kubeadm 结束时的关键输出：
 [upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.
 ~~~
 
-这次 apply 的命令返回码同样由 shell 另外记录，结果为 `0`。
-
 这时 control-plane static Pod 和 etcd 已经更新，但 kubelet 还没更新。
 
-例如组件镜像已经变成：
+先复核 kube-system Pod 使用的镜像：
 
-~~~text
-etcd-master                       registry.aliyuncs.com/google_containers/etcd:3.5.12-0
-kube-apiserver-master             registry.aliyuncs.com/google_containers/kube-apiserver:v1.27.16
-kube-controller-manager-master    registry.aliyuncs.com/google_containers/kube-controller-manager:v1.27.16
-kube-scheduler-master             registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
+~~~bash
+kubectl -n kube-system get pods \
+  -o custom-columns='POD:.metadata.name,IMAGE:.spec.containers[*].image'
 ~~~
 
-但此时再看节点：
+当时的关键结果是：
+
+~~~text
+etcd-master                    registry.aliyuncs.com/google_containers/etcd:3.5.12-0
+kube-apiserver-master          registry.aliyuncs.com/google_containers/kube-apiserver:v1.27.16
+kube-controller-manager-master registry.aliyuncs.com/google_containers/kube-controller-manager:v1.27.16
+kube-scheduler-master          registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
+~~~
+
+同一时刻 kube-proxy 还在滚动更新，日志里同时能看到 v1.27.0 和 v1.27.16，master 上的新 Pod 还处于 `ContainerCreating`。因此 `kubeadm upgrade apply` 返回成功后，没有把这一瞬间当成“所有组件都已经稳定”。
+
+再确认 etcd：
+
+~~~bash
+kubectl -n kube-system exec etcd-master -- \
+  etcdctl \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt \
+  --key=/etc/kubernetes/pki/etcd/healthcheck-client.key \
+  endpoint status -w table
+~~~
+
+裁剪后的结果：
+
+~~~text
++------------------------+---------+---------+-----------+------------+--------+
+|        ENDPOINT        | VERSION | DB SIZE | IS LEADER | IS LEARNER | ERRORS |
++------------------------+---------+---------+-----------+------------+--------+
+| https://127.0.0.1:2379 |  3.5.12 |   19 MB |      true |      false |        |
++------------------------+---------+---------+-----------+------------+--------+
+~~~
+
+然后看节点：
 
 ~~~bash
 kubectl get nodes
@@ -489,44 +559,6 @@ node4    Ready    worker          260d   v1.27.0
 ~~~
 
 这是因为 `kubectl get nodes` 的 VERSION 显示的是 kubelet 版本。
-
-### 更新 control-plane 的 kubelet 和 kubectl
-
-`kubeadm upgrade apply` 完成后，control-plane 组件已经是 v1.27.16，但 master 节点的 kubelet 还是 v1.27.0。
-
-先 drain master：
-
-~~~bash
-kubectl drain master --ignore-daemonsets
-~~~
-
-目标版本的 kubelet 和 kubectl 已经提前下载并完成校验，随后替换 `/usr/local/bin/kubelet` 和 `/usr/local/bin/kubectl`，再重启 kubelet：
-
-~~~bash
-systemctl daemon-reload
-systemctl restart kubelet
-~~~
-
-检查 master：
-
-~~~bash
-kubectl get node master
-~~~
-
-当时已经变成：
-
-~~~text
-NAME     STATUS                     ROLES           AGE    VERSION
-master   Ready,SchedulingDisabled   control-plane   262d   v1.27.16
-~~~
-
-确认 API readiness 正常后：
-
-~~~bash
-kubectl uncordon master
-~~~
-
-此时才完成 master 节点自身的 kubelet 升级。
 
 ### 证书也被续期
 
@@ -562,6 +594,43 @@ apiserver-etcd-client      Oct 02, 2027 08:22 UTC   364d
 scheduler.conf             Oct 02, 2027 08:23 UTC   364d
 ~~~
 
+
+### 更新 control-plane 的 kubelet 和 kubectl
+
+`kubeadm upgrade apply` 完成后，control-plane 组件已经是 v1.27.16，但 `kubectl get nodes` 仍显示 master 的 kubelet 是 v1.27.0。
+
+kubelet 和 kubectl 的下载、SHA256 校验方式与前面的 kubeadm 相同。维护 master 时先 drain：
+
+~~~bash
+kubectl drain master --ignore-daemonsets
+~~~
+
+再替换现有二进制并重启 kubelet：
+
+~~~bash
+install -o root -g root -m 0755 \
+  /tmp/kubelet-v1.27.16 \
+  /usr/local/bin/kubelet
+
+install -o root -g root -m 0755 \
+  /tmp/kubectl-v1.27.16 \
+  /usr/local/bin/kubectl
+
+systemctl daemon-reload
+systemctl restart kubelet
+systemctl is-active kubelet
+~~~
+
+随后检查 node 和 API，再解除 cordon：
+
+~~~bash
+kubectl get node master -o wide
+kubectl get --raw='/readyz'
+kubectl uncordon master
+~~~
+
+master 的最终版本和其他节点一起放在文末的最终检查里。
+
 ## 升级 kubelet 和 worker
 
 control-plane 处理完后，再逐台升级 worker。worker 侧的基本顺序是：
@@ -594,8 +663,6 @@ cannot delete Pods with local storage (use --delete-emptydir-data to override):
   kube-system/metrics-server-...
   kubernetes-dashboard/kubernetes-dashboard-...
   monitoring/prometheus-adapter-...
-
-drain exit code: 1
 ~~~
 
 随后检查 prometheus-adapter 的 PDB：
@@ -618,9 +685,9 @@ Desired:             1
 Total:               1
 ~~~
 
-因此这里实际上有两个独立问题：Pod 使用了 local `emptyDir`，同时 prometheus-adapter 的 PDB 也不允许驱逐当前唯一副本。
+第一次 drain 直接暴露的是 `emptyDir`；PDB 检查又说明，即使允许删除这些临时数据，prometheus-adapter 当前也没有可用的 voluntary disruption。
 
-后续 node1 完成 drain 和 kubelet 更新后，检查到：
+这个测试集群里，后续 drain 显式允许删除 `emptyDir` 数据，并临时增加 prometheus-adapter 副本数，让 PDB 有可驱逐余量。node1 完成 drain 和 kubelet 更新后，检查到：
 
 ~~~text
 NAME    STATUS                     ROLES    AGE    VERSION
@@ -644,8 +711,6 @@ node/node3 cordoned
 cannot delete Pods with local storage:
   kubernetes-dashboard/kubernetes-dashboard-...
   monitoring/prometheus-adapter-...
-
-drain exit code: 1
 ~~~
 
 到了 node4，第一次 drain 又出现了同类情况：
@@ -661,7 +726,7 @@ kube-system/metrics-server-...
 monitoring/prometheus-adapter-...
 ~~~
 
-处理后检查 node4：
+普通 workload 被迁走后检查 node4：
 
 ~~~text
 NAME    STATUS                     ROLES    AGE    VERSION
@@ -722,7 +787,30 @@ kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
 
-后续 node2 完成了升级，最终节点状态见下一节。
+因为这是测试集群，而且已经确认 Prometheus 历史数据放在 `emptyDir`，这次继续维护 node2 时临时把 PDB 的 `minAvailable` 从 1 改为 0，然后允许 drain 删除 `emptyDir`：
+
+~~~bash
+kubectl -n monitoring patch pdb prometheus-k8s \
+  --type=merge -p '{"spec":{"minAvailable":0}}'
+
+kubectl drain node2 \
+  --ignore-daemonsets \
+  --delete-emptydir-data \
+  --timeout=5m
+~~~
+
+node2 的 kubelet 更新、重启并 uncordon 后，等待 `prometheus-k8s-0` 重新 Ready，再把 PDB 恢复：
+
+~~~bash
+kubectl -n monitoring wait \
+  --for=condition=Ready pod/prometheus-k8s-0 \
+  --timeout=180s
+
+kubectl -n monitoring patch pdb prometheus-k8s \
+  --type=merge -p '{"spec":{"minAvailable":1}}'
+~~~
+
+这里的做法建立在“测试集群可以接受这次 Prometheus 历史数据丢失”的前提上。生产环境如果发现 TSDB 仍在 `emptyDir`，应先处理持久化，再做这类 drain。
 
 ## v1.27.16 最终状态
 
@@ -741,27 +829,7 @@ node3    Ready    worker          262d   v1.27.16
 node4    Ready    worker          261d   v1.27.16
 ~~~
 
-再检查异常 Pod 和 API readiness：
-
-~~~bash
-kubectl get pods -A \
-  --field-selector=status.phase!=Running,status.phase!=Succeeded \
-  -o wide
-
-kubectl get --raw='/readyz?verbose'
-~~~
-
-裁剪后的结果：
-
-~~~text
-No resources found
-
-[+]ping ok
-[+]etcd ok
-[+]etcd-readiness ok
-...
-readyz check passed
-~~~
+这条最终输出是本阶段明确保留下来的收口证据。异常 Pod 和 `/readyz` 在前面的阶段检查中都做过，但这里不把没有随最终 `kubectl get nodes` 一起回传的结果重新包装成“最终输出”。
 
 第一阶段到这里结束。下一步是：
 
