@@ -624,7 +624,7 @@ node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 
 At that point only expected DaemonSet Pods such as Calico, kube-proxy, and node-exporter remained on node1 before it was uncordoned.
 
-### node3 and node4: the same blocker moved with the Pods
+### node3 and node4: the same drain problem appeared again
 
 The first node3 drain also failed:
 
@@ -696,7 +696,13 @@ kubectl get storageclass
 kubectl get pv
 ~~~
 
-No resources were present.
+The three commands returned:
+
+~~~text
+No resources found in monitoring namespace.
+No resources found
+No resources found
+~~~
 
 Inspect the Prometheus Pod volumes:
 
