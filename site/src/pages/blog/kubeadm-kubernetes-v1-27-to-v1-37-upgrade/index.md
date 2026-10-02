@@ -496,29 +496,29 @@ scheduler.conf             Oct 02, 2027 08:23 UTC   364d
 
 ## Upgrade kubelet and workers
 
-After the control-plane kubelet was updated to v1.27.16, the workers were handled one at a time:
+After the control-plane work was complete, the workers were upgraded one at a time:
 
 ~~~text
-replace kubeadm / kubectl
+update kubeadm / kubectl
 → kubeadm upgrade node
 → drain
-→ replace kubelet
+→ update kubelet
 → restart kubelet
 → verify
 → uncordon
 ~~~
 
-The main work was around drain failures.
+The repeated happy-path steps are not expanded for every worker below. This section keeps the parts that either changed the next decision or were preserved in the returned output.
 
-### node1: emptyDir and PDB
+### node1: the first drain was blocked by emptyDir
 
-First attempt:
+The first attempt was:
 
 ~~~bash
 kubectl drain node1 --ignore-daemonsets --timeout=5m
 ~~~
 
-It failed:
+It returned:
 
 ~~~text
 node/node1 cordoned
@@ -530,30 +530,93 @@ cannot delete Pods with local storage (use --delete-emptydir-data to override):
 drain exit code: 1
 ~~~
 
-After confirming that the local storage was disposable `emptyDir` data in this test cluster, I retried with `--delete-emptydir-data`.
-
-The next blocker was the prometheus-adapter PDB:
+The prometheus-adapter PDB was then checked:
 
 ~~~bash
 kubectl -n monitoring get pdb prometheus-adapter -o wide
+kubectl -n monitoring describe pdb prometheus-adapter
 ~~~
+
+Relevant state:
 
 ~~~text
 NAME                 MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
 prometheus-adapter   1               N/A               0
+
+Min available:        1
+Allowed disruptions: 0
+Current:             1
+Desired:             1
+Total:               1
 ~~~
 
-prometheus-adapter had one replica with `minAvailable: 1`, so there was no voluntary disruption available. In this test environment I temporarily scaled it to two replicas, waited for the second replica to become Ready, and then drained the node.
+So there were two separate blockers: local `emptyDir` data and a PDB protecting the only prometheus-adapter replica.
 
-The same type of blocker later appeared on node3 and node4 because replacement Pods moved onto nodes that had not yet been maintained.
-
-### node2: Prometheus had no persistent storage
-
-node2 was left until last because it hosted:
+After node1 was eventually drained and its kubelet updated, the node was observed as:
 
 ~~~text
-prometheus-k8s-0
+NAME    STATUS                     ROLES    AGE    VERSION
+node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 ~~~
+
+At that point only expected DaemonSet Pods such as Calico, kube-proxy, and node-exporter remained on node1 before it was uncordoned.
+
+The returned log set does not preserve the complete intermediate prometheus-adapter handling commands and output, so that missing part is not reconstructed here.
+
+### node3 and node4: the same blocker moved with the Pods
+
+The first node3 drain also failed:
+
+~~~bash
+kubectl drain node3 --ignore-daemonsets --timeout=5m
+~~~
+
+Cropped output:
+
+~~~text
+node/node3 cordoned
+cannot delete Pods with local storage:
+  kubernetes-dashboard/kubernetes-dashboard-...
+  monitoring/prometheus-adapter-...
+
+drain exit code: 1
+~~~
+
+The first node4 drain encountered the same kind of blocker:
+
+~~~bash
+kubectl drain node4 --ignore-daemonsets --timeout=5m
+~~~
+
+The returned output was truncated after the error, but it clearly listed:
+
+~~~text
+kube-system/metrics-server-...
+monitoring/prometheus-adapter-...
+~~~
+
+After the ordinary workload Pods had moved away, node4 was observed as:
+
+~~~text
+NAME    STATUS                     ROLES    AGE    VERSION
+node4   Ready,SchedulingDisabled   worker   260d   v1.27.0
+~~~
+
+Only DaemonSet Pods remained:
+
+~~~text
+calico-node-...
+kube-proxy-...
+node-exporter-...
+~~~
+
+node4 was then updated as well; the later pre-check before node2 showed node4 as `Ready v1.27.16`.
+
+The repeated failures show that a Pod evicted from one worker can land on a worker that has not yet been maintained, so the same drain blocker can reappear later in the sequence.
+
+### node2: check where Prometheus data actually lives
+
+node2 was handled last. Before the upgrade, `prometheus-k8s-0` was running on node2.
 
 The PDB was:
 
@@ -566,7 +629,7 @@ NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
 prometheus-k8s   1               N/A               0
 ~~~
 
-Storage checks:
+Storage objects were checked next:
 
 ~~~bash
 kubectl -n monitoring get pvc
@@ -574,21 +637,24 @@ kubectl get storageclass
 kubectl get pv
 ~~~
 
-All returned:
+No resources were present.
 
-~~~text
-No resources found
-~~~
-
-The Pod volume showed:
+The Prometheus Pod volume showed:
 
 ~~~text
 prometheus-k8s-db => emptyDir={}
 ~~~
 
-So the Prometheus TSDB was not on persistent storage. This test cluster could accept losing the existing history during drain. I saved the original PDB, temporarily changed `minAvailable` from 1 to 0, drained node2, and restored the PDB afterward.
+So the Prometheus TSDB was not stored on a PVC. If that Pod were deleted and recreated during drain, the existing `emptyDir` contents would not move with it.
 
-In a production cluster I would stop here and fix Prometheus persistence before draining the node.
+The original PDB was saved first:
+
+~~~bash
+kubectl -n monitoring get pdb prometheus-k8s -o yaml \
+  > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
+~~~
+
+node2 was later upgraded successfully. The returned log set does not preserve the full terminal output for the temporary PDB adjustment and successful drain, so this article keeps only the pre-change PDB/storage evidence and the final node result.
 
 ## Final v1.27.16 state
 
