@@ -194,16 +194,14 @@ kubectl get pods -A \
   -o custom-columns='NAMESPACE:.metadata.namespace,POD:.metadata.name,IMAGE:.spec.containers[*].image' \
   > "$BACKUP_DIR/config/images-before.txt"
 
-tar -C / \
-  -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
-  etc/kubernetes
+tar -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
+  /etc/kubernetes
 
-tar -C / \
-  -czf "$BACKUP_DIR/kubelet-config.tar.gz" \
-  lib/systemd/system/kubelet.service \
-  usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf \
-  var/lib/kubelet/config.yaml \
-  var/lib/kubelet/kubeadm-flags.env
+tar -czf "$BACKUP_DIR/kubelet-config.tar.gz" \
+  /lib/systemd/system/kubelet.service \
+  /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf \
+  /var/lib/kubelet/config.yaml \
+  /var/lib/kubelet/kubeadm-flags.env
 ~~~
 
 etcd snapshot 前先检查 endpoint：
@@ -317,6 +315,23 @@ sha256sum -c SHA256SUMS
 ./kubelet-config.tar.gz: OK
 ~~~
 
+在替换 kubeadm 之前，先用当前的 `kubeadm v1.27.0` 查看一次 v1.27.16 对应镜像：
+
+~~~bash
+kubeadm config images list \
+  --kubernetes-version v1.27.16 \
+  --image-repository registry.aliyuncs.com/google_containers
+~~~
+
+其中 etcd 出现了 fallback：
+
+~~~text
+could not find officially supported version of etcd for Kubernetes v1.27.16,
+falling back to the nearest etcd version (3.5.7-0)
+...
+registry.aliyuncs.com/google_containers/etcd:3.5.7-0
+~~~
+
 ## 先更新 kubeadm 工具，再执行 upgrade plan
 
 这一步只更新 control-plane 节点上的 kubeadm 工具本身，集群还没有开始升级。
@@ -375,49 +390,45 @@ Server Version: ... GitVersion:"v1.27.0" ...
 - `kubeadm v1.27.16`：刚刚替换的是本机升级工具；
 - `Server v1.27.0`：集群 control-plane 还没有执行 `kubeadm upgrade apply`。
 
-因此此时执行 plan 仍然成立：
+确认本机 kubeadm 已经是 v1.27.16，而集群仍然是 v1.27.0 后，生成升级计划：
 
 ~~~bash
-kubeadm upgrade plan
+kubeadm upgrade plan "$TARGET"
 ~~~
 
-它检查的是“当前 v1.27.0 集群，如果使用 v1.27.16 的 kubeadm 去升级，会改哪些组件”。
+plan 原始输出较长。下面不是 kubeadm 的原样输出，而是根据当时 plan 中显示的版本信息整理：
 
-关键输出：
+| 组件 | 当前版本 | 目标版本 |
+| --- | --- | --- |
+| kube-apiserver | v1.27.0 | v1.27.16 |
+| kube-controller-manager | v1.27.0 | v1.27.16 |
+| kube-scheduler | v1.27.0 | v1.27.16 |
+| kube-proxy | v1.27.0 | v1.27.16 |
+| CoreDNS | v1.10.1 | v1.10.1 |
+| etcd | 3.5.7-0 | 3.5.12-0 |
+| kubelet | 5 × v1.27.0 | v1.27.16（需要后续逐节点升级） |
 
-~~~text
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.27.0   v1.27.16
-kube-controller-manager   v1.27.0   v1.27.16
-kube-scheduler            v1.27.0   v1.27.16
-kube-proxy                v1.27.0   v1.27.16
-CoreDNS                   v1.10.1   v1.10.1
-etcd                      3.5.7-0   3.5.12-0
-
-COMPONENT   CURRENT       TARGET
-kubelet     5 x v1.27.0   v1.27.16
-~~~
-
-在替换 kubeadm 之前，旧的 `v1.27.0` kubeadm 曾执行：
-
-~~~bash
-kubeadm config images list \
-  --kubernetes-version v1.27.16 \
-  --image-repository registry.aliyuncs.com/google_containers
-~~~
-
-当时出现 fallback：
-
-~~~text
-could not find officially supported version of etcd for Kubernetes v1.27.16,
-falling back to the nearest etcd version (3.5.7-0)
-...
-registry.aliyuncs.com/google_containers/etcd:3.5.7-0
-~~~
-
-而目标版本 kubeadm 的 upgrade plan 给出的 etcd 目标是 `3.5.12-0`。所以后面的升级判断以目标版本 kubeadm 的 `upgrade plan` 为准。
+这里和前面旧 kubeadm 的 `config images list` 有一个明显差异：旧 kubeadm 对 v1.27.16 的 etcd 映射 fallback 到 3.5.7-0，而 v1.27.16 kubeadm 的 upgrade plan 给出的目标是 3.5.12-0。后续以目标版本 kubeadm 的 upgrade plan 为准。
 
 ## 升级 control-plane
+
+执行 apply 前，再确认 kubeadm 保存的 ClusterConfiguration：
+
+~~~bash
+kubectl -n kube-system get cm kubeadm-config \
+  -o jsonpath='{.data.ClusterConfiguration}'
+~~~
+
+其中和镜像仓库有关的配置是：
+
+~~~yaml
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+imageRepository: registry.aliyuncs.com/google_containers
+kubernetesVersion: v1.27.0
+~~~
+
+所以后面的 `kubeadm upgrade apply` 没有再单独写 `--image-repository`。kubeadm upgrade 会读取集群里的 `kubeadm-config`；这个集群已经把 `imageRepository` 配成了 `registry.aliyuncs.com/google_containers`。如果没有这个自定义配置，kubeadm 默认使用 `registry.k8s.io`。
 
 先做 dry-run：
 
@@ -425,12 +436,13 @@ registry.aliyuncs.com/google_containers/etcd:3.5.7-0
 kubeadm upgrade apply v1.27.16 --dry-run
 ~~~
 
-dry-run 的记录结果是：
+dry-run 的 kubeadm 结束输出是：
 
 ~~~text
 [upgrade/successful] Finished dryrunning successfully!
-kubeadm upgrade dry-run exit code: 0
 ~~~
+
+命令返回码另外由 shell 记录为 `0`；这不是 kubeadm 自己打印的内容。
 
 然后再执行：
 
@@ -438,14 +450,15 @@ kubeadm upgrade dry-run exit code: 0
 kubeadm upgrade apply v1.27.16 --yes
 ~~~
 
-结束时的关键输出：
+kubeadm 结束时的关键输出：
 
 ~~~text
 [upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.27.16". Enjoy!
 
 [upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.
-kubeadm upgrade apply exit code: 0
 ~~~
+
+这次 apply 的命令返回码同样由 shell 另外记录，结果为 `0`。
 
 这时 control-plane static Pod 和 etcd 已经更新，但 kubelet 还没更新。
 
@@ -760,4 +773,5 @@ v1.27.16 → v1.28.15
 
 - <a href="https://kubernetes.io/zh-cn/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes 补丁版本</a>
 - <a href="https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">升级 kubeadm 集群</a>
+- <a href="https://kubernetes.io/zh-cn/docs/reference/setup-tools/kubeadm/kubeadm-config/" target="_blank" rel="noopener noreferrer">kubeadm 配置</a>
 - <a href="https://kubernetes.io/zh-cn/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain 参考</a>
