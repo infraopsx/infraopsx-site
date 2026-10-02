@@ -660,7 +660,7 @@ cannot delete Pods with local storage:
 kubectl drain node4 --ignore-daemonsets --timeout=5m
 ~~~
 
-当时回传的输出在错误信息后被截断，但能确认 blocker 包括：
+node4 的错误信息中能确认的 blocker 包括：
 
 ~~~text
 kube-system/metrics-server-...
@@ -711,10 +711,17 @@ kubectl get pv
 
 结果都没有资源。
 
-继续检查 Prometheus Pod 的 volume，看到：
+继续检查 Prometheus Pod 的 volume：
+
+~~~bash
+kubectl -n monitoring get pod prometheus-k8s-0 \
+  -o jsonpath='{range .spec.volumes[*]}{.name}{" => PVC="}{.persistentVolumeClaim.claimName}{" hostPath="}{.hostPath.path}{" emptyDir="}{.emptyDir}{"\n"}{end}'
+~~~
+
+其中数据库 volume 是：
 
 ~~~text
-prometheus-k8s-db => emptyDir={}
+prometheus-k8s-db => PVC= hostPath= emptyDir={}
 ~~~
 
 所以这个 Prometheus 的 TSDB 当时并没有放在 PVC 上，而是在 `emptyDir`。如果这个 Pod 在 drain 过程中被删除并重新创建，原来的历史数据不会跟着 Pod 一起迁移。
