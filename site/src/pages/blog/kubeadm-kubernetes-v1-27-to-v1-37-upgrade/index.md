@@ -52,13 +52,7 @@ Kubernetes lists 1.27.16 as the final patch in the 1.27 series. kubeadm upgrades
 → 1.37.x
 ~~~
 
-This does not mean that 1.27.16 is mandatory before 1.28. I chose it as a clean checkpoint: finish the current minor series first, then cross the minor-version boundary.
-
-References:
-
-- <a href="https://kubernetes.io/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27 release</a>
-- <a href="https://kubernetes.io/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes patch releases</a>
-- <a href="https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">Upgrading kubeadm clusters</a>
+1.27.16 is not a mandatory prerequisite for 1.28. I chose it so the 1.27 series was fully patched before moving to the next minor release.
 
 ## Pre-upgrade checks
 
