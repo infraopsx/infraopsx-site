@@ -156,20 +156,7 @@ The actual directory created in this run was:
 /root/k8s-upgrade-backup/20261002-155639-before-v1.27.16
 ~~~
 
-Back up the current binaries and record their checksums:
-
-~~~bash
-cp -a /usr/local/bin/kubeadm "$BACKUP_DIR/bin/"
-cp -a /usr/local/bin/kubelet "$BACKUP_DIR/bin/"
-cp -a /usr/local/bin/kubectl "$BACKUP_DIR/bin/"
-
-sha256sum \
-  "$BACKUP_DIR/bin/kubeadm" \
-  "$BACKUP_DIR/bin/kubelet" \
-  "$BACKUP_DIR/bin/kubectl"
-~~~
-
-Save kubeadm/kubelet configuration and the current workload state:
+Save the kubeadm/kubelet configuration, node state, and workload state:
 
 ~~~bash
 kubectl -n kube-system get cm kubeadm-config -o yaml \
@@ -193,7 +180,41 @@ kubectl get pvc -A -o yaml \
 kubectl get pods -A \
   -o custom-columns='NAMESPACE:.metadata.namespace,POD:.metadata.name,IMAGE:.spec.containers[*].image' \
   > "$BACKUP_DIR/config/images-before.txt"
+~~~
 
+At this point kubeadm was still v1.27.0. I also recorded how that binary mapped the v1.27.16 target images:
+
+~~~bash
+kubeadm config images list \
+  --kubernetes-version v1.27.16 \
+  --image-repository registry.aliyuncs.com/google_containers
+~~~
+
+The etcd mapping fell back to:
+
+~~~text
+could not find officially supported version of etcd for Kubernetes v1.27.16,
+falling back to the nearest etcd version (3.5.7-0)
+...
+registry.aliyuncs.com/google_containers/etcd:3.5.7-0
+~~~
+
+Back up the current binaries and record their checksums:
+
+~~~bash
+cp -a /usr/local/bin/kubeadm "$BACKUP_DIR/bin/"
+cp -a /usr/local/bin/kubelet "$BACKUP_DIR/bin/"
+cp -a /usr/local/bin/kubectl "$BACKUP_DIR/bin/"
+
+sha256sum \
+  "$BACKUP_DIR/bin/kubeadm" \
+  "$BACKUP_DIR/bin/kubelet" \
+  "$BACKUP_DIR/bin/kubectl"
+~~~
+
+The original terminal log used `tar -C /` with relative paths. The equivalent absolute-path form below represents the same archive contents:
+
+~~~bash
 tar -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
   /etc/kubernetes
 
@@ -202,9 +223,40 @@ tar -czf "$BACKUP_DIR/kubelet-config.tar.gz" \
   /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf \
   /var/lib/kubelet/config.yaml \
   /var/lib/kubelet/kubeadm-flags.env
+
+tar -tzf "$BACKUP_DIR/kubelet-config.tar.gz" >/dev/null \
+  && echo "OK: kubelet configuration archive verified"
 ~~~
 
-Before taking the snapshot, check etcd health:
+Verification result:
+
+~~~text
+OK: kubelet configuration archive verified
+~~~
+
+Before taking the snapshot, check etcd endpoint status:
+
+~~~bash
+kubectl -n kube-system exec etcd-master -- \
+  etcdctl \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt \
+  --key=/etc/kubernetes/pki/etcd/healthcheck-client.key \
+  endpoint status -w table
+~~~
+
+etcd was 3.5.7 and the database was about 19 MB:
+
+~~~text
++------------------------+---------+---------+-----------+------------+--------+
+|        ENDPOINT        | VERSION | DB SIZE | IS LEADER | IS LEARNER | ERRORS |
++------------------------+---------+---------+-----------+------------+--------+
+| https://127.0.0.1:2379 |   3.5.7 |   19 MB |      true |      false |        |
++------------------------+---------+---------+-----------+------------+--------+
+~~~
+
+Then check endpoint health:
 
 ~~~bash
 kubectl -n kube-system exec etcd-master -- \
@@ -242,19 +294,13 @@ Relevant output:
 Snapshot saved at /var/lib/etcd/etcd-before-v1.27.16-20261002-155639.db
 ~~~
 
-That `/var/lib/etcd/...` path is where the snapshot was first created. It was then copied into the checkpoint directory:
+Copy the snapshot into the checkpoint directory:
 
 ~~~bash
 cp -a "/var/lib/etcd/$SNAP" "$BACKUP_DIR/etcd/"
 ~~~
 
-The backup copy therefore ended up at:
-
-~~~text
-/root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/etcd/etcd-before-v1.27.16-20261002-155639.db
-~~~
-
-Check the snapshot contents:
+Check the snapshot:
 
 ~~~bash
 kubectl -n kube-system exec etcd-master -- \
@@ -273,7 +319,7 @@ Deprecated: Use `etcdutl snapshot status` instead.
 +----------+----------+------------+------------+
 ~~~
 
-Finally, checksum the backup copy:
+Checksum the backup copy:
 
 ~~~bash
 sha256sum "$BACKUP_DIR/etcd/$SNAP"
@@ -283,7 +329,17 @@ sha256sum "$BACKUP_DIR/etcd/$SNAP"
 128caa1e419caffa7ea030e850dfd3bfa01105e5622338bb6a27dc8ffd82f967  /root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/etcd/etcd-before-v1.27.16-20261002-155639.db
 ~~~
 
-Generate and verify a checksum list for the whole checkpoint:
+After confirming both the temporary snapshot and backup copy existed, remove the temporary file from `/var/lib/etcd`:
+
+~~~bash
+ls -lh \
+  "/var/lib/etcd/$SNAP" \
+  "$BACKUP_DIR/etcd/$SNAP"
+
+rm -f "/var/lib/etcd/$SNAP"
+~~~
+
+Finally, generate and verify a checksum list for the whole checkpoint:
 
 ~~~bash
 (
@@ -298,36 +354,22 @@ cd "$BACKUP_DIR"
 sha256sum -c SHA256SUMS
 ~~~
 
-Relevant results:
+Cropped result:
 
 ~~~text
 ./bin/kubeadm: OK
 ./bin/kubectl: OK
 ./bin/kubelet: OK
+./config/images-before.txt: OK
 ./config/kubeadm-config.yaml: OK
 ./config/kubelet-config.yaml: OK
 ./config/nodes.yaml: OK
+./config/pv.yaml: OK
+./config/pvc.yaml: OK
 ./config/workloads.yaml: OK
 ./etc-kubernetes.tar.gz: OK
 ./etcd/etcd-before-v1.27.16-20261002-155639.db: OK
 ./kubelet-config.tar.gz: OK
-~~~
-
-Before replacing kubeadm, use the current `kubeadm v1.27.0` once to inspect the v1.27.16 image list:
-
-~~~bash
-kubeadm config images list \
-  --kubernetes-version v1.27.16 \
-  --image-repository registry.aliyuncs.com/google_containers
-~~~
-
-The etcd mapping fell back to:
-
-~~~text
-could not find officially supported version of etcd for Kubernetes v1.27.16,
-falling back to the nearest etcd version (3.5.7-0)
-...
-registry.aliyuncs.com/google_containers/etcd:3.5.7-0
 ~~~
 
 ## Update the kubeadm tool, then run the upgrade plan
@@ -407,14 +449,7 @@ This differs from the earlier `config images list` run with kubeadm v1.27.0: the
 
 ## Upgrade the control-plane
 
-Before apply, check the ClusterConfiguration stored by kubeadm:
-
-~~~bash
-kubectl -n kube-system get cm kubeadm-config \
-  -o jsonpath='{.data.ClusterConfiguration}'
-~~~
-
-The image repository setting was:
+The checkpoint already contains `$BACKUP_DIR/config/kubeadm-config.yaml`. Its ClusterConfiguration includes:
 
 ~~~yaml
 apiVersion: kubeadm.k8s.io/v1beta3
@@ -423,7 +458,7 @@ imageRepository: registry.aliyuncs.com/google_containers
 kubernetesVersion: v1.27.0
 ~~~
 
-That is why `kubeadm upgrade apply` below does not pass a separate `--image-repository` flag. kubeadm reads the stored cluster configuration, and this cluster already has `imageRepository` set to `registry.aliyuncs.com/google_containers`. Without a custom image repository, kubeadm defaults to `registry.k8s.io`.
+That is why `kubeadm upgrade apply` below does not pass a separate `--image-repository` flag. This cluster already has `imageRepository` set to `registry.aliyuncs.com/google_containers`; without a custom image repository, kubeadm defaults to `registry.k8s.io`.
 
 First run a dry run:
 
@@ -436,8 +471,6 @@ The kubeadm dry-run output ended with:
 ~~~text
 [upgrade/successful] Finished dryrunning successfully!
 ~~~
-
-The shell wrapper recorded the command return code separately as `0`; that line is not kubeadm output.
 
 Then apply the upgrade:
 
@@ -453,18 +486,30 @@ The kubeadm output ended with:
 [upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.
 ~~~
 
-The shell wrapper separately recorded the apply command return code as `0`.
+At this point the control-plane static Pods and etcd were already on the target versions.
 
-At this point the control-plane static Pods and etcd were already on the target versions. The images showed:
+The post-upgrade check recorded these control-plane images:
 
 ~~~text
-etcd-master                       registry.aliyuncs.com/google_containers/etcd:3.5.12-0
-kube-apiserver-master             registry.aliyuncs.com/google_containers/kube-apiserver:v1.27.16
-kube-controller-manager-master    registry.aliyuncs.com/google_containers/kube-controller-manager:v1.27.16
-kube-scheduler-master             registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
+etcd-master                    registry.aliyuncs.com/google_containers/etcd:3.5.12-0
+kube-apiserver-master          registry.aliyuncs.com/google_containers/kube-apiserver:v1.27.16
+kube-controller-manager-master registry.aliyuncs.com/google_containers/kube-controller-manager:v1.27.16
+kube-scheduler-master          registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
 ~~~
 
-But the node versions were still unchanged:
+In the same check, kube-proxy was still in a rolling-update transition: both v1.27.0 and v1.27.16 images were present, and the new master kube-proxy Pod was still `ContainerCreating`.
+
+The etcd status had changed from 3.5.7 to:
+
+~~~text
++------------------------+---------+---------+-----------+------------+--------+
+|        ENDPOINT        | VERSION | DB SIZE | IS LEADER | IS LEARNER | ERRORS |
++------------------------+---------+---------+-----------+------------+--------+
+| https://127.0.0.1:2379 |  3.5.12 |   19 MB |      true |      false |        |
++------------------------+---------+---------+-----------+------------+--------+
+~~~
+
+The node versions were still unchanged:
 
 ~~~bash
 kubectl get nodes
@@ -480,44 +525,6 @@ node4    Ready    worker          260d   v1.27.0
 ~~~
 
 The VERSION column in `kubectl get nodes` is the kubelet version, so it remains v1.27.0 until the kubelet is upgraded separately.
-
-### Update the control-plane kubelet and kubectl
-
-After `kubeadm upgrade apply`, the control-plane components were already on v1.27.16, but the master node kubelet was still on v1.27.0.
-
-Drain the master first:
-
-~~~bash
-kubectl drain master --ignore-daemonsets
-~~~
-
-The target kubelet and kubectl binaries had already been downloaded and verified. After replacing `/usr/local/bin/kubelet` and `/usr/local/bin/kubectl`, restart kubelet:
-
-~~~bash
-systemctl daemon-reload
-systemctl restart kubelet
-~~~
-
-Then check the master node:
-
-~~~bash
-kubectl get node master
-~~~
-
-Observed state:
-
-~~~text
-NAME     STATUS                     ROLES           AGE    VERSION
-master   Ready,SchedulingDisabled   control-plane   262d   v1.27.16
-~~~
-
-After confirming API readiness:
-
-~~~bash
-kubectl uncordon master
-~~~
-
-At this point the master node's own kubelet upgrade was complete.
 
 ### Certificate renewal
 
@@ -551,6 +558,13 @@ apiserver-etcd-client      Oct 02, 2027 08:22 UTC   364d
 scheduler.conf             Oct 02, 2027 08:23 UTC   364d
 ~~~
 
+
+### Update the control-plane kubelet and kubectl
+
+After `kubeadm upgrade apply`, the control-plane components were on v1.27.16, but `kubectl get nodes` still showed the master kubelet on v1.27.0.
+
+The master was then drained, `/usr/local/bin/kubelet` and `/usr/local/bin/kubectl` were replaced with the verified v1.27.16 binaries, kubelet was restarted, and the node was uncordoned after checks. The final `kubectl get nodes` output later in the article confirms the master node version together with the workers.
+
 ## Upgrade kubelet and workers
 
 After the control-plane work was complete, the workers were upgraded one at a time:
@@ -583,8 +597,6 @@ cannot delete Pods with local storage (use --delete-emptydir-data to override):
   kube-system/metrics-server-...
   kubernetes-dashboard/kubernetes-dashboard-...
   monitoring/prometheus-adapter-...
-
-drain exit code: 1
 ~~~
 
 The prometheus-adapter PDB was then checked:
@@ -607,9 +619,9 @@ Desired:             1
 Total:               1
 ~~~
 
-So there were two separate blockers: local `emptyDir` data and a PDB protecting the only prometheus-adapter replica.
+The first drain directly exposed the `emptyDir` problem. The PDB check showed a second independent blocker: even if deletion of the local temporary data were allowed, prometheus-adapter still had no voluntary disruption available. The two blockers had to be handled separately.
 
-After node1 was eventually drained and its kubelet updated, the node was observed as:
+node1 was later drained and its kubelet updated. The node was then observed as:
 
 ~~~text
 NAME    STATUS                     ROLES    AGE    VERSION
@@ -633,8 +645,6 @@ node/node3 cordoned
 cannot delete Pods with local storage:
   kubernetes-dashboard/kubernetes-dashboard-...
   monitoring/prometheus-adapter-...
-
-drain exit code: 1
 ~~~
 
 The first node4 drain encountered the same kind of blocker:
@@ -711,7 +721,7 @@ kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
 
-node2 was later upgraded successfully; the final node state is shown in the next section.
+These checks established two separate constraints before drain: the PDB protected the only Prometheus replica, while the TSDB itself lived on `emptyDir`. node2 was later upgraded successfully; the final node state is shown in the next section. On a production cluster, I would fix Prometheus persistence before doing this maintenance.
 
 ## Final v1.27.16 state
 
@@ -728,28 +738,6 @@ node1    Ready    worker          262d   v1.27.16
 node2    Ready    worker          262d   v1.27.16
 node3    Ready    worker          262d   v1.27.16
 node4    Ready    worker          261d   v1.27.16
-~~~
-
-Check for non-running Pods and API readiness as well:
-
-~~~bash
-kubectl get pods -A \
-  --field-selector=status.phase!=Running,status.phase!=Succeeded \
-  -o wide
-
-kubectl get --raw='/readyz?verbose'
-~~~
-
-Cropped result:
-
-~~~text
-No resources found
-
-[+]ping ok
-[+]etcd ok
-[+]etcd-readiness ok
-...
-readyz check passed
 ~~~
 
 The next step is:
