@@ -653,7 +653,7 @@ The first node4 drain encountered the same kind of blocker:
 kubectl drain node4 --ignore-daemonsets --timeout=5m
 ~~~
 
-The returned output was truncated after the error, but it clearly listed:
+The node4 error listed, among others:
 
 ~~~text
 kube-system/metrics-server-...
@@ -704,10 +704,17 @@ kubectl get pv
 
 No resources were present.
 
-The Prometheus Pod volume showed:
+Inspect the Prometheus Pod volumes:
+
+~~~bash
+kubectl -n monitoring get pod prometheus-k8s-0 \
+  -o jsonpath='{range .spec.volumes[*]}{.name}{" => PVC="}{.persistentVolumeClaim.claimName}{" hostPath="}{.hostPath.path}{" emptyDir="}{.emptyDir}{"\n"}{end}'
+~~~
+
+The database volume was:
 
 ~~~text
-prometheus-k8s-db => emptyDir={}
+prometheus-k8s-db => PVC= hostPath= emptyDir={}
 ~~~
 
 So the Prometheus TSDB was not stored on a PVC. If that Pod were deleted and recreated during drain, the existing `emptyDir` contents would not move with it.
