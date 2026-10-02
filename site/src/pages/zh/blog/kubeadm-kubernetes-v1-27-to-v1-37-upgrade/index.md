@@ -1,7 +1,7 @@
 ---
 layout: ../../../../layouts/ArticleLayout.astro
-title: "从 Kubernetes v1.27 升级到 v1.37：一个真实 5 节点 kubeadm 集群的升级记录"
-description: "一个真实的 kubeadm Kubernetes 升级记录：从 v1.27 开始逐步升级到 v1.37。第一部分记录为什么先从 v1.27.0 升到最终补丁 v1.27.16，以及备份、控制平面升级、worker drain、PDB 阻塞和最终验证。"
+title: "Kubernetes v1.27 到 v1.37：一次真实的 kubeadm 集群升级记录"
+description: "真实记录一个 5 节点 kubeadm 集群从 Kubernetes v1.27 逐步升级到 v1.37，包括备份、etcd 变化、drain 失败、PDB 阻塞和逐阶段验证。"
 pubDate: "2026-10-02"
 category: Kubernetes
 tags:
@@ -17,6 +17,21 @@ zhPath: "/zh/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/"
 ---
 
 这不是一篇按官方文档重新整理出来的 kubeadm 教程，而是一份真实升级记录。
+
+## 升级计划与环境
+
+| 环境 | 实际情况 |
+| --- | --- |
+| 集群拓扑 | 1 个 control-plane + 4 个 worker |
+| control-plane 高可用 | 否，单 control-plane |
+| 操作系统 | Debian 12 |
+| Kernel | 6.1.0-52-amd64 |
+| Container Runtime | containerd 1.6.20 |
+| 起始版本 | Kubernetes v1.27.0 |
+| Kubernetes 二进制 | 手工管理，位于 /usr/local/bin |
+| 长期目标 | Kubernetes v1.37 |
+
+本文记录的是**单 control-plane** kubeadm 集群。常见的 3 control-plane HA 集群，在 control-plane 升级顺序、负载均衡、etcd 拓扑和控制平面可用性验证上会有所不同，因此不能把本文 control-plane 部分机械照搬到 HA 集群。worker 侧的很多现象仍然具有参考价值。
 
 这个集群已经运行了大约 260 天，起点是 Kubernetes <code>v1.27.0</code>。长期目标是把它一步一步升级到当前版本，并且不跳过 minor version。本文第一部分只记录第一个检查点：
 
@@ -43,7 +58,9 @@ v1.27.16
 
 这里需要说明：kubeadm 并没有规定“从 1.27.0 升 1.28 之前必须先停在 1.27.16”。我选择先到 1.27.16，是为了在跨 minor version 之前先建立一个完全补齐当前 minor patch 的干净检查点，尽量减少变量。
 
-## 快速答案：为什么第一步先到 v1.27.16？
+## Checkpoint 1：v1.27.0 → v1.27.16
+
+### 快速答案：为什么第一步先到 v1.27.16？
 
 因为当前集群起点是 <code>v1.27.0</code>，而 <code>v1.27.16</code> 是 1.27 系列的最终 patch。Kubernetes 并不强制要求必须先经过这个 patch 才能进入 1.28，但官方建议尽快使用当前 minor 的最新 patch，同时 kubeadm 升级不支持跳过 minor version。
 
@@ -55,7 +72,7 @@ v1.27.16
 - <a href="https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">升级 kubeadm 集群</a>
 - <a href="https://kubernetes.io/releases/version-skew-policy/" target="_blank" rel="noopener noreferrer">Kubernetes Version Skew Policy</a>
 
-## v1.27.16 这个版本号是怎么确定的？
+### v1.27.16 这个版本号是怎么确定的？
 
 这个版本不是从博客、论坛或某个软件仓库列表里随便选出来的。
 
@@ -91,7 +108,7 @@ etcd 3.5.7-0 → 3.5.12-0
 
 所以对于一个很旧的集群，我不会把旧 kubeadm 对“未来 patch 版本组件映射”的判断当作最终依据。先升级 kubeadm，再用目标版本 kubeadm 做 plan，更可靠。
 
-## 升级前的集群状态
+### 升级前的集群状态
 
 这是一个 5 节点 kubeadm 集群：
 
@@ -140,7 +157,7 @@ worker: 4
 
 另外，升级前就已经存在一些 <code>DNSConfigForming</code> Warning。这些 warning 来自主机 resolver 配置，所以我在正式升级前先记录下来，避免升级后把已有问题误认为升级引入的新问题。
 
-## 真正第一步不是升级，而是做恢复点
+### 真正第一步不是升级，而是做恢复点
 
 这次第一步不是下载 Kubernetes，而是先做恢复点。
 
@@ -167,6 +184,8 @@ total size: 19 MB
 
 snapshot 本身也做了 SHA256 校验。
 
+如果需要看更完整的 etcd 备份与恢复验证过程，可以继续看站内的 [Kubernetes 上的 etcd 备份与恢复：三成员恢复测试](/zh/blog/etcd-backup-and-restore-on-kubernetes/)。
+
 这里还碰到一个小兼容问题：当时使用的 etcd 镜像里没有 <code>etcdutl</code>，所以 snapshot 状态最后使用的是旧命令：
 
 ~~~bash
@@ -177,7 +196,7 @@ etcdctl snapshot status
 
 同时我也打包了 <code>/etc/kubernetes</code>。这个压缩包里包含 PKI 私钥，包括 CA key，因此它只能当恢复文件保存，绝对不应该上传到公开文章、GitHub 或附件里。
 
-## 先只升级 kubeadm，并验证 checksum
+### 先只升级 kubeadm，并验证 checksum
 
 因为当前集群使用的是手工二进制，所以目标 kubeadm 也是直接下载后校验。
 
@@ -197,7 +216,7 @@ v1.27.16
 
 旧 kubeadm 并没有直接丢掉，而是提前放进恢复点里。
 
-## 在真正 apply 之前先做 upgrade plan
+### 在真正 apply 之前先做 upgrade plan
 
 目标版本 kubeadm 就位后，我先执行 upgrade plan。
 
@@ -253,7 +272,7 @@ dry run
 
 > 实际升级时发生了什么
 
-## 真正执行 control-plane 升级
+### 真正执行 control-plane 升级
 
 control-plane 的实际命令是：
 
@@ -278,7 +297,7 @@ CoreDNS                    v1.10.1  → v1.10.1
 
 kubeadm 同时把旧 static Pod manifest 备份到了 <code>/etc/kubernetes/tmp/</code>。
 
-### 证书剩余时间也发生了变化
+#### 证书剩余时间也发生了变化
 
 升级前，非 CA Kubernetes 证书大约只剩 102 天。
 
@@ -288,7 +307,7 @@ kubeadm 同时把旧 static Pod manifest 备份到了 <code>/etc/kubernetes/tmp/
 
 所以以后遇到 control-plane 升级，我会同时记录升级前后的证书状态，而不是简单认为“patch 升级只改二进制”。
 
-## 为什么 control plane 已经升级，kubectl get nodes 还是 v1.27.0？
+### 为什么 control plane 已经升级，kubectl get nodes 还是 v1.27.0？
 
 这是一个很容易误判的地方。
 
@@ -318,7 +337,7 @@ kubelets:                  v1.27.0
 
 因此不能只看 Node 的 VERSION 列就判断 control-plane upgrade 是否失败。
 
-## 等 kube-proxy 完成滚动更新
+### 等 kube-proxy 完成滚动更新
 
 control-plane apply 刚完成时，kube-proxy 处于真实的 rollout 中间态：部分 Pod 已经是 <code>v1.27.16</code>，部分还在 <code>v1.27.0</code>。
 
@@ -332,7 +351,7 @@ kubectl -n kube-system rollout status ds/kube-proxy --timeout=180s
 
 这也是为什么保留真实日志很重要：只看某一个时间点的截图，很容易把正常滚动过程误认为异常。
 
-## 升级 control-plane kubelet 和 kubectl
+### 升级 control-plane kubelet 和 kubectl
 
 目标 kubelet 和 kubectl 同样先下载并做 checksum 验证。
 
@@ -365,7 +384,7 @@ kubectl uncordon master
 
 此时 control plane 已经完整到 <code>v1.27.16</code>，但 4 个 worker 仍然是 <code>v1.27.0</code>。
 
-## worker 一台一台升级
+### worker 一台一台升级
 
 每个 worker 使用同样的高层流程：
 
@@ -401,7 +420,7 @@ kubeadm upgrade node
 
 真正有价值的部分从这里开始，因为 node1 的 drain 并没有一次成功。
 
-## Drain 失败 #1：emptyDir 阻止驱逐
+### Drain 失败 #1：emptyDir 阻止驱逐
 
 node1 第一次 drain：
 
@@ -430,7 +449,7 @@ kubectl drain node1 \
 
 然后又碰到了第二个 blocker。
 
-## Drain 失败 #2：PodDisruptionBudget 不允许任何 disruption
+### Drain 失败 #2：PodDisruptionBudget 不允许任何 disruption
 
 <code>prometheus-adapter</code> 当时只有 1 个副本，而 PDB 是：
 
@@ -455,7 +474,7 @@ node1 升级完成并 uncordon 后，再把 <code>prometheus-adapter</code> 恢�
 
 换成别的应用，直接扩副本未必是正确做法。
 
-## 同一个 blocker 后面又跟着 workload 跑到了 node3 和 node4
+### 同一个 blocker 后面又跟着 workload 跑到了 node3 和 node4
 
 逐节点升级并不是彼此完全独立的。
 
@@ -467,9 +486,11 @@ node1 升级完成并 uncordon 后，再把 <code>prometheus-adapter</code> 恢�
 
 > 顺序维护多个 worker 时，要持续观察 singleton / stateful workload 被重新调度到了哪里。blocker 可能跟着 workload 一起移动。
 
+如果 replacement Pod 在驱逐后无法重新调度，可以继续参考站内的 [Kubernetes Pod Pending：从调度失败开始排查](/zh/blog/kubernetes-pod-pending/)。
+
 确认相关普通 Pod 已经迁走、节点上只剩 Calico、kube-proxy、node-exporter 这类 DaemonSet 后，再继续 kubelet upgrade。
 
-## node2 暴露了一个比升级本身更严重的 Prometheus 存储问题
+### node2 暴露了一个比升级本身更严重的 Prometheus 存储问题
 
 我把 node2 留到最后，因为它上面运行着：
 
@@ -528,7 +549,7 @@ minAvailable: 0
 
 这次维护实际上顺便完成了一次“存储设计审计”：Prometheus 的 persistence 问题不是升级造成的，但升级过程把它暴露出来了。
 
-## 最终 v1.27.16 验证
+### 最终 v1.27.16 验证
 
 所有 worker 完成后，5 个节点全部统一到：
 
@@ -566,7 +587,7 @@ readyz check passed
 
 最终检查点里，Prometheus 已经作为新 Pod 重建并恢复到 <code>2/2 Running</code>，PDB 也恢复回 <code>minAvailable: 1</code>。
 
-## 第一阶段到底改变了什么？
+## Checkpoint 1 的关键结论
 
 | 项目 | 升级前 | 升级后 |
 | --- | --- | --- |
@@ -587,35 +608,27 @@ readyz check passed
 
 ## FAQ
 
-### Kubernetes v1.27.16 现在还受支持吗？
+### kubeadm 可以跳过 Kubernetes minor version 吗？
 
-不受支持。Kubernetes 1.27 已经在 2024-07-16 EOL，<code>v1.27.16</code> 只是这个 minor series 的最终 patch，不是当前受支持版本。
-
-这次之所以还经过它，是因为真实起点就是 <code>v1.27.0</code>，目标是逐个 minor version 向前升级。
+不可以。kubeadm 官方升级流程明确不支持跳过 minor version，所以这次迁移按 minor version 一步一步向前推进。
 
 ### 从 v1.27.0 到 v1.28 之前，必须先升级到 v1.27.16 吗？
 
-不是硬性要求。
+不是硬性要求。真正不能跳过的是 1.28 这个 minor version。我选择先到 <code>v1.27.16</code>，是因为它是 1.27 系列最终 patch，可以先建立一个更干净、更可控的 checkpoint，再跨进 1.28。
 
-kubeadm 真正明确要求的是：不要跳过 minor version。
+### kubeadm upgrade apply 会顺便升级 kubelet 吗？
 
-这里先走到 <code>v1.27.16</code>，是为了先把当前 minor 内部更新到最终 patch，建立一个更可控的 checkpoint，再跨进 1.28。
+不会。这次真实过程里，<code>kubeadm upgrade apply</code> 已经把 control-plane static Pod 和 etcd 升级到目标版本，但各 Node 的 <code>VERSION</code> 仍然显示 <code>v1.27.0</code>。只有后面逐台替换 kubelet 后，Node 版本才变成 <code>v1.27.16</code>。
 
-### control plane 已经是 v1.27.16，为什么 kubectl get nodes 还显示 v1.27.0？
+### 为什么 kubectl drain 会失败？
 
-因为 <code>kubectl get nodes</code> 的 <code>VERSION</code> 列显示的是 kubelet version。
+这次碰到了两类独立 blocker。一类是 Pod 使用 <code>emptyDir</code>，kubectl 不会默认替你决定丢弃本地临时数据；另一类是单副本 workload 被 PDB 保护，并且 <code>minAvailable: 1</code>，导致允许的 voluntary disruption 数量为 0。
 
-当时 control-plane static Pod 已经升级完，但各节点 kubelet 还没有升级，所以 Node VERSION 仍然是 <code>v1.27.0</code>。
+### drain 节点会删除 emptyDir 数据吗？
 
-### 为什么 kubectl drain 会一直失败？
+可能会。默认情况下，kubectl drain 会因为 Pod 使用 <code>emptyDir</code> 而拒绝继续；只有显式确认 <code>--delete-emptydir-data</code> 后才会驱逐这些 Pod。Pod 被删除并在其他节点重建后，旧 Pod 的 <code>emptyDir</code> 内容不会跟过去。
 
-这次碰到了两个独立原因。
-
-第一类是 Pod 使用 <code>emptyDir</code>，kubectl 不会默认替你决定丢弃本地临时数据。
-
-第二类是单副本 workload 被 PDB 保护，并且 <code>minAvailable: 1</code>，导致允许的 voluntary disruption 数量为 0。
-
-## 下一阶段
+## 下一阶段：v1.27.16 → v1.28.15
 
 现在整个集群已经统一到：
 
