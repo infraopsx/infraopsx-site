@@ -393,7 +393,6 @@ echo "${EXPECTED}  kubeadm-${TARGET}" | sha256sum -c -
 
 ~~~text
 kubeadm-v1.27.16: OK
-33622018f83515331ac70c2041eba5d814a6d78a40b8869f089ea502f63a1421  kubeadm-v1.27.16
 ~~~
 
 然后替换 kubeadm：
@@ -475,7 +474,17 @@ dry-run 的 kubeadm 结束输出是：
 kubeadm upgrade apply v1.27.16 --yes
 ~~~
 
-kubeadm 结束时的关键输出：
+开头的输出可以看到 kubeadm 读取的是集群配置：
+
+~~~text
+[upgrade/config] Reading configuration from the cluster...
+[upgrade/version] You have chosen to change the cluster version to "v1.27.16"
+[upgrade/versions] Cluster version: v1.27.0
+[upgrade/versions] kubeadm version: v1.27.16
+[upgrade/prepull] Pulling images required for setting up a Kubernetes cluster
+~~~
+
+结束时的关键输出：
 
 ~~~text
 [upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.27.16". Enjoy!
