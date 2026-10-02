@@ -243,6 +243,67 @@ const tocHasExplicitNumbers = tocHeadings.some(
   <Footer locale={isZh ? 'zh' : 'en'} />
 </BaseLayout>
 
+<script is:inline>
+  (() => {
+    const copyText = async (text) => {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      textarea.remove();
+    };
+
+    const initCodeCopyButtons = () => {
+      const isZh = document.documentElement.lang === 'zh-CN';
+
+      document.querySelectorAll('.article-content pre').forEach((pre) => {
+        if (pre.querySelector('.code-copy-button')) return;
+
+        const code = pre.querySelector('code');
+        if (!code) return;
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'code-copy-button';
+        button.textContent = isZh ? '复制' : 'Copy';
+        button.setAttribute('aria-label', isZh ? '复制代码' : 'Copy code');
+
+        button.addEventListener('click', async () => {
+          const original = isZh ? '复制' : 'Copy';
+
+          try {
+            await copyText(code.innerText);
+            button.textContent = isZh ? '已复制' : 'Copied';
+          } catch {
+            button.textContent = isZh ? '复制失败' : 'Copy failed';
+          }
+
+          window.setTimeout(() => {
+            button.textContent = original;
+          }, 1600);
+        });
+
+        pre.appendChild(button);
+      });
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initCodeCopyButtons, { once: true });
+    } else {
+      initCodeCopyButtons();
+    }
+  })();
+</script>
+
 <style>
   .article-author a {
     color: inherit;
