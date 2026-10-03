@@ -182,13 +182,19 @@ kubeadm config images list \
   --image-repository registry.aliyuncs.com/google_containers
 ~~~
 
-其中 etcd 出现 fallback：
+关键输出：
 
 ~~~text
 could not find officially supported version of etcd for Kubernetes v1.27.16,
 falling back to the nearest etcd version (3.5.7-0)
-...
+
+registry.aliyuncs.com/google_containers/kube-apiserver:v1.27.16
+registry.aliyuncs.com/google_containers/kube-controller-manager:v1.27.16
+registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
+registry.aliyuncs.com/google_containers/kube-proxy:v1.27.16
+registry.aliyuncs.com/google_containers/pause:3.9
 registry.aliyuncs.com/google_containers/etcd:3.5.7-0
+registry.aliyuncs.com/google_containers/coredns:v1.10.1
 ~~~
 
 再备份当前三个二进制并记录 SHA256：
@@ -299,7 +305,7 @@ kubectl -n kube-system exec etcd-master -- \
   etcdctl snapshot status "/var/lib/etcd/$SNAP" -w table
 ~~~
 
-当前镜像里没有 `etcdutl`，所以实际回退到 `etcdctl snapshot status`：
+`etcdctl snapshot status` 已弃用，提示建议改用 `etcdutl snapshot status`。当前镜像中没有 `etcdutl`，所以本次仍使用 `etcdctl` 检查：
 
 ~~~text
 Deprecated: Use `etcdutl snapshot status` instead.
@@ -437,7 +443,6 @@ kubeadm upgrade plan "$TARGET"
 | etcd | 3.5.7-0 | 3.5.12-0 |
 | kubelet | 5 个节点均为 v1.27.0 | v1.27.16（后续逐节点升级） |
 
-旧 kubeadm 查询目标镜像时，etcd 回退到 3.5.7-0；更新 kubeadm 后，upgrade plan 给出的 etcd 目标版本是 3.5.12-0。后续升级按 upgrade plan 执行。
 
 ## 升级 control-plane
 
