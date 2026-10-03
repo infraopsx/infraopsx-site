@@ -164,6 +164,40 @@ test.describe('core site', () => {
     ).toBeVisible();
   });
 
+  test('articles expose clear recurring Patreon support links', async ({ page }) => {
+    await page.goto('/blog/rook-ceph-osd-high-memory-osd-memory-target/');
+
+    const support = page.locator('.article-support');
+    await expect(support.getByRole('heading', { name: 'Support InfraOpsX — $3/month' })).toBeVisible();
+    await expect(support).toContainText('recurring monthly Patreon membership');
+    await expect(support).toContainText('articles and tools remain free');
+
+    const supportLink = support.getByRole('link', { name: 'Support on Patreon →' });
+    await expect(supportLink).toHaveAttribute('href', 'https://www.patreon.com/infraopsx');
+    await expect(supportLink).toHaveAttribute('target', '_blank');
+    await expect(supportLink).toHaveAttribute('rel', 'noopener noreferrer');
+
+    await page.goto('/zh/blog/rook-ceph-osd-high-memory-osd-memory-target/');
+    const zhSupport = page.locator('.article-support');
+    await expect(zhSupport.getByRole('heading', { name: '支持 InfraOpsX — $3/月' })).toBeVisible();
+    await expect(zhSupport).toContainText('Patreon 每月循环订阅');
+    await expect(zhSupport).toContainText('文章和工具仍然免费开放');
+  });
+
+  test('footer exposes Patreon support link', async ({ page }) => {
+    await page.goto('/');
+
+    const supportLink = page.locator('.footer-links').getByRole('link', { name: 'Support' });
+    await expect(supportLink).toHaveAttribute('href', 'https://www.patreon.com/infraopsx');
+    await expect(supportLink).toHaveAttribute('target', '_blank');
+
+    await page.goto('/zh/');
+    await expect(page.locator('.footer-links').getByRole('link', { name: '支持' })).toHaveAttribute(
+      'href',
+      'https://www.patreon.com/infraopsx'
+    );
+  });
+
   test('theme preference can be changed and persisted', async ({ page }) => {
     await page.goto('/');
 
