@@ -6,11 +6,13 @@ const links = isZh
   ? [
       { label: '关于', href: '/zh/about/' },
       { label: '联系', href: '/zh/contact/' },
+      { label: '支持', href: 'https://www.patreon.com/infraopsx', external: true },
       { label: '隐私政策', href: '/zh/privacy/' }
     ]
   : [
       { label: 'About', href: '/about/' },
       { label: 'Contact', href: '/contact/' },
+      { label: 'Support', href: 'https://www.patreon.com/infraopsx', external: true },
       { label: 'Privacy', href: '/privacy/' }
     ];
 ---
@@ -28,7 +30,13 @@ const links = isZh
 
     <div class="footer-links">
       {links.map((item) => (
-        <a href={item.href}>{item.label}</a>
+        <a
+          href={item.href}
+          target={item.external ? '_blank' : undefined}
+          rel={item.external ? 'noopener noreferrer' : undefined}
+        >
+          {item.label}
+        </a>
       ))}
     </div>
   </div>
