@@ -581,7 +581,7 @@ kubectl uncordon master
 control-plane 处理完后，再逐台升级 worker。worker 侧的基本顺序是：
 
 ~~~text
-更新 kubeadm / kubectl
+更新 kubeadm
 → kubeadm upgrade node
 → drain
 → 更新 kubelet
@@ -589,6 +589,8 @@ control-plane 处理完后，再逐台升级 worker。worker 侧的基本顺序�
 → 检查
 → uncordon
 ~~~
+
+`kubeadm upgrade node` 更新本节点的 kubelet 配置，不负责升级 `kubectl`。本次从 v1.27.0 升到 v1.27.16 没有跨 minor；worker 上的 `kubectl v1.27.0` 仍在 API server 的一个 minor 版本偏差范围内，因此这次无需为了版本兼容而逐个更新 worker 上的 kubectl。Kubernetes 官方通用 worker 升级流程会同时更新 kubeadm 和 kubectl，以便在跨 minor 升级过程中保持客户端版本偏差符合支持范围。
 
 各 worker 的重复步骤不再逐台展开，下面只记录 drain 过程中出现的差异。
 
@@ -610,27 +612,7 @@ cannot delete Pods with local storage (use --delete-emptydir-data to override):
   monitoring/prometheus-adapter-...
 ~~~
 
-`emptyDir` 是第一次 `drain` 的直接报错。错误提示可以通过 `--delete-emptydir-data` 继续；由于这会删除 Pod 的本地临时数据，我在决定是否使用这个参数前，先检查 prometheus-adapter 的 PDB，确认驱逐 Pod 是否还会被 PDB 阻止：
-
-~~~bash
-kubectl -n monitoring get pdb prometheus-adapter -o wide
-kubectl -n monitoring describe pdb prometheus-adapter
-~~~
-
-当时的关键状态：
-
-~~~text
-NAME                 MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
-prometheus-adapter   1               N/A               0
-
-Min available:        1
-Allowed disruptions: 0
-Current:             1
-Desired:             1
-Total:               1
-~~~
-
-第一次 drain 直接暴露的是 `emptyDir`；PDB 检查又说明，即使显式允许删除这些临时数据，prometheus-adapter 当前仍然没有可用的 voluntary disruption。两类 blocker 需要分别处理。
+`emptyDir` 是这次 `drain` 报错的直接原因。加上 `--delete-emptydir-data` 可以允许驱逐，但会丢弃这些 Pod 的本地临时数据。
 
 node1 后续完成了 drain 和 kubelet 更新，检查到：
 
@@ -775,5 +757,7 @@ v1.27.16 → v1.28.15
 - <a href="https://kubernetes.io/zh-cn/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27</a>
 - <a href="https://kubernetes.io/zh-cn/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes 补丁版本</a>
 - <a href="https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">升级 kubeadm 集群</a>
+- <a href="https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/" target="_blank" rel="noopener noreferrer">升级 Linux worker 节点</a>
+- <a href="https://kubernetes.io/zh-cn/releases/version-skew-policy/" target="_blank" rel="noopener noreferrer">Kubernetes 版本偏差策略</a>
 - <a href="https://kubernetes.io/zh-cn/docs/reference/config-api/kubeadm-config.v1beta3/" target="_blank" rel="noopener noreferrer">kubeadm 配置（v1beta3）</a>
 - <a href="https://kubernetes.io/zh-cn/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain 参考</a>

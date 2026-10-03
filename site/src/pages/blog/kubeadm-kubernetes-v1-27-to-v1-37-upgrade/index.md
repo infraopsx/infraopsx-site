@@ -578,7 +578,7 @@ The final `kubectl get nodes` output later in the article confirms the master ve
 After the control-plane work was complete, the workers were upgraded one at a time:
 
 ~~~text
-update kubeadm / kubectl
+update kubeadm
 → kubeadm upgrade node
 → drain
 → update kubelet
@@ -586,6 +586,8 @@ update kubeadm / kubectl
 → verify
 → uncordon
 ~~~
+
+`kubeadm upgrade node` updates the node's local kubelet configuration; it does not upgrade `kubectl`. This step moves from v1.27.0 to v1.27.16 without changing the minor version, so a worker's existing `kubectl v1.27.0` remains within one minor version of the API server and does not need to be upgraded on every worker for this patch upgrade. The Kubernetes general worker-upgrade procedure updates kubeadm and kubectl together to keep the client within the supported skew during minor-version upgrades.
 
 The repeated worker steps are not expanded node by node below. Only the drain differences are kept.
 
@@ -607,27 +609,7 @@ cannot delete Pods with local storage (use --delete-emptydir-data to override):
   monitoring/prometheus-adapter-...
 ~~~
 
-`emptyDir` caused the first drain failure. The error suggested `--delete-emptydir-data` as a way to proceed; because that deletes the Pods' local temporary data, I checked the prometheus-adapter PDB before deciding whether to use it, to see whether the PDB would still block eviction:
-
-~~~bash
-kubectl -n monitoring get pdb prometheus-adapter -o wide
-kubectl -n monitoring describe pdb prometheus-adapter
-~~~
-
-Relevant state:
-
-~~~text
-NAME                 MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
-prometheus-adapter   1               N/A               0
-
-Min available:        1
-Allowed disruptions: 0
-Current:             1
-Desired:             1
-Total:               1
-~~~
-
-The first drain directly exposed the `emptyDir` problem. The PDB check showed a second independent blocker: even if deletion of the local temporary data were allowed, prometheus-adapter still had no voluntary disruption available. The two blockers had to be handled separately.
+`emptyDir` was the direct reason for this drain failure. Adding `--delete-emptydir-data` allows the Pods to be evicted but discards their local temporary data.
 
 node1 was later drained and its kubelet updated. The node was then observed as:
 
@@ -772,5 +754,7 @@ v1.27.16 → v1.28.15
 - <a href="https://kubernetes.io/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27 release</a>
 - <a href="https://kubernetes.io/releases/patch-releases/" target="_blank" rel="noopener noreferrer">Kubernetes patch releases</a>
 - <a href="https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/" target="_blank" rel="noopener noreferrer">Upgrading kubeadm clusters</a>
+- <a href="https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/" target="_blank" rel="noopener noreferrer">Upgrading Linux nodes</a>
+- <a href="https://kubernetes.io/releases/version-skew-policy/" target="_blank" rel="noopener noreferrer">Kubernetes version skew policy</a>
 - <a href="https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta3/" target="_blank" rel="noopener noreferrer">kubeadm Configuration (v1beta3)</a>
 - <a href="https://kubernetes.io/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain</a>
