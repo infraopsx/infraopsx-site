@@ -305,8 +305,6 @@ kubectl -n kube-system exec etcd-master -- \
   etcdctl snapshot status "/var/lib/etcd/$SNAP" -w table
 ~~~
 
-`etcdctl snapshot status` 已弃用，提示建议改用 `etcdutl snapshot status`。当前镜像中没有 `etcdutl`，所以本次仍使用 `etcdctl` 检查：
-
 ~~~text
 Deprecated: Use `etcdutl snapshot status` instead.
 
