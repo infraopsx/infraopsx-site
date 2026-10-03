@@ -209,7 +209,14 @@ cp -a /usr/local/bin/kubectl "$BACKUP_DIR/bin/"
 sha256sum \
   "$BACKUP_DIR/bin/kubeadm" \
   "$BACKUP_DIR/bin/kubelet" \
-  "$BACKUP_DIR/bin/kubectl"
+  "$BACKUP_DIR/bin/kubectl" \
+  | tee "$BACKUP_DIR/logs/02-old-binary-sha256.txt"
+~~~
+
+The SHA256 values were printed to the terminal and saved to:
+
+~~~text
+/root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/logs/02-old-binary-sha256.txt
 ~~~
 
 Archive `/etc/kubernetes` and the kubelet-related configuration as well:
