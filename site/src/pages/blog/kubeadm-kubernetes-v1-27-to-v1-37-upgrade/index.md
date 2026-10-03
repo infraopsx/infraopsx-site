@@ -318,16 +318,6 @@ Deprecated: Use `etcdutl snapshot status` instead.
 +----------+----------+------------+------------+
 ~~~
 
-Checksum the backup copy:
-
-~~~bash
-sha256sum "$BACKUP_DIR/etcd/$SNAP"
-~~~
-
-~~~text
-128caa1e419caffa7ea030e850dfd3bfa01105e5622338bb6a27dc8ffd82f967  /root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/etcd/etcd-before-v1.27.16-20261002-155639.db
-~~~
-
 After confirming both the temporary snapshot and backup copy existed, remove the temporary file from `/var/lib/etcd`:
 
 ~~~bash
