@@ -476,18 +476,6 @@ kube-controller-manager-master registry.aliyuncs.com/google_containers/kube-cont
 kube-scheduler-master          registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
 ~~~
 
-In the same check, kube-proxy was still in a rolling-update transition: both v1.27.0 and v1.27.16 images were present, and the new master kube-proxy Pod was still `ContainerCreating`.
-
-The etcd status had changed from 3.5.7 to:
-
-~~~text
-+------------------------+---------+---------+-----------+------------+--------+
-|        ENDPOINT        | VERSION | DB SIZE | IS LEADER | IS LEARNER | ERRORS |
-+------------------------+---------+---------+-----------+------------+--------+
-| https://127.0.0.1:2379 |  3.5.12 |   19 MB |      true |      false |        |
-+------------------------+---------+---------+-----------+------------+--------+
-~~~
-
 The node versions were still unchanged:
 
 ~~~bash
@@ -505,7 +493,7 @@ node4    Ready    worker          260d   v1.27.0
 
 The VERSION column in `kubectl get nodes` is the kubelet version, so it remains v1.27.0 until the kubelet is upgraded separately.
 
-### Certificate renewal
+### Certificates were also renewed automatically
 
 Before the upgrade:
 
@@ -542,7 +530,48 @@ scheduler.conf             Oct 02, 2027 08:23 UTC   364d
 
 After `kubeadm upgrade apply`, the control-plane components were on v1.27.16, but `kubectl get nodes` still showed the master kubelet on v1.27.0.
 
-The master was then drained, `/usr/local/bin/kubelet` and `/usr/local/bin/kubectl` were replaced with the verified v1.27.16 binaries, kubelet was restarted, and the node was uncordoned after checks. The final `kubectl get nodes` output later in the article confirms the master node version together with the workers.
+The master was drained as part of the maintenance sequence. I downloaded the Linux amd64 v1.27.16 kubelet and kubectl binaries from the Kubernetes release download site, verified each binary against its SHA256 file, and installed them under `/usr/local/bin`. I then restarted kubelet, checked the versions and node status, and uncordoned the master after confirming it was ready.
+
+~~~bash
+set -euo pipefail
+
+TARGET=v1.27.16
+ARCH=amd64
+
+for binary in kubelet kubectl; do
+  curl -fL \
+    "https://dl.k8s.io/release/${TARGET}/bin/linux/${ARCH}/${binary}" \
+    -o "/tmp/${binary}-${TARGET}"
+
+  curl -fL \
+    "https://dl.k8s.io/release/${TARGET}/bin/linux/${ARCH}/${binary}.sha256" \
+    -o "/tmp/${binary}-${TARGET}.sha256"
+
+  EXPECTED="$(cat "/tmp/${binary}-${TARGET}.sha256")"
+  printf '%s  %s\n' "$EXPECTED" "/tmp/${binary}-${TARGET}" | sha256sum -c -
+
+  install -o root -g root -m 0755 \
+    "/tmp/${binary}-${TARGET}" \
+    "/usr/local/bin/${binary}"
+done
+~~~
+
+Restart kubelet and verify the installed versions and master node status:
+
+~~~bash
+systemctl restart kubelet
+kubelet --version
+kubectl version
+kubectl get node master
+~~~
+
+After confirming the node is ready, uncordon the master:
+
+~~~bash
+kubectl uncordon master
+~~~
+
+The final `kubectl get nodes` output later in the article confirms the master version together with the workers.
 
 ## Upgrade kubelet and workers
 
@@ -578,7 +607,7 @@ cannot delete Pods with local storage (use --delete-emptydir-data to override):
   monitoring/prometheus-adapter-...
 ~~~
 
-The prometheus-adapter PDB was then checked:
+`emptyDir` caused the first drain failure. The error suggested `--delete-emptydir-data` as a way to proceed; because that deletes the Pods' local temporary data, I checked the prometheus-adapter PDB before deciding whether to use it, to see whether the PDB would still block eviction:
 
 ~~~bash
 kubectl -n monitoring get pdb prometheus-adapter -o wide

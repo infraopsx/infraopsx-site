@@ -475,18 +475,6 @@ kube-controller-manager-master registry.aliyuncs.com/google_containers/kube-cont
 kube-scheduler-master          registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
 ~~~
 
-同一份检查里，kube-proxy 还同时存在 v1.27.0 和 v1.27.16，master 上的新 kube-proxy Pod 处于 `ContainerCreating`。也就是说 apply 已经成功，但 kube-proxy 的滚动更新当时还没完全结束。
-
-etcd 状态也已经从 3.5.7 变为：
-
-~~~text
-+------------------------+---------+---------+-----------+------------+--------+
-|        ENDPOINT        | VERSION | DB SIZE | IS LEADER | IS LEARNER | ERRORS |
-+------------------------+---------+---------+-----------+------------+--------+
-| https://127.0.0.1:2379 |  3.5.12 |   19 MB |      true |      false |        |
-+------------------------+---------+---------+-----------+------------+--------+
-~~~
-
 然后看节点：
 
 ~~~bash
@@ -506,7 +494,7 @@ node4    Ready    worker          260d   v1.27.0
 
 这是因为 `kubectl get nodes` 的 VERSION 显示的是 kubelet 版本。
 
-### 证书也被续期
+### 证书也被自动续期
 
 升级前：
 
@@ -545,7 +533,48 @@ scheduler.conf             Oct 02, 2027 08:23 UTC   364d
 
 `kubeadm upgrade apply` 完成后，control-plane 组件已经是 v1.27.16，但 `kubectl get nodes` 仍显示 master 的 kubelet 是 v1.27.0。
 
-master 后续按维护顺序完成了 drain，替换 `/usr/local/bin/kubelet` 和 `/usr/local/bin/kubectl` 为已校验的 v1.27.16 二进制，重启 kubelet，检查节点状态后再 uncordon。最终的 `kubectl get nodes` 结果放在文末统一确认。
+master 后续按维护顺序完成 drain。kubelet 和 kubectl 的 Linux amd64 v1.27.16 二进制从 Kubernetes 官方下载站获取，分别使用对应的 SHA256 文件校验后，安装到 `/usr/local/bin` 覆盖旧版本。重启 kubelet，检查版本和节点状态后，再将 master uncordon。
+
+~~~bash
+set -euo pipefail
+
+TARGET=v1.27.16
+ARCH=amd64
+
+for binary in kubelet kubectl; do
+  curl -fL \
+    "https://dl.k8s.io/release/${TARGET}/bin/linux/${ARCH}/${binary}" \
+    -o "/tmp/${binary}-${TARGET}"
+
+  curl -fL \
+    "https://dl.k8s.io/release/${TARGET}/bin/linux/${ARCH}/${binary}.sha256" \
+    -o "/tmp/${binary}-${TARGET}.sha256"
+
+  EXPECTED="$(cat "/tmp/${binary}-${TARGET}.sha256")"
+  printf '%s  %s\n' "$EXPECTED" "/tmp/${binary}-${TARGET}" | sha256sum -c -
+
+  install -o root -g root -m 0755 \
+    "/tmp/${binary}-${TARGET}" \
+    "/usr/local/bin/${binary}"
+done
+~~~
+
+重启 kubelet，检查二进制版本和 master 节点状态：
+
+~~~bash
+systemctl restart kubelet
+kubelet --version
+kubectl version
+kubectl get node master
+~~~
+
+确认节点已恢复 Ready 后，再 uncordon master：
+
+~~~bash
+kubectl uncordon master
+~~~
+
+最终的 `kubectl get nodes` 结果会在文末统一确认。
 
 ## 升级 kubelet 和 worker
 
@@ -581,7 +610,7 @@ cannot delete Pods with local storage (use --delete-emptydir-data to override):
   monitoring/prometheus-adapter-...
 ~~~
 
-随后检查 prometheus-adapter 的 PDB：
+`emptyDir` 是第一次 `drain` 的直接报错。错误提示可以通过 `--delete-emptydir-data` 继续；由于这会删除 Pod 的本地临时数据，我在决定是否使用这个参数前，先检查 prometheus-adapter 的 PDB，确认驱逐 Pod 是否还会被 PDB 阻止：
 
 ~~~bash
 kubectl -n monitoring get pdb prometheus-adapter -o wide
