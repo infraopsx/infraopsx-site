@@ -184,13 +184,19 @@ kubeadm config images list \
   --image-repository registry.aliyuncs.com/google_containers
 ~~~
 
-The etcd mapping fell back to:
+Relevant output:
 
 ~~~text
 could not find officially supported version of etcd for Kubernetes v1.27.16,
 falling back to the nearest etcd version (3.5.7-0)
-...
+
+registry.aliyuncs.com/google_containers/kube-apiserver:v1.27.16
+registry.aliyuncs.com/google_containers/kube-controller-manager:v1.27.16
+registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
+registry.aliyuncs.com/google_containers/kube-proxy:v1.27.16
+registry.aliyuncs.com/google_containers/pause:3.9
 registry.aliyuncs.com/google_containers/etcd:3.5.7-0
+registry.aliyuncs.com/google_containers/coredns:v1.10.1
 ~~~
 
 Back up the current binaries and record their checksums:
@@ -301,7 +307,7 @@ kubectl -n kube-system exec etcd-master -- \
   etcdctl snapshot status "/var/lib/etcd/$SNAP" -w table
 ~~~
 
-The image did not contain `etcdutl`, so this run fell back to `etcdctl snapshot status`:
+`etcdctl snapshot status` is deprecated and recommends `etcdutl snapshot status` instead. This image did not include `etcdutl`, so this run still used `etcdctl` for the check:
 
 ~~~text
 Deprecated: Use `etcdutl snapshot status` instead.
@@ -438,7 +444,6 @@ The version information from the upgrade plan is summarized below:
 | etcd | 3.5.7-0 | 3.5.12-0 |
 | kubelet | all 5 nodes on v1.27.0 | v1.27.16 (upgraded node by node later) |
 
-With the old kubeadm binary, the target image lookup fell back to etcd 3.5.7-0. After updating kubeadm, the upgrade plan selected etcd 3.5.12-0. The upgrade then followed the versions shown by that plan.
 
 ## Upgrade the control-plane
 
