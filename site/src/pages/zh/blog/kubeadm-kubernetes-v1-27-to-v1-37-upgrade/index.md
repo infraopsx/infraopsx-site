@@ -174,29 +174,6 @@ kubectl get pods -A \
   > "$BACKUP_DIR/config/images-before.txt"
 ~~~
 
-这时 kubeadm 还是 v1.27.0。用它记录一次 v1.27.16 的目标镜像：
-
-~~~bash
-kubeadm config images list \
-  --kubernetes-version v1.27.16 \
-  --image-repository registry.aliyuncs.com/google_containers
-~~~
-
-关键输出：
-
-~~~text
-could not find officially supported version of etcd for Kubernetes v1.27.16,
-falling back to the nearest etcd version (3.5.7-0)
-
-registry.aliyuncs.com/google_containers/kube-apiserver:v1.27.16
-registry.aliyuncs.com/google_containers/kube-controller-manager:v1.27.16
-registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
-registry.aliyuncs.com/google_containers/kube-proxy:v1.27.16
-registry.aliyuncs.com/google_containers/pause:3.9
-registry.aliyuncs.com/google_containers/etcd:3.5.7-0
-registry.aliyuncs.com/google_containers/coredns:v1.10.1
-~~~
-
 再备份当前三个二进制并记录 SHA256：
 
 ~~~bash
@@ -423,7 +400,33 @@ imageRepository: registry.aliyuncs.com/google_containers
 kubernetesVersion: v1.27.0
 ~~~
 
-因此下面的 `kubeadm upgrade apply` 没有额外传 `--image-repository`。这个集群的 kubeadm 配置已经把镜像仓库设为 `registry.aliyuncs.com/google_containers`；没有自定义 `imageRepository` 时，kubeadm 默认使用 `registry.k8s.io`。
+使用更新后的 kubeadm v1.27.16 查看本次升级所需镜像：
+
+~~~bash
+kubeadm config images list \
+  --kubernetes-version v1.27.16 \
+  --image-repository registry.aliyuncs.com/google_containers
+~~~
+
+实际输出：
+
+~~~text
+registry.aliyuncs.com/google_containers/kube-apiserver:v1.27.16
+registry.aliyuncs.com/google_containers/kube-controller-manager:v1.27.16
+registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
+registry.aliyuncs.com/google_containers/kube-proxy:v1.27.16
+registry.aliyuncs.com/google_containers/pause:3.9
+registry.aliyuncs.com/google_containers/etcd:3.5.12-0
+registry.aliyuncs.com/google_containers/coredns:v1.10.1
+~~~
+
+确认镜像列表无误后，提前拉取镜像：
+
+~~~bash
+kubeadm config images pull \
+  --kubernetes-version v1.27.16 \
+  --image-repository registry.aliyuncs.com/google_containers
+~~~
 
 先做 dry-run：
 

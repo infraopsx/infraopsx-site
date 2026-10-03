@@ -176,29 +176,6 @@ kubectl get pods -A \
   > "$BACKUP_DIR/config/images-before.txt"
 ~~~
 
-At this point kubeadm was still v1.27.0. I also recorded how that binary mapped the v1.27.16 target images:
-
-~~~bash
-kubeadm config images list \
-  --kubernetes-version v1.27.16 \
-  --image-repository registry.aliyuncs.com/google_containers
-~~~
-
-Relevant output:
-
-~~~text
-could not find officially supported version of etcd for Kubernetes v1.27.16,
-falling back to the nearest etcd version (3.5.7-0)
-
-registry.aliyuncs.com/google_containers/kube-apiserver:v1.27.16
-registry.aliyuncs.com/google_containers/kube-controller-manager:v1.27.16
-registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
-registry.aliyuncs.com/google_containers/kube-proxy:v1.27.16
-registry.aliyuncs.com/google_containers/pause:3.9
-registry.aliyuncs.com/google_containers/etcd:3.5.7-0
-registry.aliyuncs.com/google_containers/coredns:v1.10.1
-~~~
-
 Back up the current binaries and record their checksums:
 
 ~~~bash
@@ -424,7 +401,33 @@ imageRepository: registry.aliyuncs.com/google_containers
 kubernetesVersion: v1.27.0
 ~~~
 
-That is why `kubeadm upgrade apply` below does not pass a separate `--image-repository` flag. This cluster already has `imageRepository` set to `registry.aliyuncs.com/google_containers`; without a custom image repository, kubeadm defaults to `registry.k8s.io`.
+Use the updated kubeadm v1.27.16 binary to list the images required for this upgrade:
+
+~~~bash
+kubeadm config images list \
+  --kubernetes-version v1.27.16 \
+  --image-repository registry.aliyuncs.com/google_containers
+~~~
+
+Output:
+
+~~~text
+registry.aliyuncs.com/google_containers/kube-apiserver:v1.27.16
+registry.aliyuncs.com/google_containers/kube-controller-manager:v1.27.16
+registry.aliyuncs.com/google_containers/kube-scheduler:v1.27.16
+registry.aliyuncs.com/google_containers/kube-proxy:v1.27.16
+registry.aliyuncs.com/google_containers/pause:3.9
+registry.aliyuncs.com/google_containers/etcd:3.5.12-0
+registry.aliyuncs.com/google_containers/coredns:v1.10.1
+~~~
+
+After checking the image list, pull the images:
+
+~~~bash
+kubeadm config images pull \
+  --kubernetes-version v1.27.16 \
+  --image-repository registry.aliyuncs.com/google_containers
+~~~
 
 First run a dry run:
 
