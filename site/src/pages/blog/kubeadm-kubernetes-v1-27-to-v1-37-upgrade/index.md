@@ -344,7 +344,7 @@ ls -lh \
 rm -f "/var/lib/etcd/$SNAP"
 ~~~
 
-Finally, generate and verify a checksum list for the whole checkpoint:
+Finally, generate a SHA256 checksum list for the whole checkpoint so it can be verified later after copying the backup or before a restore:
 
 ~~~bash
 (
@@ -354,27 +354,6 @@ Finally, generate and verify a checksum list for the whole checkpoint:
     | xargs -0 sha256sum \
     > SHA256SUMS
 )
-
-cd "$BACKUP_DIR"
-sha256sum -c SHA256SUMS
-~~~
-
-Cropped result:
-
-~~~text
-./bin/kubeadm: OK
-./bin/kubectl: OK
-./bin/kubelet: OK
-./config/images-before.txt: OK
-./config/kubeadm-config.yaml: OK
-./config/kubelet-config.yaml: OK
-./config/nodes.yaml: OK
-./config/pv.yaml: OK
-./config/pvc.yaml: OK
-./config/workloads.yaml: OK
-./etc-kubernetes.tar.gz: OK
-./etcd/etcd-before-v1.27.16-20261002-155639.db: OK
-./kubelet-config.tar.gz: OK
 ~~~
 
 ## Update the kubeadm tool, then run the upgrade plan
