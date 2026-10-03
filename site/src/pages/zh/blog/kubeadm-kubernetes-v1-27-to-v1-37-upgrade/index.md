@@ -316,16 +316,6 @@ Deprecated: Use `etcdutl snapshot status` instead.
 +----------+----------+------------+------------+
 ~~~
 
-备份副本的 SHA256：
-
-~~~bash
-sha256sum "$BACKUP_DIR/etcd/$SNAP"
-~~~
-
-~~~text
-128caa1e419caffa7ea030e850dfd3bfa01105e5622338bb6a27dc8ffd82f967  /root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/etcd/etcd-before-v1.27.16-20261002-155639.db
-~~~
-
 确认 host 上的临时 snapshot 和备份副本都存在后，删除 `/var/lib/etcd` 下的临时文件：
 
 ~~~bash
