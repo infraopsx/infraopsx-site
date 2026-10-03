@@ -207,7 +207,14 @@ cp -a /usr/local/bin/kubectl "$BACKUP_DIR/bin/"
 sha256sum \
   "$BACKUP_DIR/bin/kubeadm" \
   "$BACKUP_DIR/bin/kubelet" \
-  "$BACKUP_DIR/bin/kubectl"
+  "$BACKUP_DIR/bin/kubectl" \
+  | tee "$BACKUP_DIR/logs/02-old-binary-sha256.txt"
+~~~
+
+SHA256 同时输出到终端，并保存到：
+
+~~~text
+/root/k8s-upgrade-backup/20261002-155639-before-v1.27.16/logs/02-old-binary-sha256.txt
 ~~~
 
 同时归档 `/etc/kubernetes` 和 kubelet 相关配置：
