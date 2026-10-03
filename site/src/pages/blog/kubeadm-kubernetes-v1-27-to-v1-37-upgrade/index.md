@@ -206,7 +206,7 @@ sha256sum \
   "$BACKUP_DIR/bin/kubectl"
 ~~~
 
-The original terminal log used `tar -C /` with relative paths. The equivalent absolute-path form below represents the same archive contents:
+Archive `/etc/kubernetes` and the kubelet-related configuration as well:
 
 ~~~bash
 tar -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
@@ -426,7 +426,7 @@ After confirming that the local kubeadm binary is v1.27.16 while the cluster is 
 kubeadm upgrade plan "$TARGET"
 ~~~
 
-The original plan output is lengthy. The table below is a summary of the version information shown by that plan, not a verbatim kubeadm output block:
+The version information from the upgrade plan is summarized below:
 
 | Component | Current | Target |
 | --- | --- | --- |
@@ -436,9 +436,9 @@ The original plan output is lengthy. The table below is a summary of the version
 | kube-proxy | v1.27.0 | v1.27.16 |
 | CoreDNS | v1.10.1 | v1.10.1 |
 | etcd | 3.5.7-0 | 3.5.12-0 |
-| kubelet | 5 × v1.27.0 | v1.27.16 (upgraded node by node later) |
+| kubelet | all 5 nodes on v1.27.0 | v1.27.16 (upgraded node by node later) |
 
-This differs from the earlier `config images list` run with kubeadm v1.27.0: the old binary fell back to etcd 3.5.7-0, while the v1.27.16 kubeadm upgrade plan selected etcd 3.5.12-0. The later upgrade steps therefore followed the target kubeadm's upgrade plan.
+With the old kubeadm binary, the target image lookup fell back to etcd 3.5.7-0. After updating kubeadm, the upgrade plan selected etcd 3.5.12-0. The upgrade then followed the versions shown by that plan.
 
 ## Upgrade the control-plane
 
