@@ -204,7 +204,7 @@ sha256sum \
   "$BACKUP_DIR/bin/kubectl"
 ~~~
 
-原始日志里的 tar 使用 `-C /` 配合相对路径。下面用等价的绝对路径写法表示同一批归档内容：
+同时归档 `/etc/kubernetes` 和 kubelet 相关配置：
 
 ~~~bash
 tar -czf "$BACKUP_DIR/etc-kubernetes.tar.gz" \
@@ -425,7 +425,7 @@ Server Version: ... GitVersion:"v1.27.0" ...
 kubeadm upgrade plan "$TARGET"
 ~~~
 
-plan 原始输出较长。下面不是 kubeadm 的原样输出，而是根据当时 plan 中显示的版本信息整理：
+将 upgrade plan 中的版本信息整理如下：
 
 | 组件 | 当前版本 | 目标版本 |
 | --- | --- | --- |
@@ -435,9 +435,9 @@ plan 原始输出较长。下面不是 kubeadm 的原样输出，而是根据当
 | kube-proxy | v1.27.0 | v1.27.16 |
 | CoreDNS | v1.10.1 | v1.10.1 |
 | etcd | 3.5.7-0 | 3.5.12-0 |
-| kubelet | 5 × v1.27.0 | v1.27.16（需要后续逐节点升级） |
+| kubelet | 5 个节点均为 v1.27.0 | v1.27.16（后续逐节点升级） |
 
-这里和前面旧 kubeadm 的 `config images list` 有一个明显差异：旧 kubeadm 对 v1.27.16 的 etcd 映射 fallback 到 3.5.7-0，而 v1.27.16 kubeadm 的 upgrade plan 给出的目标是 3.5.12-0。后续以目标版本 kubeadm 的 upgrade plan 为准。
+旧 kubeadm 查询目标镜像时，etcd 回退到 3.5.7-0；更新 kubeadm 后，upgrade plan 给出的 etcd 目标版本是 3.5.12-0。后续升级按 upgrade plan 执行。
 
 ## 升级 control-plane
 
