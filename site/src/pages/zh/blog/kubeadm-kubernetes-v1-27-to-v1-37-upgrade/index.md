@@ -41,7 +41,7 @@ v1.27.16
 
 当前集群是 `v1.27.0`。这次先不跨到 1.28，而是先把 1.27.0 补到 1.27 系列最后一个 patch：`v1.27.16`。
 
-Kubernetes 官方发布记录显示，1.27 系列最后一个 patch 版本是 1.27.16。kubeadm 不支持跳过 minor 版本升级，例如不能从 1.27 直接跳到 1.29，所以后面的路线会按 1.28、1.29……逐个 minor 往前走。
+Kubernetes 官方发布记录显示，1.27 系列最后一个 patch 版本是 1.27.16。kubeadm 不支持跳过 minor 版本升级，例如不能从 1.27 直接升级到 1.29，所以后面的路线会按 1.28、1.29……逐个 minor 往前走。
 
 ~~~text
 1.27.0
@@ -62,7 +62,7 @@ Kubernetes 官方发布记录显示，1.27 系列最后一个 patch 版本是 1.
 kubectl get nodes -o wide
 ~~~
 
-当时的输出：
+关键输出：
 
 ~~~text
 NAME     STATUS   ROLES           AGE    VERSION   INTERNAL-IP    OS-IMAGE                         KERNEL-VERSION   CONTAINER-RUNTIME
@@ -97,7 +97,7 @@ command -v kubeadm kubelet kubectl
 systemctl cat kubelet
 ~~~
 
-裁剪后的输出：
+关键输出：
 
 ~~~text
 /usr/local/bin/kubeadm
@@ -110,9 +110,7 @@ ExecStart=/usr/local/bin/kubelet
 ExecStart=/usr/local/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
 ~~~
 
-升级前实际检查到的三个二进制都在 `/usr/local/bin`，kubelet 的 systemd service 也从这个路径启动，因此这次升级按现有路径替换二进制。
-
-升级前 API readiness 正常：
+升级前 API readiness 状态：
 
 ~~~bash
 kubectl get --raw='/readyz?verbose'
@@ -130,7 +128,7 @@ readyz check passed
 
 ## 先做备份和 etcd snapshot
 
-先生成本次 checkpoint 的目录和 snapshot 文件名：
+生成 checkpoint 目录和 snapshot 文件名：
 
 ~~~bash
 TS="$(date +%Y%m%d-%H%M%S)"
@@ -348,7 +346,7 @@ cd "$BACKUP_DIR"
 sha256sum -c SHA256SUMS
 ~~~
 
-裁剪后的结果：
+关键输出：
 
 ~~~text
 ./bin/kubeadm: OK
@@ -366,11 +364,11 @@ sha256sum -c SHA256SUMS
 ./kubelet-config.tar.gz: OK
 ~~~
 
-## 先更新 kubeadm 工具，再执行 upgrade plan
+## 先更新 kubeadm 到 v1.27.16，再执行 upgrade plan
 
-这一步只更新 control-plane 节点上的 kubeadm 工具本身，集群还没有开始升级。
+这一步只把 control-plane 节点上的 kubeadm 更新到 v1.27.16，集群本身还没有升级。
 
-当时先下载目标版本 kubeadm 和官方 SHA256 文件：
+先下载目标版本 kubeadm 和 SHA256 文件：
 
 ~~~bash
 TARGET=v1.27.16
@@ -403,14 +401,14 @@ install -o root -g root -m 0755 \
   /usr/local/bin/kubeadm
 ~~~
 
-替换后先确认工具版本和集群版本：
+替换后确认 kubeadm 版本和集群版本：
 
 ~~~bash
 kubeadm version -o short
 kubectl version
 ~~~
 
-裁剪后的输出：
+关键输出：
 
 ~~~text
 v1.27.16
@@ -418,10 +416,8 @@ v1.27.16
 Server Version: ... GitVersion:"v1.27.0" ...
 ~~~
 
-这里的两个版本并不冲突：
-
-- `kubeadm v1.27.16`：刚刚替换的是本机升级工具；
-- `Server v1.27.0`：集群 control-plane 还没有执行 `kubeadm upgrade apply`。
+- `kubeadm v1.27.16`：本机 kubeadm 当前版本；
+- `Server v1.27.0`：集群当前版本。
 
 确认本机 kubeadm 已经是 v1.27.16，而集群仍然是 v1.27.0 后，生成升级计划：
 
@@ -648,7 +644,7 @@ node3 第一次 drain 也没有一次成功：
 kubectl drain node3 --ignore-daemonsets --timeout=5m
 ~~~
 
-裁剪后的输出：
+关键输出：
 
 ~~~text
 node/node3 cordoned
