@@ -342,7 +342,7 @@ ls -lh \
 rm -f "/var/lib/etcd/$SNAP"
 ~~~
 
-最后为整个 checkpoint 生成并验证校验清单：
+最后为整个 checkpoint 生成 SHA256 校验清单，供后续复制备份或恢复前校验：
 
 ~~~bash
 (
@@ -352,27 +352,6 @@ rm -f "/var/lib/etcd/$SNAP"
     | xargs -0 sha256sum \
     > SHA256SUMS
 )
-
-cd "$BACKUP_DIR"
-sha256sum -c SHA256SUMS
-~~~
-
-关键输出：
-
-~~~text
-./bin/kubeadm: OK
-./bin/kubectl: OK
-./bin/kubelet: OK
-./config/images-before.txt: OK
-./config/kubeadm-config.yaml: OK
-./config/kubelet-config.yaml: OK
-./config/nodes.yaml: OK
-./config/pv.yaml: OK
-./config/pvc.yaml: OK
-./config/workloads.yaml: OK
-./etc-kubernetes.tar.gz: OK
-./etcd/etcd-before-v1.27.16-20261002-155639.db: OK
-./kubelet-config.tar.gz: OK
 ~~~
 
 ## 先更新 kubeadm 到 v1.27.16，再执行 upgrade plan
