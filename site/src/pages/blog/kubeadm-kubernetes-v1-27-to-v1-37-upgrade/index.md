@@ -839,7 +839,7 @@ The actual plan was:
 
 ### Upgrade the control-plane
 
-After pre-pulling the target images, I ran a dry run first:
+Before the actual upgrade, I ran a dry run first:
 
 ~~~bash
 kubeadm upgrade apply v1.28.15 --dry-run --yes
