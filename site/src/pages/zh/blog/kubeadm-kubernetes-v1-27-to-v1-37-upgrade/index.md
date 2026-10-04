@@ -694,7 +694,17 @@ prometheus-k8s-db => PVC= hostPath= emptyDir={}
 
 这说明当时的 Prometheus TSDB 没有使用 PVC，而是放在 Pod 的 `emptyDir` 中。也就是说，node2 上同时存在两个独立问题：PDB 阻止正常 eviction，而一旦删除并重建这个 Pod，原来的本地 TSDB 历史数据也不会跟着 Pod 一起迁移。
 
-这个测试集群最终完成了 node2 升级；如果在生产环境遇到同样的布局，应该先确认 Prometheus 的持久化和副本策略，再决定怎样处理 PDB，而不是直接绕过保护继续 drain。
+这个测试集群里采用的是临时放宽 PDB 的方式：先保存原 PDB，把 `prometheus-k8s` 的 `minAvailable` 从 `1` 临时改成 `0`，完成 node2 的 drain 后再恢复原 PDB。整个处理顺序是：
+
+~~~text
+保存原 PDB
+→ 临时将 minAvailable: 1 调整为 0
+→ 重新 drain node2
+→ 完成节点维护
+→ 恢复原 PDB
+~~~
+
+这里之所以能接受这种处理，是因为这是测试集群，而且已经确认 Prometheus TSDB 使用的是 `emptyDir`，本轮维护可以接受历史数据丢失。生产环境如果遇到同样的布局，应该先处理 Prometheus 的持久化和副本策略，再决定怎样调整 PDB，而不是直接放宽保护继续 drain。
 
 ### node3 和 node4：继续按相同方式处理 emptyDir
 
