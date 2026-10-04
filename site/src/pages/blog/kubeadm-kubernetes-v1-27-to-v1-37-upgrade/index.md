@@ -622,12 +622,18 @@ At that point only expected DaemonSet Pods such as Calico, kube-proxy, and node-
 
 ### node2, node3, and node4: the same drain problem appeared again
 
-node2 was actually the last of these workers to be handled, but this section records them in node-number order.
-
 The first node2 drain was:
 
 ~~~bash
 kubectl drain node2 --ignore-daemonsets
+~~~
+
+Relevant output:
+
+~~~text
+node/node2 cordoned
+cannot delete Pods with local storage:
+  kube-system/metrics-server-...
 ~~~
 
 It also did not complete on the first attempt and hit the same class of local-storage drain blocker seen on the other workers. It is therefore kept in this shared section rather than expanded into a separate troubleshooting section.
