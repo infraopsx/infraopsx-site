@@ -778,7 +778,8 @@ node4    Ready    worker          261d   v1.27.16
 因此这里不是直接拿新版 manifest 覆盖，而是在 v3.27.5 manifest 中保留这项配置后再应用：
 
 ~~~bash
-kubectl apply --server-side --force-conflicts   -f calico-v3.27.5-custom.yaml
+kubectl apply --server-side --force-conflicts \
+  -f calico-v3.27.5-custom.yaml
 ~~~
 
 等待两个组件完成 rollout：
@@ -799,7 +800,9 @@ Calico                      v3.27.5
 再确认自定义自动探测方式仍然存在：
 
 ~~~bash
-kubectl -n kube-system get daemonset calico-node   -o jsonpath='{range .spec.template.spec.containers[?(@.name=="calico-node")].env[*]}{.name}={.value}{"\n"}{end}'   | grep -E '^IP=|^IP_AUTODETECTION_METHOD='
+kubectl -n kube-system get daemonset calico-node \
+  -o jsonpath='{range .spec.template.spec.containers[?(@.name=="calico-node")].env[*]}{.name}={.value}{"\n"}{end}' \
+  | grep -E '^IP=|^IP_AUTODETECTION_METHOD='
 ~~~
 
 ~~~text
@@ -862,7 +865,9 @@ kubeadm upgrade apply v1.28.15 --yes
 master 的 drain 继续沿用前文已经确认过的 emptyDir 处理方式，不再重复制造一次相同的失败：
 
 ~~~bash
-kubectl drain master   --ignore-daemonsets   --delete-emptydir-data
+kubectl drain master \
+  --ignore-daemonsets \
+  --delete-emptydir-data
 ~~~
 
 随后按前文相同方式更新 kubelet 和 kubectl，重启 kubelet。检查到 master 为 `Ready,SchedulingDisabled` 且 kubelet 已经是 v1.28.15 后再执行：
@@ -959,7 +964,8 @@ readyz check passed
 同时检查所有 namespace 中没有异常状态的 Pod：
 
 ~~~bash
-kubectl get pods -A --no-headers |   awk '$4 != "Running" && $4 != "Completed" {print}'
+kubectl get pods -A --no-headers | \
+  awk '$4 != "Running" && $4 != "Completed" {print}'
 ~~~
 
 这次输出为空。
@@ -971,7 +977,11 @@ kubectl get pods -A --no-headers |   awk '$4 != "Running" && $4 != "Completed" {
 先验证集群 DNS：
 
 ~~~bash
-kubectl run dns-smoke-test   --image=busybox:1.36   --restart=Never   --command --   nslookup kubernetes.default.svc.cluster.local
+kubectl run dns-smoke-test \
+  --image=busybox:1.36 \
+  --restart=Never \
+  --command -- \
+  nslookup kubernetes.default.svc.cluster.local
 
 kubectl logs dns-smoke-test
 ~~~
@@ -987,9 +997,15 @@ Address: 10.96.0.1
 然后用带正常 TLS 支持的 curl 容器访问 Kubernetes API Service。命令只输出 API 返回内容，不使用 verbose 模式，避免把 ServiceAccount token 打到日志里：
 
 ~~~bash
-kubectl run api-smoke-test   --image=curlimages/curl:8.10.1   --restart=Never   --command -- sh -c '
+kubectl run api-smoke-test \
+  --image=curlimages/curl:8.10.1 \
+  --restart=Never \
+  --command -- sh -c '
     TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
-    curl -sS       --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt       -H "Authorization: Bearer ${TOKEN}"       https://kubernetes.default.svc/version
+    curl -sS \
+      --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+      -H "Authorization: Bearer ${TOKEN}" \
+      https://kubernetes.default.svc/version
   '
 
 kubectl logs api-smoke-test
