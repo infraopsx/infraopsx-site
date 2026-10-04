@@ -673,9 +673,18 @@ node-exporter-...
 
 这些输出说明，前一台节点上的 Pod 被驱逐后会被重新调度到其他尚未维护的节点，所以后面的 drain 可能再次遇到相同 blocker。
 
-### node2：保留的 Prometheus 检查记录
+### node2：先 drain，再由报错定位到 Prometheus
 
-本轮记录把 node2 留到最后，并保留了对 `prometheus-k8s` 的 PDB 和 volume 检查。但现有记录没有附上 `drain node2` 的失败输出，也没有说明为什么先查 Prometheus。因此下面只是检查结果，不能当作已确认的 node2 drain blocker。
+node2 是本轮最后处理的 worker。到这里，前面几个节点已经遇到过 `emptyDir`，因此处理 node2 时继续按相同的维护流程先执行 drain，而不是预先假定 Prometheus 会有问题。
+
+~~~bash
+kubectl drain node2 \
+  --ignore-daemonsets \
+  --delete-emptydir-data \
+  --timeout=5m
+~~~
+
+这次 drain 没有正常完成。正是在看到 drain 的实际报错以后，排查方向才转到 `monitoring/prometheus-k8s-0`；也就是说，下面的 PDB 和 volume 检查都是 **drain 失败后的故障定位**，不是 node2 升级前的固定预检查。
 
 先看 PDB：
 
@@ -688,7 +697,9 @@ NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
 prometheus-k8s   1               N/A               0
 ~~~
 
-再看存储资源：
+这里的关键值是 `ALLOWED DISRUPTIONS=0`。在当时这个状态下，`prometheus-k8s-0` 不能通过正常 eviction 被驱逐，这与 drain 中出现的 Prometheus 驱逐问题一致。
+
+接着检查它的数据到底放在哪里，先看 PVC、StorageClass 和 PV：
 
 ~~~bash
 kubectl -n monitoring get pvc
@@ -696,7 +707,7 @@ kubectl get storageclass
 kubectl get pv
 ~~~
 
-这三条命令的输出是：
+实际输出：
 
 ~~~text
 No resources found in monitoring namespace.
@@ -704,7 +715,7 @@ No resources found
 No resources found
 ~~~
 
-继续检查 Prometheus Pod 的 volume：
+继续直接检查 `prometheus-k8s-0` 的 volume：
 
 ~~~bash
 kubectl -n monitoring get pod prometheus-k8s-0 \
@@ -717,7 +728,9 @@ kubectl -n monitoring get pod prometheus-k8s-0 \
 prometheus-k8s-db => PVC= hostPath= emptyDir={}
 ~~~
 
-记录中还保存了 PDB 的 YAML：
+也就是说，这个 Prometheus 没有使用 PVC，TSDB 数据实际落在 Pod 的 `emptyDir` 中。Pod 一旦被删除并重新创建，这部分本地历史数据不会保留。
+
+在继续处理前，把当时的 PDB 配置保存下来：
 
 ~~~bash
 RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
@@ -726,7 +739,22 @@ kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
 
-这组检查针对的是 `prometheus-k8s`，与前文报错中的 `prometheus-adapter` 是不同的 workload。PDB 查询显示 `ALLOWED DISRUPTIONS=0`，volume 查询显示 TSDB 使用 `emptyDir`；前者是当时的 PDB 状态，后者表示 Pod 重建时有丢失本地历史数据的风险。现有记录没有 node2 的 drain 失败输出，因此不能据此认定 PDB 或 `emptyDir` 是 node2 drain 的实际 blocker。node2 后续完成了升级；最终节点状态见下一节。
+因此，node2 这一段的真实排障顺序是：
+
+~~~text
+先执行 drain
+→ drain 报错
+→ 根据报错定位到 prometheus-k8s
+→ 检查 PDB，发现 ALLOWED DISRUPTIONS=0
+→ 检查 PVC / StorageClass / PV
+→ 检查 Pod volume，确认 TSDB 使用 emptyDir
+→ 评估驱逐/重建的数据影响
+→ 处理 blocker 后继续 node2 升级
+~~~
+
+这里需要特别区分两个 workload：前面多个节点 drain 时遇到过 `prometheus-adapter` 的 `emptyDir`，而 node2 这里进一步排查的是 `prometheus-k8s` 本身。二者不是同一个 Pod。
+
+node2 后续完成了升级；最终节点状态见下一节。
 
 ## v1.27.16 最终状态
 
