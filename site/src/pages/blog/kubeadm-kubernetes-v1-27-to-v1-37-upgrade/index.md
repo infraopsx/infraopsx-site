@@ -587,7 +587,7 @@ update kubeadm
 → uncordon
 ~~~
 
-`kubeadm upgrade node` updates the node's local kubelet configuration; it does not upgrade `kubectl`. This step moves from v1.27.0 to v1.27.16 without changing the minor version, so a worker's existing `kubectl v1.27.0` remains within one minor version of the API server and does not need to be upgraded on every worker for this patch upgrade. The Kubernetes general worker-upgrade procedure updates kubeadm and kubectl together to keep the client within the supported skew during minor-version upgrades.
+In this procedure, I run the cluster-management `kubectl` commands from the control-plane node. The worker steps therefore update kubeadm and kubelet only; the workers do not need a local kubectl installation.
 
 The repeated worker steps are not expanded node by node below. Only the drain differences are kept.
 

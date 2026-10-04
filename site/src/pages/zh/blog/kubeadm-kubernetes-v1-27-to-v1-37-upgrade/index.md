@@ -590,7 +590,7 @@ control-plane 处理完后，再逐台升级 worker。worker 侧的基本顺序�
 → uncordon
 ~~~
 
-`kubeadm upgrade node` 更新本节点的 kubelet 配置，不负责升级 `kubectl`。本次从 v1.27.0 升到 v1.27.16 没有跨 minor；worker 上的 `kubectl v1.27.0` 仍在 API server 的一个 minor 版本偏差范围内，因此这次无需为了版本兼容而逐个更新 worker 上的 kubectl。Kubernetes 官方通用 worker 升级流程会同时更新 kubeadm 和 kubectl，以便在跨 minor 升级过程中保持客户端版本偏差符合支持范围。
+本次集群管理用的 `kubectl` 命令从 control-plane 节点执行。worker 侧只更新 kubeadm 和 kubelet，不需要在 worker 上安装或更新 kubectl。
 
 各 worker 的重复步骤不再逐台展开，下面只记录 drain 过程中出现的差异。
 
