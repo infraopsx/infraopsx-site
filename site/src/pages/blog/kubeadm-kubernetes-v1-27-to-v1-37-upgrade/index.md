@@ -573,7 +573,7 @@ kubectl uncordon master
 
 The final `kubectl get nodes` output later in the article confirms the master version together with the workers.
 
-## Upgrade kubelet and workers
+## Upgrade worker nodes
 
 After the control-plane work was complete, the workers were upgraded one at a time:
 
