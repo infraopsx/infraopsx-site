@@ -622,39 +622,104 @@ node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 
 当时 node1 上只剩下 Calico、kube-proxy、node-exporter 这类 DaemonSet Pod，然后再 uncordon。
 
-### node2、node3 和 node4：同样的 drain 问题再次出现
+### node2：允许删除 emptyDir 后，Prometheus PDB 又挡住 drain
 
-node2、node3 和 node4 第一次执行 drain 时，都被使用 `emptyDir` 的 Pod 挡住。
-
-第一次执行的命令分别是：
+node2 第一次 drain 同样遇到了前面的 `emptyDir` 限制。确认这些临时数据可以丢弃后，重试时直接带上 `--delete-emptydir-data`：
 
 ~~~bash
-kubectl drain node2 --ignore-daemonsets
+kubectl drain node2 --ignore-daemonsets --delete-emptydir-data
+~~~
+
+普通 Pod 开始被驱逐，但 `prometheus-k8s-0` 无法通过 eviction 离开节点，drain 会反复重试：
+
+~~~text
+evicting pod monitoring/prometheus-k8s-0
+error when evicting pods/"prometheus-k8s-0" -n "monitoring" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+~~~
+
+这里需要区分两层限制：`--delete-emptydir-data` 只是允许 drain 删除使用 `emptyDir` 的 Pod，它不会绕过 PodDisruptionBudget。继续检查 Prometheus 的 PDB：
+
+~~~bash
+kubectl -n monitoring get pdb prometheus-k8s -o wide
+~~~
+
+当时的状态是：
+
+~~~text
+NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
+prometheus-k8s   1               N/A               0
+~~~
+
+`ALLOWED DISRUPTIONS=0` 表示在当时的副本和 PDB 状态下，正常 eviction 不允许再中断这个 Pod。
+
+在继续处理前，先把原 PDB 保存下来：
+
+~~~bash
+RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
+
+kubectl -n monitoring get pdb prometheus-k8s -o yaml \
+  > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
+~~~
+
+PDB 只是解释了为什么正常 eviction 失败，还需要确认这个 Pod 被删除并重建后会不会丢数据。先检查 PVC、StorageClass 和 PV：
+
+~~~bash
+kubectl -n monitoring get pvc
+kubectl get storageclass
+kubectl get pv
+~~~
+
+当时的输出分别是：
+
+~~~text
+No resources found in monitoring namespace.
+No resources found
+No resources found
+~~~
+
+再直接检查 `prometheus-k8s-0` 的 volume：
+
+~~~bash
+kubectl -n monitoring get pod prometheus-k8s-0 \
+  -o jsonpath='{range .spec.volumes[*]}{.name}{" => PVC="}{.persistentVolumeClaim.claimName}{" hostPath="}{.hostPath.path}{" emptyDir="}{.emptyDir}{"\n"}{end}'
+~~~
+
+数据库 volume 是：
+
+~~~text
+prometheus-k8s-db => PVC= hostPath= emptyDir={}
+~~~
+
+这说明当时的 Prometheus TSDB 没有使用 PVC，而是放在 Pod 的 `emptyDir` 中。也就是说，node2 上同时存在两个独立问题：PDB 阻止正常 eviction，而一旦删除并重建这个 Pod，原来的本地 TSDB 历史数据也不会跟着 Pod 一起迁移。
+
+这个测试集群最终完成了 node2 升级；如果在生产环境遇到同样的布局，应该先确认 Prometheus 的持久化和副本策略，再决定怎样处理 PDB，而不是直接绕过保护继续 drain。
+
+### node3 和 node4：继续按相同方式处理 emptyDir
+
+node3 和 node4 第一次执行 drain 时，也被使用 `emptyDir` 的 Pod 挡住：
+
+~~~bash
 kubectl drain node3 --ignore-daemonsets
 kubectl drain node4 --ignore-daemonsets
 ~~~
 
-三台节点都出现了同一类错误：
+两台节点都出现了同一类错误：
 
 ~~~text
 cannot delete Pods with local storage (use --delete-emptydir-data to override):
 ~~~
 
-这是因为这些 Pod 使用了本地 `emptyDir`。默认情况下，`kubectl drain` 不会删除这类 Pod，避免直接丢失 Pod 生命周期内的本地临时数据。
-
-确认这些临时数据可以丢弃后，三台节点的 drain 都增加 `--delete-emptydir-data`：
+确认这些临时数据可以丢弃后，重新执行：
 
 ~~~bash
-kubectl drain node2 --ignore-daemonsets --delete-emptydir-data
 kubectl drain node3 --ignore-daemonsets --delete-emptydir-data
 kubectl drain node4 --ignore-daemonsets --delete-emptydir-data
 ~~~
 
-drain 完成后，三台节点都处于 `SchedulingDisabled`，此时 kubelet 还没有更新，所以版本仍然是 v1.27.0：
+drain 完成后，两台节点都处于 `SchedulingDisabled`，此时 kubelet 还没有更新，所以版本仍然是 v1.27.0：
 
 ~~~text
 NAME    STATUS                     ROLES    AGE    VERSION
-node2   Ready,SchedulingDisabled   worker   260d   v1.27.0
 node3   Ready,SchedulingDisabled   worker   260d   v1.27.0
 node4   Ready,SchedulingDisabled   worker   260d   v1.27.0
 ~~~
