@@ -1,7 +1,7 @@
 ---
 layout: ../../../../layouts/ArticleLayout.astro
 title: "Kubernetes v1.27 到 v1.37：一次 kubeadm 集群升级记录"
-description: "记录一个 5 节点 kubeadm 集群从 Kubernetes v1.27 逐步升级到 v1.37。第一部分覆盖 v1.27.0 到 v1.27.16，包括 etcd 备份、worker drain、emptyDir、PodDisruptionBudget（PDB）和最终验证。"
+description: "记录一个 5 节点 kubeadm 集群从 Kubernetes v1.27 逐步升级到 v1.37。目前覆盖 v1.27.0 到 v1.28.15，包括 etcd 备份、worker drain、PodDisruptionBudget（PDB）、Calico 升级和升级后验证。"
 pubDate: "2026-10-02"
 category: Kubernetes
 tags:
@@ -9,6 +9,7 @@ tags:
   - kubeadm
   - Upgrade
   - etcd
+  - Calico
   - PodDisruptionBudget
   - PDB
 enPath: "/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/"
@@ -755,11 +756,264 @@ node3    Ready    worker          262d   v1.27.16
 node4    Ready    worker          261d   v1.27.16
 ~~~
 
-第一阶段到这里结束。下一步是：
+## v1.27.16 → v1.28.15
+
+第一阶段已经把二进制下载、SHA256 校验、etcd snapshot、control-plane 升级、worker drain、kubelet 更新和 PDB 处理完整走过一遍。进入 minor version 升级后，这些重复步骤不再逐项展开；备份和 etcd snapshot 继续沿用前文做法，本节只记录 v1.27.16 → v1.28.15 这一跳新增的变化、兼容性准备和最终验证。
+
+### 升级 Kubernetes 前先处理 Calico
+
+当前集群使用 manifest 部署的 Calico v3.25.0。目标 Kubernetes 是 v1.28.15，因此这次先把 Calico 升级到 v3.27.5，再升级 Kubernetes。
+
+这不是 kubeadm 的硬性要求，也不表示 Calico v3.25.0 在 Kubernetes 1.28 上一定无法运行。这样安排的原因是 CNI 属于集群最基础的网络组件之一，而 Calico 每个版本都会针对一定范围的 Kubernetes 版本进行测试。先把 CNI 调整到更接近目标 Kubernetes 版本的版本，可以把网络组件变化和 Kubernetes control-plane 变化拆成两个阶段，减少后续出现网络问题时的排查变量。
+
+这个集群还有一项不能丢的本地配置：
+
+~~~yaml
+- name: IP
+  value: "autodetect"
+- name: IP_AUTODETECTION_METHOD
+  value: "can-reach=10.10.10.1"
+~~~
+
+因此这里不是直接拿新版 manifest 覆盖，而是在 v3.27.5 manifest 中保留这项配置后再应用：
+
+~~~bash
+kubectl apply --server-side --force-conflicts   -f calico-v3.27.5-custom.yaml
+~~~
+
+等待两个组件完成 rollout：
+
+~~~bash
+kubectl -n kube-system rollout status daemonset/calico-node
+kubectl -n kube-system rollout status deployment/calico-kube-controllers
+~~~
+
+升级完成后：
 
 ~~~text
-v1.27.16 → v1.28.15
+calico-node                 5/5 Ready
+calico-kube-controllers     1/1 Ready
+Calico                      v3.27.5
 ~~~
+
+再确认自定义自动探测方式仍然存在：
+
+~~~bash
+kubectl -n kube-system get daemonset calico-node   -o jsonpath='{range .spec.template.spec.containers[?(@.name=="calico-node")].env[*]}{.name}={.value}{"\n"}{end}'   | grep -E '^IP=|^IP_AUTODETECTION_METHOD='
+~~~
+
+~~~text
+IP=autodetect
+IP_AUTODETECTION_METHOD=can-reach=10.10.10.1
+~~~
+
+Calico 稳定后再进入 Kubernetes v1.28.15 升级。
+
+### kubeadm upgrade plan：这一跳会改变什么
+
+control-plane 上的 kubeadm 更新到 v1.28.15 并完成 SHA256 校验后，执行：
+
+~~~bash
+kubeadm upgrade plan v1.28.15
+~~~
+
+这次实际计划是：
+
+| 组件 | 当前版本 | 目标版本 |
+| --- | --- | --- |
+| kube-apiserver | v1.27.16 | v1.28.15 |
+| kube-controller-manager | v1.27.16 | v1.28.15 |
+| kube-scheduler | v1.27.16 | v1.28.15 |
+| kube-proxy | v1.27.16 | v1.28.15 |
+| CoreDNS | v1.10.1 | v1.10.1 |
+| etcd | 3.5.12-0 | 3.5.15-0 |
+| kubelet | 5 个节点均为 v1.27.16 | v1.28.15 |
+
+同时，kube-proxy 和 kubelet 的 component config 都仍然使用当前 API 版本，本轮不需要手工做配置迁移。
+
+### 升级 control-plane
+
+目标镜像预拉取完成后，先做 dry-run：
+
+~~~bash
+kubeadm upgrade apply v1.28.15 --dry-run --yes
+~~~
+
+结束输出：
+
+~~~text
+[upgrade/successful] Finished dryrunning successfully!
+~~~
+
+然后正式升级：
+
+~~~bash
+kubeadm upgrade apply v1.28.15 --yes
+~~~
+
+最终：
+
+~~~text
+[upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.28.15". Enjoy!
+~~~
+
+此时 control-plane static Pod 和 etcd 已经切到目标版本，master 的 kubelet 仍然需要单独更新。
+
+master 的 drain 继续沿用前文已经确认过的 emptyDir 处理方式，不再重复制造一次相同的失败：
+
+~~~bash
+kubectl drain master   --ignore-daemonsets   --delete-emptydir-data
+~~~
+
+随后按前文相同方式更新 kubelet 和 kubectl，重启 kubelet。检查到 master 为 `Ready,SchedulingDisabled` 且 kubelet 已经是 v1.28.15 后再执行：
+
+~~~bash
+kubectl uncordon master
+~~~
+
+### 逐台升级 worker
+
+worker 仍然一台一台处理，基本顺序没有变化：
+
+~~~text
+更新 kubeadm
+→ kubeadm upgrade node
+→ drain
+→ 更新 kubelet
+→ restart kubelet
+→ 检查
+→ uncordon
+~~~
+
+这一轮四台 worker 的结果如下：
+
+| 节点 | 升级结果 | 本轮差异 |
+| --- | --- | --- |
+| node1 | v1.28.15 / Ready | drain 再次被 Prometheus PDB 阻止 |
+| node2 | v1.28.15 / Ready | 无新增问题 |
+| node3 | v1.28.15 / Ready | 无新增问题 |
+| node4 | v1.28.15 / Ready | drain 再次被 Prometheus PDB 阻止 |
+
+node1 和 node4 遇到的仍然是前文已经分析过的同一个约束：
+
+~~~text
+Cannot evict pod as it would violate the pod's disruption budget.
+~~~
+
+因此这里不再重复解释 PDB 和 `emptyDir` 的关系，而是沿用前文已经验证过的处理方式：临时把 `prometheus-k8s` 的 `minAvailable` 从 `1` 调整为 `0`，完成 drain；待 `prometheus-k8s-0` 在其他节点恢复为 `2/2 Running` 后，再把 `minAvailable` 恢复为 `1`。
+
+### v1.28.15 最终状态
+
+所有节点完成后：
+
+~~~bash
+kubectl get nodes -o wide
+~~~
+
+~~~text
+NAME     STATUS   ROLES           VERSION
+master   Ready    control-plane   v1.28.15
+node1    Ready    worker          v1.28.15
+node2    Ready    worker          v1.28.15
+node3    Ready    worker          v1.28.15
+node4    Ready    worker          v1.28.15
+~~~
+
+关键组件的最终版本：
+
+| 组件 | 最终状态 |
+| --- | --- |
+| kube-apiserver | v1.28.15 |
+| kube-controller-manager | v1.28.15 |
+| kube-scheduler | v1.28.15 |
+| etcd | 3.5.15-0 |
+| CoreDNS | v1.10.1，2/2 Ready |
+| kube-proxy | v1.28.15，5/5 Ready |
+| Calico | v3.27.5，calico-node 5/5 Ready |
+| Prometheus | 2/2 Running |
+| Prometheus PDB | minAvailable=1 |
+
+Calico 的本地自动探测配置也仍然保持：
+
+~~~text
+IP=autodetect
+IP_AUTODETECTION_METHOD=can-reach=10.10.10.1
+~~~
+
+API readiness：
+
+~~~bash
+kubectl get --raw='/readyz?verbose'
+~~~
+
+最终：
+
+~~~text
+[+]ping ok
+[+]etcd ok
+[+]etcd-readiness ok
+...
+readyz check passed
+~~~
+
+同时检查所有 namespace 中没有异常状态的 Pod：
+
+~~~bash
+kubectl get pods -A --no-headers |   awk '$4 != "Running" && $4 != "Completed" {print}'
+~~~
+
+这次输出为空。
+
+### 再从 Pod 内验证 DNS、Service 和 API
+
+节点和 control-plane 都是 Ready 还不够，我最后又从普通 Pod 内验证了一次实际数据路径。
+
+先验证集群 DNS：
+
+~~~bash
+kubectl run dns-smoke-test   --image=busybox:1.36   --restart=Never   --command --   nslookup kubernetes.default.svc.cluster.local
+
+kubectl logs dns-smoke-test
+~~~
+
+解析结果：
+
+~~~text
+Server:  10.96.0.10
+Name:    kubernetes.default.svc.cluster.local
+Address: 10.96.0.1
+~~~
+
+然后用带正常 TLS 支持的 curl 容器访问 Kubernetes API Service。命令只输出 API 返回内容，不使用 verbose 模式，避免把 ServiceAccount token 打到日志里：
+
+~~~bash
+kubectl run api-smoke-test   --image=curlimages/curl:8.10.1   --restart=Never   --command -- sh -c '
+    TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+    curl -sS       --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt       -H "Authorization: Bearer ${TOKEN}"       https://kubernetes.default.svc/version
+  '
+
+kubectl logs api-smoke-test
+~~~
+
+返回的版本信息包含：
+
+~~~json
+{
+  "major": "1",
+  "minor": "28",
+  "gitVersion": "v1.28.15"
+}
+~~~
+
+这一步把前面的状态检查再向前推进了一层：Pod 内 DNS 能解析 Service，Service ClusterIP 能到达 API Server，TLS CA 校验和 ServiceAccount 认证都能正常完成，API 最终返回 HTTP 200 和 v1.28.15 的版本信息。
+
+测试完成后删除临时 Pod：
+
+~~~bash
+kubectl delete pod dns-smoke-test api-smoke-test
+~~~
+
+到这里，v1.27.16 → v1.28.15 这一阶段结束。
 
 ## 参考资料
 
@@ -770,3 +1024,5 @@ v1.27.16 → v1.28.15
 - <a href="https://kubernetes.io/zh-cn/releases/version-skew-policy/" target="_blank" rel="noopener noreferrer">Kubernetes 版本偏差策略</a>
 - <a href="https://kubernetes.io/zh-cn/docs/reference/config-api/kubeadm-config.v1beta3/" target="_blank" rel="noopener noreferrer">kubeadm 配置（v1beta3）</a>
 - <a href="https://kubernetes.io/zh-cn/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain 参考</a>
+- <a href="https://kubernetes.io/zh-cn/releases/1.28/" target="_blank" rel="noopener noreferrer">Kubernetes 1.28</a>
+- <a href="https://docs.tigera.io/calico/latest/getting-started/kubernetes/requirements" target="_blank" rel="noopener noreferrer">Calico Kubernetes 系统要求</a>
