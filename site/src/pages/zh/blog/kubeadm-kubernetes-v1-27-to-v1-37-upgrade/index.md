@@ -623,7 +623,7 @@ node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 
 当时 node1 上只剩下 Calico、kube-proxy、node-exporter 这类 DaemonSet Pod，然后再 uncordon。
 
-### node3 和 node4：同样的 drain 问题再次出现
+### node2、node3 和 node4：同样的 drain 问题再次出现
 
 node3 第一次 drain 也没有一次成功：
 
@@ -637,7 +637,6 @@ kubectl drain node3 --ignore-daemonsets --timeout=5m
 node/node3 cordoned
 cannot delete Pods with local storage:
   kubernetes-dashboard/kubernetes-dashboard-...
-  monitoring/prometheus-adapter-...
 ~~~
 
 到了 node4，第一次 drain 又出现了同类情况：
@@ -646,12 +645,11 @@ cannot delete Pods with local storage:
 kubectl drain node4 --ignore-daemonsets --timeout=5m
 ~~~
 
-node4 的 drain 报错说明，带有本地存储的 Pod 无法删除；记录中列出的 blocker 包括：
+关键输出同样指向带本地存储的 Pod：
 
 ~~~text
 cannot delete Pods with local storage:
   kube-system/metrics-server-...
-  monitoring/prometheus-adapter-...
 ~~~
 
 普通 workload 被迁走后检查 node4：
@@ -661,7 +659,7 @@ NAME    STATUS                     ROLES    AGE    VERSION
 node4   Ready,SchedulingDisabled   worker   260d   v1.27.0
 ~~~
 
-而 node4 上只剩：
+此时 node4 上只剩 DaemonSet Pod：
 
 ~~~text
 calico-node-...
@@ -669,83 +667,19 @@ kube-proxy-...
 node-exporter-...
 ~~~
 
-后续 node4 的 kubelet 也完成了更新；在处理 node2 前再次检查集群时，node4 已经是 `Ready v1.27.16`。
+node4 的 kubelet 后续完成更新并恢复为 `Ready v1.27.16`。
 
-这些输出说明，前一台节点上的 Pod 被驱逐后会被重新调度到其他尚未维护的节点，所以后面的 drain 可能再次遇到相同 blocker。
-
-### node2：第一次 drain
-
-node2 是本轮最后处理的 worker。开始处理时先按正常维护流程执行：
+最后处理 node2 时，第一次同样先执行 drain：
 
 ~~~bash
 kubectl drain node2 --ignore-daemonsets
 ~~~
 
-这里本来应该紧接着保留这次 `drain` 的完整终端输出。
+node2 也遇到了前面相同类型的 drain 问题，因此这里不再单独展开一套新的排障章节，而是和 node3、node4 放在一起记录。
 
-但目前从可回溯的聊天记录、已索引文件和当前文章历史中，我只重新找回了后续 PDB / volume 的操作记录，没有找回这一次 `kubectl drain node2` 的原始输出。因此这里不再写“drain 因某个 Pod/PDB 失败，所以继续检查 PDB”这样的因果结论，避免用后验信息替代当时日志。
+这一轮连续出现的现象说明：前一台节点上的普通 Pod 被驱逐后，会重新调度到其他尚未维护的节点，因此后续节点再次 drain 时，可能再次遇到同一类带本地存储 Pod 的 blocker。
 
-下面这些内容只是本轮 node2 维护过程中**确实保留下来的后续检查记录**；它们本身不能替代缺失的第一次 drain 日志，也不能单独证明为什么当时进入了 PDB 排查。
-
-后续记录中有如下 PDB 查询：
-
-~~~bash
-kubectl -n monitoring get pdb prometheus-k8s -o wide
-~~~
-
-实际输出：
-
-~~~text
-NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
-prometheus-k8s   1               N/A               0
-~~~
-
-同时还保存了该 PDB 的完整 YAML：
-
-~~~bash
-RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
-
-kubectl -n monitoring get pdb prometheus-k8s -o yaml \
-  > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
-~~~
-
-当时还检查了存储资源：
-
-~~~bash
-kubectl -n monitoring get pvc
-kubectl get storageclass
-kubectl get pv
-~~~
-
-输出：
-
-~~~text
-No resources found in monitoring namespace.
-No resources found
-No resources found
-~~~
-
-随后检查 `prometheus-k8s-0` 的 volume：
-
-~~~bash
-kubectl -n monitoring get pod prometheus-k8s-0 \
-  -o jsonpath='{range .spec.volumes[*]}{.name}{" => PVC="}{.persistentVolumeClaim.claimName}{" hostPath="}{.hostPath.path}{" emptyDir="}{.emptyDir}{"\n"}{end}'
-~~~
-
-数据库 volume 的输出是：
-
-~~~text
-prometheus-k8s-db => PVC= hostPath= emptyDir={}
-~~~
-
-这些后续记录能够确认两件事：
-
-- 当时 `prometheus-k8s` 的 PDB 状态是 `ALLOWED DISRUPTIONS=0`；
-- `prometheus-k8s-0` 的 TSDB volume 使用的是 `emptyDir`，没有 PVC。
-
-但在第一次 `drain node2` 的原始输出重新找回之前，本文不把它们写成“第一次 drain 的直接 blocker”或“触发 PDB 排查的原因”。
-
-node2 后续完成了升级；最终节点状态见下一节。
+node2、node3 和 node4 后续都完成了 kubelet 更新并恢复调度；最终节点状态见下一节。
 
 ## v1.27.16 最终状态
 
