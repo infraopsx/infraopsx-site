@@ -646,11 +646,12 @@ cannot delete Pods with local storage:
 kubectl drain node4 --ignore-daemonsets --timeout=5m
 ~~~
 
-node4 的错误信息中能确认的 blocker 包括：
+node4 的 drain 报错说明，带有本地存储的 Pod 无法删除；记录中列出的 blocker 包括：
 
 ~~~text
-kube-system/metrics-server-...
-monitoring/prometheus-adapter-...
+cannot delete Pods with local storage:
+  kube-system/metrics-server-...
+  monitoring/prometheus-adapter-...
 ~~~
 
 普通 workload 被迁走后检查 node4：
@@ -672,9 +673,9 @@ node-exporter-...
 
 这些输出说明，前一台节点上的 Pod 被驱逐后会被重新调度到其他尚未维护的节点，所以后面的 drain 可能再次遇到相同 blocker。
 
-### node2：先确认 Prometheus 的数据放在哪里
+### node2：保留的 Prometheus 检查记录
 
-node2 最后处理。升级前，`prometheus-k8s-0` 正在 node2 上运行。
+本轮记录把 node2 留到最后，并保留了对 `prometheus-k8s` 的 PDB 和 volume 检查。但现有记录没有附上 `drain node2` 的失败输出，也没有说明为什么先查 Prometheus。因此下面只是检查结果，不能当作已确认的 node2 drain blocker。
 
 先看 PDB：
 
@@ -695,7 +696,7 @@ kubectl get storageclass
 kubectl get pv
 ~~~
 
-当时的输出分别是：
+这三条命令的输出是：
 
 ~~~text
 No resources found in monitoring namespace.
@@ -716,9 +717,7 @@ kubectl -n monitoring get pod prometheus-k8s-0 \
 prometheus-k8s-db => PVC= hostPath= emptyDir={}
 ~~~
 
-所以这个 Prometheus 的 TSDB 当时并没有放在 PVC 上，而是在 `emptyDir`。如果这个 Pod 在 drain 过程中被删除并重新创建，原来的历史数据不会跟着 Pod 一起迁移。
-
-这里先保存了原 PDB。当时本轮日志目录是：
+记录中还保存了 PDB 的 YAML：
 
 ~~~bash
 RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
@@ -727,7 +726,7 @@ kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
 
-这一步确认了两个事实：PDB 不允许当前唯一副本做 voluntary disruption，而 Prometheus 的 TSDB 又在 `emptyDir`。因此继续 drain 前必须同时考虑 PDB 和数据丢失。这个测试集群最终完成了 node2 升级；生产环境如果发现 TSDB 仍在 `emptyDir`，应先处理持久化，再做节点维护。
+这组检查针对的是 `prometheus-k8s`，与前文报错中的 `prometheus-adapter` 是不同的 workload。PDB 查询显示 `ALLOWED DISRUPTIONS=0`，volume 查询显示 TSDB 使用 `emptyDir`；前者是当时的 PDB 状态，后者表示 Pod 重建时有丢失本地历史数据的风险。现有记录没有 node2 的 drain 失败输出，因此不能据此认定 PDB 或 `emptyDir` 是 node2 drain 的实际 blocker。node2 后续完成了升级；最终节点状态见下一节。
 
 ## v1.27.16 最终状态
 

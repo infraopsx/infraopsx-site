@@ -643,11 +643,12 @@ The first node4 drain encountered the same kind of blocker:
 kubectl drain node4 --ignore-daemonsets --timeout=5m
 ~~~
 
-The node4 error listed, among others:
+The node4 drain reported Pods with local storage that could not be deleted, including:
 
 ~~~text
-kube-system/metrics-server-...
-monitoring/prometheus-adapter-...
+cannot delete Pods with local storage:
+  kube-system/metrics-server-...
+  monitoring/prometheus-adapter-...
 ~~~
 
 After the ordinary workload Pods had moved away, node4 was observed as:
@@ -669,9 +670,9 @@ node4 was then updated as well; the later pre-check before node2 showed node4 as
 
 The repeated failures show that a Pod evicted from one worker can land on a worker that has not yet been maintained, so the same drain blocker can reappear later in the sequence.
 
-### node2: check where Prometheus data actually lives
+### node2: recorded Prometheus checks
 
-node2 was handled last. Before the upgrade, `prometheus-k8s-0` was running on node2.
+The upgrade notes leave node2 until last and preserve checks of the `prometheus-k8s` PDB and volumes. They do not include a failed `kubectl drain node2` output or explain why Prometheus was checked first. This section records the observed state; it does not identify a confirmed drain blocker.
 
 The PDB was:
 
@@ -684,7 +685,7 @@ NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
 prometheus-k8s   1               N/A               0
 ~~~
 
-Storage objects were checked next:
+Storage objects were checked:
 
 ~~~bash
 kubectl -n monitoring get pvc
@@ -700,7 +701,7 @@ No resources found
 No resources found
 ~~~
 
-Inspect the Prometheus Pod volumes:
+The Prometheus Pod volumes were inspected:
 
 ~~~bash
 kubectl -n monitoring get pod prometheus-k8s-0 \
@@ -713,9 +714,7 @@ The database volume was:
 prometheus-k8s-db => PVC= hostPath= emptyDir={}
 ~~~
 
-So the Prometheus TSDB was not stored on a PVC. If that Pod were deleted and recreated during drain, the existing `emptyDir` contents would not move with it.
-
-The original PDB was saved first. The log directory for this upgrade was:
+The notes also record saving the PDB YAML in the upgrade log:
 
 ~~~bash
 RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
@@ -724,7 +723,7 @@ kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
 
-These checks established two separate constraints before drain: the PDB protected the only Prometheus replica, while the TSDB itself lived on `emptyDir`. node2 was later upgraded successfully; the final node state is shown in the next section. On a production cluster, I would fix Prometheus persistence before doing this maintenance.
+These checks concern `prometheus-k8s`, a different workload from the earlier `prometheus-adapter` Pods. The PDB query reported `ALLOWED DISRUPTIONS=0`, and the TSDB volume used `emptyDir`; these show the recorded PDB status and a local-data retention risk if the Pod is recreated. The preserved notes do not show that either condition caused a node2 drain failure. node2 was later upgraded successfully; the final node state is shown in the next section.
 
 ## Final v1.27.16 state
 
