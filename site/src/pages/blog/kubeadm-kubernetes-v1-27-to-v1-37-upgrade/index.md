@@ -622,6 +622,16 @@ At that point only expected DaemonSet Pods such as Calico, kube-proxy, and node-
 
 ### node2, node3, and node4: the same drain problem appeared again
 
+node2 was actually the last of these workers to be handled, but this section records them in node-number order.
+
+The first node2 drain was:
+
+~~~bash
+kubectl drain node2 --ignore-daemonsets
+~~~
+
+It also did not complete on the first attempt and hit the same class of local-storage drain blocker seen on the other workers. It is therefore kept in this shared section rather than expanded into a separate troubleshooting section.
+
 The first node3 drain also failed:
 
 ~~~bash
@@ -666,15 +676,7 @@ node-exporter-...
 
 node4's kubelet was then updated and the node later returned as `Ready v1.27.16`.
 
-When node2 was handled last, the first step was again a normal drain:
-
-~~~bash
-kubectl drain node2 --ignore-daemonsets
-~~~
-
-node2 encountered the same type of drain problem seen on the preceding workers, so it is kept in this shared section rather than expanded into a separate troubleshooting subsection.
-
-The repeated pattern shows that ordinary Pods evicted from one worker can be rescheduled onto another worker that has not yet been maintained. A later drain can therefore hit the same class of local-storage blocker again.
+The repeated pattern across these three workers shows that ordinary Pods evicted from one worker can be rescheduled onto another worker that has not yet been maintained. A later drain can therefore hit the same class of local-storage blocker again.
 
 node2, node3, and node4 were all subsequently updated and returned to scheduling; the final node state is shown in the next section.
 
