@@ -625,69 +625,42 @@ node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 
 ### node2、node3 和 node4：同样的 drain 问题再次出现
 
-node2 第一次执行：
+node2、node3 和 node4 第一次执行 drain 时，都被使用 `emptyDir` 的 Pod 挡住。
+
+第一次执行的命令分别是：
 
 ~~~bash
 kubectl drain node2 --ignore-daemonsets
-~~~
-
-关键输出：
-
-~~~text
-node/node2 cordoned
-cannot delete Pods with local storage:
-  kube-system/metrics-server-...
-~~~
-
-同样没有一次成功，遇到的也是前面已经出现过的本地存储类 drain blocker。这里不再单独展开新的排障章节。
-
-node3 第一次 drain 也没有一次成功：
-
-~~~bash
 kubectl drain node3 --ignore-daemonsets --timeout=5m
-~~~
-
-关键输出：
-
-~~~text
-node/node3 cordoned
-cannot delete Pods with local storage:
-  kubernetes-dashboard/kubernetes-dashboard-...
-~~~
-
-到了 node4，第一次 drain 又出现了同类情况：
-
-~~~bash
 kubectl drain node4 --ignore-daemonsets --timeout=5m
 ~~~
 
-关键输出同样指向带本地存储的 Pod：
+三台节点都出现了同一类错误：
 
 ~~~text
-cannot delete Pods with local storage:
-  kube-system/metrics-server-...
+cannot delete Pods with local storage (use --delete-emptydir-data to override):
 ~~~
 
-普通 workload 被迁走后检查 node4：
+这是因为这些 Pod 使用了本地 `emptyDir`。默认情况下，`kubectl drain` 不会删除这类 Pod，避免直接丢失 Pod 生命周期内的本地临时数据。
+
+确认这些临时数据可以丢弃后，三台节点的 drain 都增加 `--delete-emptydir-data`：
+
+~~~bash
+kubectl drain node2 --ignore-daemonsets --delete-emptydir-data
+kubectl drain node3 --ignore-daemonsets --delete-emptydir-data --timeout=5m
+kubectl drain node4 --ignore-daemonsets --delete-emptydir-data --timeout=5m
+~~~
+
+drain 完成后，三台节点都处于 `SchedulingDisabled`，此时 kubelet 还没有更新，所以版本仍然是 v1.27.0：
 
 ~~~text
 NAME    STATUS                     ROLES    AGE    VERSION
+node2   Ready,SchedulingDisabled   worker   260d   v1.27.0
+node3   Ready,SchedulingDisabled   worker   260d   v1.27.0
 node4   Ready,SchedulingDisabled   worker   260d   v1.27.0
 ~~~
 
-此时 node4 上只剩 DaemonSet Pod：
-
-~~~text
-calico-node-...
-kube-proxy-...
-node-exporter-...
-~~~
-
-node4 的 kubelet 后续完成更新并恢复为 `Ready v1.27.16`。
-
-这三个节点连续出现同类情况，说明前一台节点上的普通 Pod 被驱逐后，会重新调度到其他尚未维护的节点，因此后续节点再次 drain 时，可能再次遇到同一类带本地存储 Pod 的 blocker。
-
-node2、node3 和 node4 后续都完成了 kubelet 更新并恢复调度；最终节点状态见下一节。
+随后再继续更新各节点的 kubelet，检查节点恢复正常后执行 uncordon。最终状态见下一节。
 
 ## v1.27.16 最终状态
 
