@@ -775,7 +775,8 @@ This cluster also has one local setting that must survive the Calico upgrade:
 So the v3.27.5 manifest was adjusted to preserve that setting before it was applied:
 
 ~~~bash
-kubectl apply --server-side --force-conflicts   -f calico-v3.27.5-custom.yaml
+kubectl apply --server-side --force-conflicts \
+  -f calico-v3.27.5-custom.yaml
 ~~~
 
 Then wait for both Calico components to finish rolling out:
@@ -796,7 +797,9 @@ Calico                      v3.27.5
 The custom autodetection setting was checked again:
 
 ~~~bash
-kubectl -n kube-system get daemonset calico-node   -o jsonpath='{range .spec.template.spec.containers[?(@.name=="calico-node")].env[*]}{.name}={.value}{"\n"}{end}'   | grep -E '^IP=|^IP_AUTODETECTION_METHOD='
+kubectl -n kube-system get daemonset calico-node \
+  -o jsonpath='{range .spec.template.spec.containers[?(@.name=="calico-node")].env[*]}{.name}={.value}{"\n"}{end}' \
+  | grep -E '^IP=|^IP_AUTODETECTION_METHOD='
 ~~~
 
 ~~~text
@@ -859,7 +862,9 @@ At that point the control-plane static Pods and etcd were already on their targe
 For the master drain I reused the `emptyDir` handling already established earlier instead of repeating the same initial failure:
 
 ~~~bash
-kubectl drain master   --ignore-daemonsets   --delete-emptydir-data
+kubectl drain master \
+  --ignore-daemonsets \
+  --delete-emptydir-data
 ~~~
 
 The kubelet and kubectl binaries were then updated using the same download, checksum, and replacement procedure shown earlier. After restarting kubelet and confirming that the master was `Ready,SchedulingDisabled` on v1.28.15, I uncordoned it:
@@ -956,7 +961,8 @@ readyz check passed
 I also checked for Pods outside the normal terminal states:
 
 ~~~bash
-kubectl get pods -A --no-headers |   awk '$4 != "Running" && $4 != "Completed" {print}'
+kubectl get pods -A --no-headers | \
+  awk '$4 != "Running" && $4 != "Completed" {print}'
 ~~~
 
 The command returned no output.
@@ -968,7 +974,11 @@ Node and control-plane readiness are useful, but I also wanted one functional ch
 First, verify cluster DNS:
 
 ~~~bash
-kubectl run dns-smoke-test   --image=busybox:1.36   --restart=Never   --command --   nslookup kubernetes.default.svc.cluster.local
+kubectl run dns-smoke-test \
+  --image=busybox:1.36 \
+  --restart=Never \
+  --command -- \
+  nslookup kubernetes.default.svc.cluster.local
 
 kubectl logs dns-smoke-test
 ~~~
@@ -984,9 +994,15 @@ Address: 10.96.0.1
 Then use a curl container with normal TLS support to call the Kubernetes API Service. The command intentionally avoids verbose mode so the ServiceAccount token is not printed into logs:
 
 ~~~bash
-kubectl run api-smoke-test   --image=curlimages/curl:8.10.1   --restart=Never   --command -- sh -c '
+kubectl run api-smoke-test \
+  --image=curlimages/curl:8.10.1 \
+  --restart=Never \
+  --command -- sh -c '
     TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
-    curl -sS       --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt       -H "Authorization: Bearer ${TOKEN}"       https://kubernetes.default.svc/version
+    curl -sS \
+      --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+      -H "Authorization: Bearer ${TOKEN}" \
+      https://kubernetes.default.svc/version
   '
 
 kubectl logs api-smoke-test
