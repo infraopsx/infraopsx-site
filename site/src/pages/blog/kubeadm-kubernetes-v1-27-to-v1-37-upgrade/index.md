@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/ArticleLayout.astro
 title: "Kubernetes v1.27 to v1.37: A kubeadm Cluster Upgrade Log"
-description: "A 5-node kubeadm cluster upgrade from Kubernetes v1.27 to v1.37. Part 1 covers v1.27.0 to v1.27.16, including etcd backup, worker drain, emptyDir, PodDisruptionBudget (PDB), and verification."
+description: "A 5-node kubeadm cluster upgrade from Kubernetes v1.27 toward v1.37. It currently covers v1.27.0 through v1.28.15, including etcd backup, worker drain, PodDisruptionBudget (PDB), Calico upgrade, and post-upgrade verification."
 pubDate: "2026-10-02"
 category: Kubernetes
 tags:
@@ -9,6 +9,7 @@ tags:
   - kubeadm
   - Upgrade
   - etcd
+  - Calico
   - PodDisruptionBudget
   - PDB
 enPath: "/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/"
@@ -752,11 +753,264 @@ node3    Ready    worker          262d   v1.27.16
 node4    Ready    worker          261d   v1.27.16
 ~~~
 
-The next step is:
+## v1.27.16 → v1.28.15
+
+The first stage already covered binary downloads, SHA256 verification, the etcd snapshot, control-plane upgrade, worker drain, kubelet replacement, and PDB handling in detail. For this minor-version jump, I do not repeat those mechanics. Backup and etcd snapshot follow the same procedure described earlier; this section focuses only on what changed for v1.27.16 → v1.28.15, the compatibility preparation, and the final verification.
+
+### Upgrade Calico before Kubernetes
+
+The cluster was running Calico v3.25.0 installed from manifests. Because the Kubernetes target is v1.28.15, I upgraded Calico to v3.27.5 before changing Kubernetes itself.
+
+This is not a hard kubeadm requirement, and it does not mean Calico v3.25.0 is guaranteed to fail on Kubernetes 1.28. The reason for doing it first is operational: the CNI is one of the most fundamental cluster networking components, and each Calico release is tested against a defined range of Kubernetes versions. Moving the CNI closer to the target Kubernetes version first separates the networking change from the control-plane change and reduces the number of variables if a networking problem appears later.
+
+This cluster also has one local setting that must survive the Calico upgrade:
+
+~~~yaml
+- name: IP
+  value: "autodetect"
+- name: IP_AUTODETECTION_METHOD
+  value: "can-reach=10.10.10.1"
+~~~
+
+So the v3.27.5 manifest was adjusted to preserve that setting before it was applied:
+
+~~~bash
+kubectl apply --server-side --force-conflicts   -f calico-v3.27.5-custom.yaml
+~~~
+
+Then wait for both Calico components to finish rolling out:
+
+~~~bash
+kubectl -n kube-system rollout status daemonset/calico-node
+kubectl -n kube-system rollout status deployment/calico-kube-controllers
+~~~
+
+The resulting state was:
 
 ~~~text
-v1.27.16 → v1.28.15
+calico-node                 5/5 Ready
+calico-kube-controllers     1/1 Ready
+Calico                      v3.27.5
 ~~~
+
+The custom autodetection setting was checked again:
+
+~~~bash
+kubectl -n kube-system get daemonset calico-node   -o jsonpath='{range .spec.template.spec.containers[?(@.name=="calico-node")].env[*]}{.name}={.value}{"\n"}{end}'   | grep -E '^IP=|^IP_AUTODETECTION_METHOD='
+~~~
+
+~~~text
+IP=autodetect
+IP_AUTODETECTION_METHOD=can-reach=10.10.10.1
+~~~
+
+Only after Calico was healthy did I move on to Kubernetes v1.28.15.
+
+### kubeadm upgrade plan: what changes in this jump
+
+After updating the control-plane kubeadm binary to v1.28.15 and verifying its SHA256 checksum, I ran:
+
+~~~bash
+kubeadm upgrade plan v1.28.15
+~~~
+
+The actual plan was:
+
+| Component | Current | Target |
+| --- | --- | --- |
+| kube-apiserver | v1.27.16 | v1.28.15 |
+| kube-controller-manager | v1.27.16 | v1.28.15 |
+| kube-scheduler | v1.27.16 | v1.28.15 |
+| kube-proxy | v1.27.16 | v1.28.15 |
+| CoreDNS | v1.10.1 | v1.10.1 |
+| etcd | 3.5.12-0 | 3.5.15-0 |
+| kubelet | all 5 nodes on v1.27.16 | v1.28.15 |
+
+The kube-proxy and kubelet component configs remained on their current API versions, so no manual config migration was required in this round.
+
+### Upgrade the control-plane
+
+After pre-pulling the target images, I ran a dry run first:
+
+~~~bash
+kubeadm upgrade apply v1.28.15 --dry-run --yes
+~~~
+
+It ended with:
+
+~~~text
+[upgrade/successful] Finished dryrunning successfully!
+~~~
+
+Then I applied the upgrade:
+
+~~~bash
+kubeadm upgrade apply v1.28.15 --yes
+~~~
+
+The final result was:
+
+~~~text
+[upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.28.15". Enjoy!
+~~~
+
+At that point the control-plane static Pods and etcd were already on their target versions, while the master kubelet still had to be updated separately.
+
+For the master drain I reused the `emptyDir` handling already established earlier instead of repeating the same initial failure:
+
+~~~bash
+kubectl drain master   --ignore-daemonsets   --delete-emptydir-data
+~~~
+
+The kubelet and kubectl binaries were then updated using the same download, checksum, and replacement procedure shown earlier. After restarting kubelet and confirming that the master was `Ready,SchedulingDisabled` on v1.28.15, I uncordoned it:
+
+~~~bash
+kubectl uncordon master
+~~~
+
+### Upgrade workers one at a time
+
+The worker sequence did not change:
+
+~~~text
+update kubeadm
+→ kubeadm upgrade node
+→ drain
+→ update kubelet
+→ restart kubelet
+→ verify
+→ uncordon
+~~~
+
+The four workers ended this round as follows:
+
+| Node | Result | Difference in this round |
+| --- | --- | --- |
+| node1 | v1.28.15 / Ready | drain was blocked again by the Prometheus PDB |
+| node2 | v1.28.15 / Ready | no new issue |
+| node3 | v1.28.15 / Ready | no new issue |
+| node4 | v1.28.15 / Ready | drain was blocked again by the Prometheus PDB |
+
+node1 and node4 hit the same constraint already analyzed in the previous section:
+
+~~~text
+Cannot evict pod as it would violate the pod's disruption budget.
+~~~
+
+I therefore reused the already-tested handling instead of repeating the PDB and `emptyDir` explanation: temporarily change the `prometheus-k8s` PDB from `minAvailable: 1` to `minAvailable: 0`, complete the drain, wait until `prometheus-k8s-0` is `2/2 Running` on another node, and then restore `minAvailable: 1`.
+
+### Final v1.28.15 state
+
+After all nodes were complete:
+
+~~~bash
+kubectl get nodes -o wide
+~~~
+
+~~~text
+NAME     STATUS   ROLES           VERSION
+master   Ready    control-plane   v1.28.15
+node1    Ready    worker          v1.28.15
+node2    Ready    worker          v1.28.15
+node3    Ready    worker          v1.28.15
+node4    Ready    worker          v1.28.15
+~~~
+
+The key component versions were:
+
+| Component | Final state |
+| --- | --- |
+| kube-apiserver | v1.28.15 |
+| kube-controller-manager | v1.28.15 |
+| kube-scheduler | v1.28.15 |
+| etcd | 3.5.15-0 |
+| CoreDNS | v1.10.1, 2/2 Ready |
+| kube-proxy | v1.28.15, 5/5 Ready |
+| Calico | v3.27.5, calico-node 5/5 Ready |
+| Prometheus | 2/2 Running |
+| Prometheus PDB | minAvailable=1 |
+
+The local Calico autodetection setting was still preserved:
+
+~~~text
+IP=autodetect
+IP_AUTODETECTION_METHOD=can-reach=10.10.10.1
+~~~
+
+API readiness:
+
+~~~bash
+kubectl get --raw='/readyz?verbose'
+~~~
+
+ended with:
+
+~~~text
+[+]ping ok
+[+]etcd ok
+[+]etcd-readiness ok
+...
+readyz check passed
+~~~
+
+I also checked for Pods outside the normal terminal states:
+
+~~~bash
+kubectl get pods -A --no-headers |   awk '$4 != "Running" && $4 != "Completed" {print}'
+~~~
+
+The command returned no output.
+
+### Verify DNS, Service networking, and the API from inside a Pod
+
+Node and control-plane readiness are useful, but I also wanted one functional check from an ordinary Pod.
+
+First, verify cluster DNS:
+
+~~~bash
+kubectl run dns-smoke-test   --image=busybox:1.36   --restart=Never   --command --   nslookup kubernetes.default.svc.cluster.local
+
+kubectl logs dns-smoke-test
+~~~
+
+The lookup returned:
+
+~~~text
+Server:  10.96.0.10
+Name:    kubernetes.default.svc.cluster.local
+Address: 10.96.0.1
+~~~
+
+Then use a curl container with normal TLS support to call the Kubernetes API Service. The command intentionally avoids verbose mode so the ServiceAccount token is not printed into logs:
+
+~~~bash
+kubectl run api-smoke-test   --image=curlimages/curl:8.10.1   --restart=Never   --command -- sh -c '
+    TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+    curl -sS       --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt       -H "Authorization: Bearer ${TOKEN}"       https://kubernetes.default.svc/version
+  '
+
+kubectl logs api-smoke-test
+~~~
+
+The returned version data included:
+
+~~~json
+{
+  "major": "1",
+  "minor": "28",
+  "gitVersion": "v1.28.15"
+}
+~~~
+
+This extends the verification beyond node status: DNS from a Pod can resolve the Service, the Service ClusterIP can reach the API server, TLS CA verification and ServiceAccount authentication work, and the API returns the expected v1.28.15 version.
+
+Remove the temporary Pods when finished:
+
+~~~bash
+kubectl delete pod dns-smoke-test api-smoke-test
+~~~
+
+That completes the v1.27.16 → v1.28.15 stage.
 
 ## References
 
@@ -767,3 +1021,5 @@ v1.27.16 → v1.28.15
 - <a href="https://kubernetes.io/releases/version-skew-policy/" target="_blank" rel="noopener noreferrer">Kubernetes version skew policy</a>
 - <a href="https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta3/" target="_blank" rel="noopener noreferrer">kubeadm Configuration (v1beta3)</a>
 - <a href="https://kubernetes.io/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain</a>
+- <a href="https://kubernetes.io/releases/1.28/" target="_blank" rel="noopener noreferrer">Kubernetes 1.28 release</a>
+- <a href="https://docs.tigera.io/calico/latest/getting-started/kubernetes/requirements" target="_blank" rel="noopener noreferrer">Calico Kubernetes system requirements</a>
