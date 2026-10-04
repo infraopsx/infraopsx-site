@@ -691,7 +691,17 @@ prometheus-k8s-db => PVC= hostPath= emptyDir={}
 
 So node2 had two independent constraints at the same time: the PDB blocked normal eviction, while the Prometheus TSDB itself lived in the Pod's `emptyDir`. Deleting and recreating that Pod would therefore also discard its local TSDB history.
 
-This test cluster ultimately completed the node2 upgrade. On a production cluster with the same layout, Prometheus persistence and replica strategy should be addressed before deciding how to handle the PDB rather than simply bypassing the protection and continuing the drain.
+In this test cluster, the PDB was relaxed temporarily: the original PDB was saved, `prometheus-k8s` was changed from `minAvailable: 1` to `minAvailable: 0`, node2 was drained, and the original PDB was restored after the maintenance:
+
+~~~text
+save the original PDB
+→ temporarily change minAvailable: 1 to 0
+→ drain node2 again
+→ complete node maintenance
+→ restore the original PDB
+~~~
+
+That was acceptable here because this was a test cluster and the Prometheus TSDB had already been confirmed to use `emptyDir`, so losing its local history during this maintenance window was acceptable. On a production cluster with the same layout, Prometheus persistence and replica strategy should be addressed before relaxing the PDB and continuing the drain.
 
 ### node3 and node4: continue with the same emptyDir handling
 
