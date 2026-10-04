@@ -587,7 +587,7 @@ update kubeadm
 → uncordon
 ~~~
 
-In this procedure, I run the cluster-management `kubectl` commands from the control-plane node. The worker steps therefore update kubeadm and kubelet only; the workers do not need a local kubectl installation.
+In this procedure, I run the cluster-management `kubectl` commands from the control-plane node. The worker steps therefore update kubeadm and kubelet only; the workers do not need a local kubectl installation. The earlier sections already show how kubeadm and kubelet binaries are downloaded, verified with SHA256, and installed, so those repeated binary-update steps are not expanded again here.
 
 The repeated worker steps are not expanded node by node below. Only the drain differences are kept.
 
@@ -628,8 +628,8 @@ The first commands were:
 
 ~~~bash
 kubectl drain node2 --ignore-daemonsets
-kubectl drain node3 --ignore-daemonsets --timeout=5m
-kubectl drain node4 --ignore-daemonsets --timeout=5m
+kubectl drain node3 --ignore-daemonsets
+kubectl drain node4 --ignore-daemonsets
 ~~~
 
 All three nodes hit the same class of error:
@@ -644,8 +644,8 @@ After confirming that the temporary data could be discarded, the drain commands 
 
 ~~~bash
 kubectl drain node2 --ignore-daemonsets --delete-emptydir-data
-kubectl drain node3 --ignore-daemonsets --delete-emptydir-data --timeout=5m
-kubectl drain node4 --ignore-daemonsets --delete-emptydir-data --timeout=5m
+kubectl drain node3 --ignore-daemonsets --delete-emptydir-data
+kubectl drain node4 --ignore-daemonsets --delete-emptydir-data
 ~~~
 
 After drain completed, all three nodes were `SchedulingDisabled`. Their kubelets had not yet been updated, so they still reported v1.27.0:
