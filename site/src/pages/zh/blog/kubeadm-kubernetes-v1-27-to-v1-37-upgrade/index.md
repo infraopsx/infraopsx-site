@@ -775,11 +775,19 @@ node4    Ready    worker          261d   v1.27.16
   value: "can-reach=10.10.10.1"
 ~~~
 
-因此这里不是直接拿新版 manifest 覆盖，而是在 v3.27.5 manifest 中保留这项配置后再应用：
+先获取官方 v3.27.5 manifest，并复制一份用于保留当前集群的本地配置：
 
 ~~~bash
-kubectl apply --server-side --force-conflicts \
-  -f calico-v3.27.5-custom.yaml
+curl -LO \
+  https://raw.githubusercontent.com/projectcalico/calico/v3.27.5/manifests/calico.yaml
+
+cp calico.yaml calico-v3.27.5-custom.yaml
+~~~
+
+然后在 `calico-v3.27.5-custom.yaml` 中保留上面的 `IP` 和 `IP_AUTODETECTION_METHOD` 配置，再应用：
+
+~~~bash
+kubectl apply -f calico-v3.27.5-custom.yaml
 ~~~
 
 等待两个组件完成 rollout：
@@ -812,7 +820,7 @@ IP_AUTODETECTION_METHOD=can-reach=10.10.10.1
 
 Calico 稳定后再进入 Kubernetes v1.28.15 升级。
 
-### kubeadm upgrade plan：这一跳会改变什么
+### 确认 v1.28.15 升级计划
 
 control-plane 上的 kubeadm 更新到 v1.28.15 并完成 SHA256 校验后，执行：
 
@@ -831,8 +839,6 @@ kubeadm upgrade plan v1.28.15
 | CoreDNS | v1.10.1 | v1.10.1 |
 | etcd | 3.5.12-0 | 3.5.15-0 |
 | kubelet | 5 个节点均为 v1.27.16 | v1.28.15 |
-
-同时，kube-proxy 和 kubelet 的 component config 都仍然使用当前 API 版本，本轮不需要手工做配置迁移。
 
 ### 升级 control-plane
 
@@ -994,7 +1000,7 @@ Name:    kubernetes.default.svc.cluster.local
 Address: 10.96.0.1
 ~~~
 
-然后用带正常 TLS 支持的 curl 容器访问 Kubernetes API Service。命令只输出 API 返回内容，不使用 verbose 模式，避免把 ServiceAccount token 打到日志里：
+然后用 curl 容器访问 Kubernetes API Service：
 
 ~~~bash
 kubectl run api-smoke-test \
