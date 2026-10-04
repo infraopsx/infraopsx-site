@@ -673,33 +673,45 @@ node-exporter-...
 
 这些输出说明，前一台节点上的 Pod 被驱逐后会被重新调度到其他尚未维护的节点，所以后面的 drain 可能再次遇到相同 blocker。
 
-### node2：先 drain，再由报错定位到 Prometheus
+### node2：第一次 drain
 
-node2 是本轮最后处理的 worker。到这里，前面几个节点已经遇到过 `emptyDir`，因此处理 node2 时继续按相同的维护流程先执行 drain，而不是预先假定 Prometheus 会有问题。
+node2 是本轮最后处理的 worker。开始处理时仍然按正常维护流程先 drain，不提前判断会遇到什么问题。
+
+第一次执行：
 
 ~~~bash
-kubectl drain node2 \
-  --ignore-daemonsets \
-  --delete-emptydir-data \
-  --timeout=5m
+kubectl drain node2 --ignore-daemonsets
 ~~~
 
-这次 drain 没有正常完成。正是在看到 drain 的实际报错以后，排查方向才转到 `monitoring/prometheus-k8s-0`；也就是说，下面的 PDB 和 volume 检查都是 **drain 失败后的故障定位**，不是 node2 升级前的固定预检查。
+这次 drain 没有正常完成。到这里才开始根据实际错误继续排查 Pod 的驱逐限制，而不是在 drain 之前预判某个 workload 有问题。
 
-先看 PDB：
+继续检查相关 PDB：
 
 ~~~bash
 kubectl -n monitoring get pdb prometheus-k8s -o wide
 ~~~
+
+当时的实际输出是：
 
 ~~~text
 NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
 prometheus-k8s   1               N/A               0
 ~~~
 
-这里的关键值是 `ALLOWED DISRUPTIONS=0`。在当时这个状态下，`prometheus-k8s-0` 不能通过正常 eviction 被驱逐，这与 drain 中出现的 Prometheus 驱逐问题一致。
+这里可以确认，当时 `prometheus-k8s` 的 `ALLOWED DISRUPTIONS` 为 `0`。也就是说，在这个 PDB 状态下，正常 eviction 不允许再中断这个 Pod。
 
-接着检查它的数据到底放在哪里，先看 PVC、StorageClass 和 PV：
+当时还把 PDB 的完整 YAML 保存进了本轮升级日志：
+
+~~~bash
+RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
+
+kubectl -n monitoring get pdb prometheus-k8s -o yaml \
+  > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
+~~~
+
+确认 PDB 状态之后，才继续检查这个 Pod 的数据存储方式，判断如果后续需要删除或重建 Pod，会不会丢数据。
+
+先看 PVC、StorageClass 和 PV：
 
 ~~~bash
 kubectl -n monitoring get pvc
@@ -715,44 +727,37 @@ No resources found
 No resources found
 ~~~
 
-继续直接检查 `prometheus-k8s-0` 的 volume：
+然后检查 Pod volume：
 
 ~~~bash
 kubectl -n monitoring get pod prometheus-k8s-0 \
   -o jsonpath='{range .spec.volumes[*]}{.name}{" => PVC="}{.persistentVolumeClaim.claimName}{" hostPath="}{.hostPath.path}{" emptyDir="}{.emptyDir}{"\n"}{end}'
 ~~~
 
-其中数据库 volume 是：
+数据库 volume 的输出是：
 
 ~~~text
 prometheus-k8s-db => PVC= hostPath= emptyDir={}
 ~~~
 
-也就是说，这个 Prometheus 没有使用 PVC，TSDB 数据实际落在 Pod 的 `emptyDir` 中。Pod 一旦被删除并重新创建，这部分本地历史数据不会保留。
+这说明该 Prometheus 实例没有使用 PVC，TSDB 数据位于 Pod 的 `emptyDir`。因此如果删除并重新创建 Pod，这部分本地历史数据不会保留。
 
-在继续处理前，把当时的 PDB 配置保存下来：
-
-~~~bash
-RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
-
-kubectl -n monitoring get pdb prometheus-k8s -o yaml \
-  > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
-~~~
-
-因此，node2 这一段的真实排障顺序是：
+node2 这一段的记录顺序应当理解为：
 
 ~~~text
-先执行 drain
+执行第一次 drain
 → drain 报错
-→ 根据报错定位到 prometheus-k8s
-→ 检查 PDB，发现 ALLOWED DISRUPTIONS=0
-→ 检查 PVC / StorageClass / PV
-→ 检查 Pod volume，确认 TSDB 使用 emptyDir
-→ 评估驱逐/重建的数据影响
-→ 处理 blocker 后继续 node2 升级
+→ 根据错误继续排查驱逐限制
+→ 检查 PDB
+→ 看到 prometheus-k8s 的 ALLOWED DISRUPTIONS=0
+→ 保存 PDB YAML
+→ 再检查 PVC / PV / StorageClass
+→ 检查 Pod volume
+→ 确认 TSDB 使用 emptyDir
+→ 评估数据影响后继续处理 node2
 ~~~
 
-这里需要特别区分两个 workload：前面多个节点 drain 时遇到过 `prometheus-adapter` 的 `emptyDir`，而 node2 这里进一步排查的是 `prometheus-k8s` 本身。二者不是同一个 Pod。
+这里的重点是：`prometheus-k8s` 是在第一次 drain 出现问题之后才进入排查过程，不是处理 node2 之前预先检查的对象。
 
 node2 后续完成了升级；最终节点状态见下一节。
 
