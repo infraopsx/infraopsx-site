@@ -590,7 +590,7 @@ control-plane 处理完后，再逐台升级 worker。worker 侧的基本顺序�
 → uncordon
 ~~~
 
-本次集群管理用的 `kubectl` 命令从 control-plane 节点执行。worker 侧只更新 kubeadm 和 kubelet，不需要在 worker 上安装或更新 kubectl。
+本次集群管理用的 `kubectl` 命令从 control-plane 节点执行。worker 侧只更新 kubeadm 和 kubelet，不需要在 worker 上安装或更新 kubectl。kubeadm 和 kubelet 的下载、SHA256 校验以及替换二进制的方式前文已经写过，这里不再重复展开。
 
 各 worker 的重复步骤不再逐台展开，下面只记录 drain 过程中出现的差异。
 
@@ -631,8 +631,8 @@ node2、node3 和 node4 第一次执行 drain 时，都被使用 `emptyDir` 的 
 
 ~~~bash
 kubectl drain node2 --ignore-daemonsets
-kubectl drain node3 --ignore-daemonsets --timeout=5m
-kubectl drain node4 --ignore-daemonsets --timeout=5m
+kubectl drain node3 --ignore-daemonsets
+kubectl drain node4 --ignore-daemonsets
 ~~~
 
 三台节点都出现了同一类错误：
@@ -647,8 +647,8 @@ cannot delete Pods with local storage (use --delete-emptydir-data to override):
 
 ~~~bash
 kubectl drain node2 --ignore-daemonsets --delete-emptydir-data
-kubectl drain node3 --ignore-daemonsets --delete-emptydir-data --timeout=5m
-kubectl drain node4 --ignore-daemonsets --delete-emptydir-data --timeout=5m
+kubectl drain node3 --ignore-daemonsets --delete-emptydir-data
+kubectl drain node4 --ignore-daemonsets --delete-emptydir-data
 ~~~
 
 drain 完成后，三台节点都处于 `SchedulingDisabled`，此时 kubelet 还没有更新，所以版本仍然是 v1.27.0：
