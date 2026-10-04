@@ -772,11 +772,19 @@ This cluster also has one local setting that must survive the Calico upgrade:
   value: "can-reach=10.10.10.1"
 ~~~
 
-So the v3.27.5 manifest was adjusted to preserve that setting before it was applied:
+First download the official v3.27.5 manifest and copy it to a local file that can preserve the cluster-specific settings:
 
 ~~~bash
-kubectl apply --server-side --force-conflicts \
-  -f calico-v3.27.5-custom.yaml
+curl -LO \
+  https://raw.githubusercontent.com/projectcalico/calico/v3.27.5/manifests/calico.yaml
+
+cp calico.yaml calico-v3.27.5-custom.yaml
+~~~
+
+Then keep the `IP` and `IP_AUTODETECTION_METHOD` settings shown above in `calico-v3.27.5-custom.yaml`, and apply it:
+
+~~~bash
+kubectl apply -f calico-v3.27.5-custom.yaml
 ~~~
 
 Then wait for both Calico components to finish rolling out:
@@ -809,7 +817,7 @@ IP_AUTODETECTION_METHOD=can-reach=10.10.10.1
 
 Only after Calico was healthy did I move on to Kubernetes v1.28.15.
 
-### kubeadm upgrade plan: what changes in this jump
+### Confirm the v1.28.15 upgrade plan
 
 After updating the control-plane kubeadm binary to v1.28.15 and verifying its SHA256 checksum, I ran:
 
@@ -828,8 +836,6 @@ The actual plan was:
 | CoreDNS | v1.10.1 | v1.10.1 |
 | etcd | 3.5.12-0 | 3.5.15-0 |
 | kubelet | all 5 nodes on v1.27.16 | v1.28.15 |
-
-The kube-proxy and kubelet component configs remained on their current API versions, so no manual config migration was required in this round.
 
 ### Upgrade the control-plane
 
@@ -991,7 +997,7 @@ Name:    kubernetes.default.svc.cluster.local
 Address: 10.96.0.1
 ~~~
 
-Then use a curl container with normal TLS support to call the Kubernetes API Service. The command intentionally avoids verbose mode so the ServiceAccount token is not printed into logs:
+Then use a curl container to call the Kubernetes API Service:
 
 ~~~bash
 kubectl run api-smoke-test \
