@@ -622,69 +622,42 @@ At that point only expected DaemonSet Pods such as Calico, kube-proxy, and node-
 
 ### node2, node3, and node4: the same drain problem appeared again
 
-The first node2 drain was:
+The first drain attempt on node2, node3, and node4 was blocked by Pods using `emptyDir`.
+
+The first commands were:
 
 ~~~bash
 kubectl drain node2 --ignore-daemonsets
-~~~
-
-Relevant output:
-
-~~~text
-node/node2 cordoned
-cannot delete Pods with local storage:
-  kube-system/metrics-server-...
-~~~
-
-It also did not complete on the first attempt and hit the same class of local-storage drain blocker seen on the other workers. It is therefore kept in this shared section rather than expanded into a separate troubleshooting section.
-
-The first node3 drain also failed:
-
-~~~bash
 kubectl drain node3 --ignore-daemonsets --timeout=5m
-~~~
-
-Relevant output:
-
-~~~text
-node/node3 cordoned
-cannot delete Pods with local storage:
-  kubernetes-dashboard/kubernetes-dashboard-...
-~~~
-
-The first node4 drain encountered the same kind of problem:
-
-~~~bash
 kubectl drain node4 --ignore-daemonsets --timeout=5m
 ~~~
 
-The relevant output again pointed to Pods with local storage:
+All three nodes hit the same class of error:
 
 ~~~text
-cannot delete Pods with local storage:
-  kube-system/metrics-server-...
+cannot delete Pods with local storage (use --delete-emptydir-data to override):
 ~~~
 
-After the ordinary workload Pods had moved away, node4 was observed as:
+Those Pods used local `emptyDir` storage. By default, `kubectl drain` does not delete them because doing so discards temporary data tied to the Pod lifecycle.
+
+After confirming that the temporary data could be discarded, the drain commands were retried with `--delete-emptydir-data`:
+
+~~~bash
+kubectl drain node2 --ignore-daemonsets --delete-emptydir-data
+kubectl drain node3 --ignore-daemonsets --delete-emptydir-data --timeout=5m
+kubectl drain node4 --ignore-daemonsets --delete-emptydir-data --timeout=5m
+~~~
+
+After drain completed, all three nodes were `SchedulingDisabled`. Their kubelets had not yet been updated, so they still reported v1.27.0:
 
 ~~~text
 NAME    STATUS                     ROLES    AGE    VERSION
+node2   Ready,SchedulingDisabled   worker   260d   v1.27.0
+node3   Ready,SchedulingDisabled   worker   260d   v1.27.0
 node4   Ready,SchedulingDisabled   worker   260d   v1.27.0
 ~~~
 
-Only DaemonSet Pods remained:
-
-~~~text
-calico-node-...
-kube-proxy-...
-node-exporter-...
-~~~
-
-node4's kubelet was then updated and the node later returned as `Ready v1.27.16`.
-
-The repeated pattern across these three workers shows that ordinary Pods evicted from one worker can be rescheduled onto another worker that has not yet been maintained. A later drain can therefore hit the same class of local-storage blocker again.
-
-node2, node3, and node4 were all subsequently updated and returned to scheduling; the final node state is shown in the next section.
+The kubelet on each node was then updated, and the node was uncordoned after verification. The final state is shown in the next section.
 
 ## Final v1.27.16 state
 
