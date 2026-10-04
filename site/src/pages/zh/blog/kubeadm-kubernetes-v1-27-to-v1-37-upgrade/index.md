@@ -576,7 +576,7 @@ kubectl uncordon master
 
 最终的 `kubectl get nodes` 结果会在文末统一确认。
 
-## 升级 kubelet 和 worker
+## 升级 worker 节点
 
 control-plane 处理完后，再逐台升级 worker。worker 侧的基本顺序是：
 
