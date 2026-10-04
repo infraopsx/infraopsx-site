@@ -625,12 +625,18 @@ node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 
 ### node2、node3 和 node4：同样的 drain 问题再次出现
 
-node2 是这三个节点里最后实际处理的一个，但这里按节点编号顺序记录。
-
 node2 第一次执行：
 
 ~~~bash
 kubectl drain node2 --ignore-daemonsets
+~~~
+
+关键输出：
+
+~~~text
+node/node2 cordoned
+cannot delete Pods with local storage:
+  kube-system/metrics-server-...
 ~~~
 
 同样没有一次成功，遇到的也是前面已经出现过的本地存储类 drain blocker。这里不再单独展开新的排障章节。
