@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/ArticleLayout.astro
 title: "Kubernetes v1.27 to v1.37: A kubeadm Cluster Upgrade Log"
-description: "A 5-node kubeadm cluster upgrade from Kubernetes v1.27 to v1.37. Part 1 covers v1.27.0 to v1.27.16, including backup, etcd, drain failures, and verification."
+description: "A 5-node kubeadm cluster upgrade from Kubernetes v1.27 to v1.37. Part 1 covers v1.27.0 to v1.27.16, including etcd backup, worker drain, emptyDir, PodDisruptionBudget (PDB), and verification."
 pubDate: "2026-10-02"
 category: Kubernetes
 tags:
@@ -9,6 +9,8 @@ tags:
   - kubeadm
   - Upgrade
   - etcd
+  - PodDisruptionBudget
+  - PDB
 enPath: "/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/"
 zhPath: "/zh/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/"
 ---
