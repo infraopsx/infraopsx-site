@@ -625,6 +625,16 @@ node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 
 ### node2、node3 和 node4：同样的 drain 问题再次出现
 
+node2 是这三个节点里最后实际处理的一个，但这里按节点编号顺序记录。
+
+node2 第一次执行：
+
+~~~bash
+kubectl drain node2 --ignore-daemonsets
+~~~
+
+同样没有一次成功，遇到的也是前面已经出现过的本地存储类 drain blocker。这里不再单独展开新的排障章节。
+
 node3 第一次 drain 也没有一次成功：
 
 ~~~bash
@@ -669,15 +679,7 @@ node-exporter-...
 
 node4 的 kubelet 后续完成更新并恢复为 `Ready v1.27.16`。
 
-最后处理 node2 时，第一次同样先执行 drain：
-
-~~~bash
-kubectl drain node2 --ignore-daemonsets
-~~~
-
-node2 也遇到了前面相同类型的 drain 问题，因此这里不再单独展开一套新的排障章节，而是和 node3、node4 放在一起记录。
-
-这一轮连续出现的现象说明：前一台节点上的普通 Pod 被驱逐后，会重新调度到其他尚未维护的节点，因此后续节点再次 drain 时，可能再次遇到同一类带本地存储 Pod 的 blocker。
+这三个节点连续出现同类情况，说明前一台节点上的普通 Pod 被驱逐后，会重新调度到其他尚未维护的节点，因此后续节点再次 drain 时，可能再次遇到同一类带本地存储 Pod 的 blocker。
 
 node2、node3 和 node4 后续都完成了 kubelet 更新并恢复调度；最终节点状态见下一节。
 
