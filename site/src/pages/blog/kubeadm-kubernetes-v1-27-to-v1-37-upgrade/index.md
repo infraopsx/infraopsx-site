@@ -619,44 +619,109 @@ node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 
 At that point only expected DaemonSet Pods such as Calico, kube-proxy, and node-exporter remained on node1 before it was uncordoned.
 
-### node2, node3, and node4: the same drain problem appeared again
+### node2: after allowing emptyDir deletion, the Prometheus PDB blocked drain
 
-The first drain attempt on node2, node3, and node4 was blocked by Pods using `emptyDir`.
-
-The first commands were:
+The first node2 drain hit the same `emptyDir` restriction seen earlier. After confirming that the temporary data could be discarded, the drain was retried with `--delete-emptydir-data`:
 
 ~~~bash
-kubectl drain node2 --ignore-daemonsets
+kubectl drain node2 --ignore-daemonsets --delete-emptydir-data
+~~~
+
+Ordinary Pods started moving, but `prometheus-k8s-0` could not be evicted and drain kept retrying:
+
+~~~text
+evicting pod monitoring/prometheus-k8s-0
+error when evicting pods/"prometheus-k8s-0" -n "monitoring" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+~~~
+
+These are two different layers of protection. `--delete-emptydir-data` only allows drain to remove Pods that use `emptyDir`; it does not bypass a PodDisruptionBudget. The Prometheus PDB was checked next:
+
+~~~bash
+kubectl -n monitoring get pdb prometheus-k8s -o wide
+~~~
+
+Its state was:
+
+~~~text
+NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
+prometheus-k8s   1               N/A               0
+~~~
+
+With `ALLOWED DISRUPTIONS=0`, a normal eviction could not disrupt this Pod in the current replica and PDB state.
+
+Before changing anything, the original PDB was saved:
+
+~~~bash
+RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
+
+kubectl -n monitoring get pdb prometheus-k8s -o yaml \
+  > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
+~~~
+
+The PDB explained why normal eviction failed, but it was also necessary to check what would happen to the data if the Pod were deleted and recreated. PVCs, StorageClasses, and PVs were checked:
+
+~~~bash
+kubectl -n monitoring get pvc
+kubectl get storageclass
+kubectl get pv
+~~~
+
+The commands returned:
+
+~~~text
+No resources found in monitoring namespace.
+No resources found
+No resources found
+~~~
+
+The `prometheus-k8s-0` volumes were then inspected directly:
+
+~~~bash
+kubectl -n monitoring get pod prometheus-k8s-0 \
+  -o jsonpath='{range .spec.volumes[*]}{.name}{" => PVC="}{.persistentVolumeClaim.claimName}{" hostPath="}{.hostPath.path}{" emptyDir="}{.emptyDir}{"\n"}{end}'
+~~~
+
+The database volume was:
+
+~~~text
+prometheus-k8s-db => PVC= hostPath= emptyDir={}
+~~~
+
+So node2 had two independent constraints at the same time: the PDB blocked normal eviction, while the Prometheus TSDB itself lived in the Pod's `emptyDir`. Deleting and recreating that Pod would therefore also discard its local TSDB history.
+
+This test cluster ultimately completed the node2 upgrade. On a production cluster with the same layout, Prometheus persistence and replica strategy should be addressed before deciding how to handle the PDB rather than simply bypassing the protection and continuing the drain.
+
+### node3 and node4: continue with the same emptyDir handling
+
+The first drain attempt on node3 and node4 was also blocked by Pods using `emptyDir`:
+
+~~~bash
 kubectl drain node3 --ignore-daemonsets
 kubectl drain node4 --ignore-daemonsets
 ~~~
 
-All three nodes hit the same class of error:
+Both nodes hit the same class of error:
 
 ~~~text
 cannot delete Pods with local storage (use --delete-emptydir-data to override):
 ~~~
 
-Those Pods used local `emptyDir` storage. By default, `kubectl drain` does not delete them because doing so discards temporary data tied to the Pod lifecycle.
-
-After confirming that the temporary data could be discarded, the drain commands were retried with `--delete-emptydir-data`:
+After confirming that the temporary data could be discarded, the drain commands were retried with:
 
 ~~~bash
-kubectl drain node2 --ignore-daemonsets --delete-emptydir-data
 kubectl drain node3 --ignore-daemonsets --delete-emptydir-data
 kubectl drain node4 --ignore-daemonsets --delete-emptydir-data
 ~~~
 
-After drain completed, all three nodes were `SchedulingDisabled`. Their kubelets had not yet been updated, so they still reported v1.27.0:
+After drain completed, both nodes were `SchedulingDisabled`. Their kubelets had not yet been updated, so they still reported v1.27.0:
 
 ~~~text
 NAME    STATUS                     ROLES    AGE    VERSION
-node2   Ready,SchedulingDisabled   worker   260d   v1.27.0
 node3   Ready,SchedulingDisabled   worker   260d   v1.27.0
 node4   Ready,SchedulingDisabled   worker   260d   v1.27.0
 ~~~
 
-The kubelet on each node was then updated, and the node was uncordoned after verification. The final state is shown in the next section.
+The kubelet on each node was then updated, and each node was uncordoned after verification. The final state is shown in the next section.
 
 ## Final v1.27.16 state
 
