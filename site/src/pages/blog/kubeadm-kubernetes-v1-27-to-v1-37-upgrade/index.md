@@ -672,32 +672,32 @@ The repeated failures show that a Pod evicted from one worker can land on a work
 
 ### node2: first drain attempt
 
-node2 was the last worker in this round. The maintenance started with a normal drain, without assuming in advance which workload might cause a problem.
-
-The first command was:
+node2 was the last worker in this round. The maintenance started with the normal command:
 
 ~~~bash
 kubectl drain node2 --ignore-daemonsets
 ~~~
 
-This drain did not complete normally. Only at that point did the troubleshooting move on to the actual Pod eviction constraints reported during drain.
+The complete terminal output from this drain attempt should be shown here.
 
-The relevant PDB was then checked:
+However, after re-checking the currently retrievable chat records, indexed files, and article history, I could recover the later PDB and volume checks but not the original output from this `kubectl drain node2` command. Therefore this article no longer claims that a specific Pod or PDB caused the drain failure or that the drain output directly led to the PDB check.
+
+The following entries are only **later checks that were actually preserved during the same node2 maintenance**. They do not replace the missing first-drain log and cannot by themselves prove why the PDB investigation was started.
+
+A later PDB query was recorded:
 
 ~~~bash
 kubectl -n monitoring get pdb prometheus-k8s -o wide
 ~~~
 
-The recorded output was:
+Recorded output:
 
 ~~~text
 NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
 prometheus-k8s   1               N/A               0
 ~~~
 
-This confirms that `prometheus-k8s` had `ALLOWED DISRUPTIONS=0` at that time. With the PDB in that state, a normal eviction could not disrupt that Pod.
-
-The complete PDB YAML was also saved into the upgrade log:
+The full PDB YAML was also saved:
 
 ~~~bash
 RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
@@ -706,9 +706,7 @@ kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
 
-Only after confirming the PDB state did the investigation continue into the Pod's storage, to understand the data impact if the Pod later had to be deleted or recreated.
-
-Check PVCs, StorageClasses, and PVs:
+Storage resources were checked as well:
 
 ~~~bash
 kubectl -n monitoring get pvc
@@ -716,7 +714,7 @@ kubectl get storageclass
 kubectl get pv
 ~~~
 
-Recorded output:
+Output:
 
 ~~~text
 No resources found in monitoring namespace.
@@ -724,7 +722,7 @@ No resources found
 No resources found
 ~~~
 
-Then inspect the Pod volumes:
+The `prometheus-k8s-0` volumes were then inspected:
 
 ~~~bash
 kubectl -n monitoring get pod prometheus-k8s-0 \
@@ -737,24 +735,12 @@ The database volume was:
 prometheus-k8s-db => PVC= hostPath= emptyDir={}
 ~~~
 
-So this Prometheus instance did not use a PVC. Its TSDB data lived in an `emptyDir`, meaning local historical data would not survive deletion and recreation of the Pod.
+These preserved checks establish two facts:
 
-The node2 chronology is therefore:
+- the `prometheus-k8s` PDB had `ALLOWED DISRUPTIONS=0`;
+- the `prometheus-k8s-0` TSDB volume used `emptyDir` rather than a PVC.
 
-~~~text
-run the first drain
-→ drain reports an error
-→ investigate the reported eviction constraint
-→ inspect the PDB
-→ see prometheus-k8s with ALLOWED DISRUPTIONS=0
-→ save the PDB YAML
-→ inspect PVC / PV / StorageClass
-→ inspect the Pod volumes
-→ confirm the TSDB uses emptyDir
-→ assess data impact and continue node2 maintenance
-~~~
-
-The important point is that `prometheus-k8s` entered the investigation only after the first drain problem appeared; it was not a pre-check before touching node2.
+Until the original first `drain node2` output is recovered, the article does not present either fact as the direct drain blocker or as the proven reason the PDB check was initiated.
 
 node2 was subsequently upgraded successfully; the final node state is shown in the next section.
 
