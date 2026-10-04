@@ -1,7 +1,7 @@
 ---
 layout: ../../../../layouts/ArticleLayout.astro
 title: "Kubernetes v1.27 到 v1.37：一次 kubeadm 集群升级记录"
-description: "记录一个 5 节点 kubeadm 集群从 Kubernetes v1.27 逐步升级到 v1.37。第一部分是 v1.27.0 到 v1.27.16，包括备份、etcd、drain 和最终验证。"
+description: "记录一个 5 节点 kubeadm 集群从 Kubernetes v1.27 逐步升级到 v1.37。第一部分覆盖 v1.27.0 到 v1.27.16，包括 etcd 备份、worker drain、emptyDir、PodDisruptionBudget（PDB）和最终验证。"
 pubDate: "2026-10-02"
 category: Kubernetes
 tags:
@@ -9,6 +9,8 @@ tags:
   - kubeadm
   - Upgrade
   - etcd
+  - PodDisruptionBudget
+  - PDB
 enPath: "/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/"
 zhPath: "/zh/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/"
 ---
