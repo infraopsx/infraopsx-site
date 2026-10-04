@@ -670,11 +670,20 @@ node4 was then updated as well; the later pre-check before node2 showed node4 as
 
 The repeated failures show that a Pod evicted from one worker can land on a worker that has not yet been maintained, so the same drain blocker can reappear later in the sequence.
 
-### node2: recorded Prometheus checks
+### node2: drain first, then follow the error to Prometheus
 
-The upgrade notes leave node2 until last and preserve checks of the `prometheus-k8s` PDB and volumes. They do not include a failed `kubectl drain node2` output or explain why Prometheus was checked first. This section records the observed state; it does not identify a confirmed drain blocker.
+node2 was the last worker in this round. By this point the earlier workers had already exposed the `emptyDir` issue, so node2 was handled with the same maintenance flow: run drain first rather than assuming that Prometheus would be a problem.
 
-The PDB was:
+~~~bash
+kubectl drain node2 \
+  --ignore-daemonsets \
+  --delete-emptydir-data \
+  --timeout=5m
+~~~
+
+This drain did not complete normally. Only after seeing the actual drain error did the investigation turn to `monitoring/prometheus-k8s-0`. The PDB and volume checks below were therefore **post-failure troubleshooting**, not pre-upgrade Prometheus checks.
+
+First inspect the PDB:
 
 ~~~bash
 kubectl -n monitoring get pdb prometheus-k8s -o wide
@@ -685,7 +694,9 @@ NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
 prometheus-k8s   1               N/A               0
 ~~~
 
-Storage objects were checked:
+The important value here is `ALLOWED DISRUPTIONS=0`. In that state, `prometheus-k8s-0` could not be evicted through a normal eviction, which is consistent with the Prometheus eviction problem seen during drain.
+
+Next, check where the Prometheus data actually lives:
 
 ~~~bash
 kubectl -n monitoring get pvc
@@ -693,7 +704,7 @@ kubectl get storageclass
 kubectl get pv
 ~~~
 
-The three commands returned:
+The commands returned:
 
 ~~~text
 No resources found in monitoring namespace.
@@ -701,7 +712,7 @@ No resources found
 No resources found
 ~~~
 
-The Prometheus Pod volumes were inspected:
+Then inspect the volumes on `prometheus-k8s-0` directly:
 
 ~~~bash
 kubectl -n monitoring get pod prometheus-k8s-0 \
@@ -714,7 +725,9 @@ The database volume was:
 prometheus-k8s-db => PVC= hostPath= emptyDir={}
 ~~~
 
-The notes also record saving the PDB YAML in the upgrade log:
+So this Prometheus instance did not use a PVC. Its TSDB data lived in an `emptyDir`, which means local historical data would not survive deletion and recreation of the Pod.
+
+Before continuing, the PDB configuration was saved in the upgrade log:
 
 ~~~bash
 RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
@@ -723,7 +736,22 @@ kubectl -n monitoring get pdb prometheus-k8s -o yaml \
   > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
 ~~~
 
-These checks concern `prometheus-k8s`, a different workload from the earlier `prometheus-adapter` Pods. The PDB query reported `ALLOWED DISRUPTIONS=0`, and the TSDB volume used `emptyDir`; these show the recorded PDB status and a local-data retention risk if the Pod is recreated. The preserved notes do not show that either condition caused a node2 drain failure. node2 was later upgraded successfully; the final node state is shown in the next section.
+The actual troubleshooting order for node2 was therefore:
+
+~~~text
+run drain
+→ drain fails
+→ follow the error to prometheus-k8s
+→ inspect the PDB and find ALLOWED DISRUPTIONS=0
+→ inspect PVC / StorageClass / PV
+→ inspect the Pod volumes and confirm the TSDB uses emptyDir
+→ assess the data impact of eviction/recreation
+→ handle the blocker and continue the node2 upgrade
+~~~
+
+This is also different from the earlier `prometheus-adapter` `emptyDir` blockers seen on other workers. The node2 investigation here concerns `prometheus-k8s` itself.
+
+node2 was subsequently upgraded successfully; the final node state is shown in the next section.
 
 ## Final v1.27.16 state
 
