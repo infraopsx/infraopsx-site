@@ -842,7 +842,7 @@ kubeadm upgrade plan v1.28.15
 
 ### 升级 control-plane
 
-目标镜像预拉取完成后，先做 dry-run：
+正式升级前先做 dry-run：
 
 ~~~bash
 kubeadm upgrade apply v1.28.15 --dry-run --yes
