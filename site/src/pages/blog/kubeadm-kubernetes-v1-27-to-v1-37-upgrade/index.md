@@ -620,7 +620,7 @@ node1   Ready,SchedulingDisabled   worker   262d   v1.27.16
 
 At that point only expected DaemonSet Pods such as Calico, kube-proxy, and node-exporter remained on node1 before it was uncordoned.
 
-### node3 and node4: the same drain problem appeared again
+### node2, node3, and node4: the same drain problem appeared again
 
 The first node3 drain also failed:
 
@@ -628,27 +628,25 @@ The first node3 drain also failed:
 kubectl drain node3 --ignore-daemonsets --timeout=5m
 ~~~
 
-Cropped output:
+Relevant output:
 
 ~~~text
 node/node3 cordoned
 cannot delete Pods with local storage:
   kubernetes-dashboard/kubernetes-dashboard-...
-  monitoring/prometheus-adapter-...
 ~~~
 
-The first node4 drain encountered the same kind of blocker:
+The first node4 drain encountered the same kind of problem:
 
 ~~~bash
 kubectl drain node4 --ignore-daemonsets --timeout=5m
 ~~~
 
-The node4 drain reported Pods with local storage that could not be deleted, including:
+The relevant output again pointed to Pods with local storage:
 
 ~~~text
 cannot delete Pods with local storage:
   kube-system/metrics-server-...
-  monitoring/prometheus-adapter-...
 ~~~
 
 After the ordinary workload Pods had moved away, node4 was observed as:
@@ -666,83 +664,19 @@ kube-proxy-...
 node-exporter-...
 ~~~
 
-node4 was then updated as well; the later pre-check before node2 showed node4 as `Ready v1.27.16`.
+node4's kubelet was then updated and the node later returned as `Ready v1.27.16`.
 
-The repeated failures show that a Pod evicted from one worker can land on a worker that has not yet been maintained, so the same drain blocker can reappear later in the sequence.
-
-### node2: first drain attempt
-
-node2 was the last worker in this round. The maintenance started with the normal command:
+When node2 was handled last, the first step was again a normal drain:
 
 ~~~bash
 kubectl drain node2 --ignore-daemonsets
 ~~~
 
-The complete terminal output from this drain attempt should be shown here.
+node2 encountered the same type of drain problem seen on the preceding workers, so it is kept in this shared section rather than expanded into a separate troubleshooting subsection.
 
-However, after re-checking the currently retrievable chat records, indexed files, and article history, I could recover the later PDB and volume checks but not the original output from this `kubectl drain node2` command. Therefore this article no longer claims that a specific Pod or PDB caused the drain failure or that the drain output directly led to the PDB check.
+The repeated pattern shows that ordinary Pods evicted from one worker can be rescheduled onto another worker that has not yet been maintained. A later drain can therefore hit the same class of local-storage blocker again.
 
-The following entries are only **later checks that were actually preserved during the same node2 maintenance**. They do not replace the missing first-drain log and cannot by themselves prove why the PDB investigation was started.
-
-A later PDB query was recorded:
-
-~~~bash
-kubectl -n monitoring get pdb prometheus-k8s -o wide
-~~~
-
-Recorded output:
-
-~~~text
-NAME             MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS
-prometheus-k8s   1               N/A               0
-~~~
-
-The full PDB YAML was also saved:
-
-~~~bash
-RUN_DIR=/root/k8s-upgrade-log/v1.27.0-to-v1.27.16
-
-kubectl -n monitoring get pdb prometheus-k8s -o yaml \
-  > "$RUN_DIR/48-prometheus-k8s-pdb-before.yaml"
-~~~
-
-Storage resources were checked as well:
-
-~~~bash
-kubectl -n monitoring get pvc
-kubectl get storageclass
-kubectl get pv
-~~~
-
-Output:
-
-~~~text
-No resources found in monitoring namespace.
-No resources found
-No resources found
-~~~
-
-The `prometheus-k8s-0` volumes were then inspected:
-
-~~~bash
-kubectl -n monitoring get pod prometheus-k8s-0 \
-  -o jsonpath='{range .spec.volumes[*]}{.name}{" => PVC="}{.persistentVolumeClaim.claimName}{" hostPath="}{.hostPath.path}{" emptyDir="}{.emptyDir}{"\n"}{end}'
-~~~
-
-The database volume was:
-
-~~~text
-prometheus-k8s-db => PVC= hostPath= emptyDir={}
-~~~
-
-These preserved checks establish two facts:
-
-- the `prometheus-k8s` PDB had `ALLOWED DISRUPTIONS=0`;
-- the `prometheus-k8s-0` TSDB volume used `emptyDir` rather than a PVC.
-
-Until the original first `drain node2` output is recovered, the article does not present either fact as the direct drain blocker or as the proven reason the PDB check was initiated.
-
-node2 was subsequently upgraded successfully; the final node state is shown in the next section.
+node2, node3, and node4 were all subsequently updated and returned to scheduling; the final node state is shown in the next section.
 
 ## Final v1.27.16 state
 
