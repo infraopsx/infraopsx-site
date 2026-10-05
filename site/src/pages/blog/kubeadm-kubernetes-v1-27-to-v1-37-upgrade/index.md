@@ -1065,8 +1065,6 @@ kubectl get --raw /metrics \
 
 This cluster had no StorageClasses or PVs, and the deprecated-API metric query also returned no output.
 
-The apiserver metric is runtime evidence only. It shows what the apiserver has actually observed; it does not prove that offline Helm charts, YAML files, or other manifests that have not been submitted to the apiserver contain no old API versions.
-
 ### Re-run the upgrade plan with the target kubeadm
 
 This round exposed one useful difference worth keeping in the log.
