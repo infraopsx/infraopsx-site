@@ -1068,8 +1068,6 @@ kubectl get --raw /metrics \
 
 本次集群没有 StorageClass 和 PV，deprecated API 指标也没有输出。
 
-这里需要注意：apiserver metric 只能反映运行时实际观察到的请求，不能证明离线保存的 Helm chart、YAML 或尚未提交到 API server 的清单里一定没有旧 API。
-
 ### 用目标版本 kubeadm 重新确认 upgrade plan
 
 这一轮有一个值得单独记录的差异。
