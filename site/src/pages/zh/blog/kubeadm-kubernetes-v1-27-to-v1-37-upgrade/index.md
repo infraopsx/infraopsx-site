@@ -1,7 +1,7 @@
 ---
 layout: ../../../../layouts/ArticleLayout.astro
 title: "Kubernetes v1.27 到 v1.37：一次 kubeadm 集群升级记录"
-description: "记录一个 5 节点 kubeadm 集群从 Kubernetes v1.27 逐步升级到 v1.37。目前覆盖 v1.27.0 到 v1.28.15，包括 etcd 备份、worker drain、PodDisruptionBudget（PDB）、Calico 升级和升级后验证。"
+description: "记录一个 5 节点 kubeadm 集群从 Kubernetes v1.27 逐步升级到 v1.37。目前覆盖 v1.27.0 到 v1.29.14，包括 etcd 备份、worker drain、PodDisruptionBudget（PDB）、Calico、升级计划差异和升级后验证。"
 pubDate: "2026-10-02"
 category: Kubernetes
 tags:
@@ -1037,6 +1037,281 @@ kubectl delete pod dns-smoke-test api-smoke-test
 
 到这里，v1.27.16 → v1.28.15 这一阶段结束。
 
+## v1.28.15 → v1.29.14
+
+这一轮继续复用前面已经验证过的升级方法，不再重复二进制下载、SHA256 校验、etcd snapshot 和逐节点维护的基础步骤。这里重点记录 v1.29 这一跳新增的兼容性检查、upgrade plan 差异，以及最终验证。
+
+### 升级前检查 v1.29 移除的 API
+
+先检查 apiserver 是否实际观察到即将在 v1.29 被移除的 API 请求：
+
+~~~bash
+kubectl get --raw /metrics \
+  | grep 'apiserver_requested_deprecated_apis' \
+  | grep 'removed_release="1.29"' || true
+~~~
+
+这次没有输出。
+
+再检查当前存储对象和几个老的 in-tree 存储字段：
+
+~~~bash
+kubectl get storageclass -o wide
+kubectl get pv -o wide
+
+kubectl get pv -o yaml \
+  | grep -nE 'gcePersistentDisk:|rbd:|cephfs:' || true
+
+kubectl get --raw /metrics \
+  | grep '^apiserver_requested_deprecated_apis' || true
+~~~
+
+本次集群没有 StorageClass 和 PV，deprecated API 指标也没有输出。
+
+这里需要注意：apiserver metric 只能反映运行时实际观察到的请求，不能证明离线保存的 Helm chart、YAML 或尚未提交到 API server 的清单里一定没有旧 API。
+
+### 用目标版本 kubeadm 重新确认 upgrade plan
+
+这一轮有一个值得单独记录的差异。
+
+最开始 control-plane 上仍然是 kubeadm v1.28.15。用它查看 v1.29.14 升级计划时，CoreDNS 和 etcd 的目标变化没有完整体现。随后先把 control-plane 上的 kubeadm 更新到 v1.29.14，再重新执行：
+
+~~~bash
+kubeadm upgrade plan v1.29.14
+~~~
+
+这次的结果才作为本轮最终计划：
+
+| 组件 | 当前版本 | 目标版本 |
+| --- | --- | --- |
+| kube-apiserver | v1.28.15 | v1.29.14 |
+| kube-controller-manager | v1.28.15 | v1.29.14 |
+| kube-scheduler | v1.28.15 | v1.29.14 |
+| kube-proxy | v1.28.15 | v1.29.14 |
+| CoreDNS | v1.10.1 | v1.11.1 |
+| etcd | 3.5.15-0 | 3.5.16-0 |
+| kubelet | 5 个节点均为 v1.28.15 | v1.29.14 |
+
+这次实际操作说明：跨 minor 升级时，最终的 upgrade plan 应以目标版本 kubeadm 生成的结果为准，而不是继续依赖旧版本 kubeadm 对目标版本的计划结果。
+
+### dry-run 和 control-plane 升级
+
+正式升级前先做 dry-run：
+
+~~~bash
+kubeadm upgrade apply v1.29.14 --dry-run --yes
+~~~
+
+结束输出：
+
+~~~text
+[upgrade/successful] Finished dryrunning successfully!
+~~~
+
+然后执行正式升级：
+
+~~~bash
+kubeadm upgrade apply v1.29.14 --yes
+~~~
+
+结束输出：
+
+~~~text
+[upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.29.14". Enjoy!
+~~~
+
+这一步完成后，control-plane static Pod、etcd、CoreDNS 和 kube-proxy 已经更新到计划中的目标版本。
+
+实际检查到的关键版本：
+
+| 组件 | 版本 / 状态 |
+| --- | --- |
+| kube-apiserver | v1.29.14 |
+| kube-controller-manager | v1.29.14 |
+| kube-scheduler | v1.29.14 |
+| etcd | 3.5.16-0 |
+| CoreDNS | v1.11.1 |
+| kube-proxy | v1.29.14 |
+
+随后更新 master 的 kubelet 和 kubectl，重启 kubelet，确认运行中的 kubelet 已经是 v1.29.14。节点恢复 Ready 后执行：
+
+~~~bash
+kubectl uncordon master
+~~~
+
+最终 master：
+
+~~~text
+master   Ready   control-plane   v1.29.14
+~~~
+
+### 逐台升级 worker
+
+这一轮仍然逐台处理 worker。实际执行顺序是：
+
+~~~text
+drain
+→ 更新 kubeadm
+→ kubeadm upgrade node
+→ 更新 kubelet
+→ restart kubelet
+→ 验证运行中的 kubelet
+→ uncordon
+~~~
+
+每台 worker 的 \`kubeadm upgrade node\` 都返回：
+
+~~~text
+[upgrade] The configuration for this node was successfully updated!
+~~~
+
+四台 worker 最终都恢复到 Ready / v1.29.14。
+
+node1 和 node4 在 drain 时再次遇到前面已经分析过的 Prometheus PDB：
+
+~~~text
+Cannot evict pod as it would violate the pod's disruption budget.
+~~~
+
+当时 \`prometheus-k8s\` 仍然是：
+
+~~~text
+MIN AVAILABLE        1
+ALLOWED DISRUPTIONS  0
+~~~
+
+因此继续复用前面已经验证过的处理方式：临时把 \`minAvailable\` 从 1 改成 0，完成 drain；等待 \`prometheus-k8s-0\` 在其他节点恢复到 \`2/2 Running\` 后，再恢复：
+
+~~~text
+MIN AVAILABLE        1
+ALLOWED DISRUPTIONS  0
+~~~
+
+node2 和 node3 本轮 drain 没有出现新的阻塞。
+
+### 最终状态和功能验证
+
+全部节点完成后：
+
+~~~bash
+kubectl get nodes -o wide
+~~~
+
+结果：
+
+~~~text
+NAME     STATUS   ROLES           VERSION
+master   Ready    control-plane   v1.29.14
+node1    Ready    worker          v1.29.14
+node2    Ready    worker          v1.29.14
+node3    Ready    worker          v1.29.14
+node4    Ready    worker          v1.29.14
+~~~
+
+control-plane static Pod 全部 \`Running\`，CoreDNS 为 \`2/2\`，kube-proxy 为 \`5/5\`，Calico node 为 \`5/5\`。检查非正常 Pod：
+
+~~~bash
+kubectl get pods -A | \
+  awk 'NR==1 || ($4!="Running" && $4!="Completed")'
+~~~
+
+除了表头外没有其他输出。
+
+API readiness：
+
+~~~bash
+kubectl get --raw='/readyz?verbose'
+~~~
+
+结束为：
+
+~~~text
+readyz check passed
+~~~
+
+Calico 继续保持 v3.27.5，本地 IP 自动探测配置也没有丢失：
+
+~~~text
+IP=autodetect
+IP_AUTODETECTION_METHOD=can-reach=10.10.10.1
+~~~
+
+这套集群的 \`metrics.k8s.io\` 实际由 \`monitoring/prometheus-adapter\` 提供。升级后：
+
+~~~bash
+kubectl get apiservice v1beta1.metrics.k8s.io
+kubectl top nodes
+kubectl top pods -A
+~~~
+
+APIService 为 \`AVAILABLE=True\`，\`kubectl top\` 也能正常返回 CPU 和内存数据。
+
+最后再从普通 Pod 内验证 DNS 和 Kubernetes API Service。
+
+DNS：
+
+~~~bash
+kubectl run dns-smoke-test \
+  --image=busybox:1.36 \
+  --restart=Never \
+  --command -- \
+  sh -c 'nslookup kubernetes.default.svc.cluster.local'
+
+kubectl logs dns-smoke-test
+~~~
+
+实际解析结果：
+
+~~~text
+Server:         10.96.0.10
+Address:        10.96.0.10:53
+
+Name:   kubernetes.default.svc.cluster.local
+Address: 10.96.0.1
+~~~
+
+API：
+
+~~~bash
+kubectl run api-smoke-test \
+  --image=curlimages/curl:8.12.1 \
+  --restart=Never \
+  --command -- \
+  sh -c '
+    TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+    CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
+    curl -fsS \
+      --connect-timeout 10 \
+      --max-time 30 \
+      --cacert "$CACERT" \
+      -H "Authorization: Bearer $TOKEN" \
+      https://kubernetes.default.svc/version
+  '
+
+kubectl logs api-smoke-test
+~~~
+
+返回：
+
+~~~json
+{
+  "major": "1",
+  "minor": "29",
+  "gitVersion": "v1.29.14"
+}
+~~~
+
+这说明升级后的 Pod DNS、Service ClusterIP、API TLS 校验、ServiceAccount 认证和 API server 访问都正常。
+
+测试完成后删除临时 Pod：
+
+~~~bash
+kubectl delete pod api-smoke-test dns-smoke-test
+~~~
+
+到这里，v1.28.15 → v1.29.14 这一阶段结束。
+
 ## 参考资料
 
 - <a href="https://kubernetes.io/zh-cn/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27</a>
@@ -1047,4 +1322,5 @@ kubectl delete pod dns-smoke-test api-smoke-test
 - <a href="https://kubernetes.io/zh-cn/docs/reference/config-api/kubeadm-config.v1beta3/" target="_blank" rel="noopener noreferrer">kubeadm 配置（v1beta3）</a>
 - <a href="https://kubernetes.io/zh-cn/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain 参考</a>
 - <a href="https://kubernetes.io/zh-cn/releases/1.28/" target="_blank" rel="noopener noreferrer">Kubernetes 1.28</a>
+- <a href="https://kubernetes.io/zh-cn/releases/1.29/" target="_blank" rel="noopener noreferrer">Kubernetes 1.29</a>
 - <a href="https://docs.tigera.io/calico/latest/getting-started/kubernetes/requirements" target="_blank" rel="noopener noreferrer">Calico Kubernetes 系统要求</a>
