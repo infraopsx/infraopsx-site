@@ -164,6 +164,7 @@ test.describe('core site', () => {
     ).toBeVisible();
   });
 
+
   test('articles expose clear recurring Patreon support links', async ({ page }) => {
     await page.goto('/blog/rook-ceph-osd-high-memory-osd-memory-target/');
 
@@ -211,6 +212,38 @@ test.describe('core site', () => {
 
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-theme-preference', 'dark');
+  });
+
+  test('article code blocks expose working copy controls', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.goto('/blog/kubeadm-kubernetes-v1-27-to-v1-30-upgrade/');
+
+    const firstCode = page.locator('.article-content pre').first();
+    const copyButton = firstCode.locator('.code-copy-button');
+
+    await expect(copyButton).toBeVisible();
+    await expect(copyButton).toHaveText('Copy');
+
+    const expected = await firstCode.locator('code').innerText();
+    await copyButton.click();
+
+    await expect(copyButton).toHaveText('Copied');
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboardText).toBe(expected);
+  });
+
+  test('article does not overflow the mobile viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/zh/blog/kubeadm-kubernetes-v1-27-to-v1-30-upgrade/');
+
+    const sizes = await page.evaluate(() => ({
+      viewport: window.innerWidth,
+      document: document.documentElement.scrollWidth,
+      body: document.body.scrollWidth
+    }));
+
+    expect(sizes.document).toBeLessThanOrEqual(sizes.viewport + 1);
+    expect(sizes.body).toBeLessThanOrEqual(sizes.viewport + 1);
   });
 
   test('mobile navigation opens and exposes primary links', async ({ page }) => {
