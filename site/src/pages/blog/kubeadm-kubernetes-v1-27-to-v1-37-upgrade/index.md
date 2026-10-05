@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/ArticleLayout.astro
-title: "Kubernetes v1.27 to v1.37: A kubeadm Cluster Upgrade Log"
-description: "A practical kubeadm upgrade log for a 5-node Kubernetes cluster moving from v1.27 toward v1.37. It currently covers v1.27.0 through v1.30.14, including etcd backups, worker drains, PodDisruptionBudgets, Calico, upgrade-plan differences, and post-upgrade verification."
+title: "Kubernetes v1.27 to v1.30: A kubeadm Cluster Upgrade Log"
+description: "A practical kubeadm upgrade log for a 5-node Kubernetes cluster moving from v1.27.0 through v1.30.14, including etcd backups, worker drains, PodDisruptionBudgets, Calico, upgrade-plan differences, and post-upgrade verification."
 pubDate: "2026-10-02"
 category: Kubernetes
 tags:
@@ -48,10 +48,9 @@ Kubernetes lists 1.27.16 as the final patch in the 1.27 series. kubeadm upgrades
 ~~~text
 1.27.0
 → 1.27.16
-→ 1.28.x
-→ 1.29.x
-→ ...
-→ 1.37.x
+→ 1.28.15
+→ 1.29.14
+→ 1.30.14
 ~~~
 
 1.27.16 is not a mandatory prerequisite for 1.28. I chose it so the 1.27 series was fully patched before moving to the next minor release.
@@ -1607,6 +1606,12 @@ API:
 Both smoke Pods ended in `Completed` and were then removed.
 
 That completes the v1.29.14 → v1.30.14 stage.
+
+### Continuing beyond v1.30
+
+This article stops at v1.30.14 instead of continuing to append every later minor release to the same page. The overall method for upgrading from v1.30 to newer Kubernetes releases remains the same: move one minor version at a time, use the target-version kubeadm to confirm the upgrade plan for each hop, check version-specific API, CNI, and component compatibility, run a dry run, upgrade the control-plane, drain and upgrade workers one at a time, and repeat readiness, DNS, Service/API, and monitoring checks afterward.
+
+The exact component targets and compatibility changes must still be checked for each destination release. Do not reuse version numbers from one stage of this article as if they applied unchanged to later releases.
 
 ## References
 
