@@ -1,7 +1,7 @@
 ---
 layout: ../../../../layouts/ArticleLayout.astro
-title: "Kubernetes v1.27 到 v1.37：一次 kubeadm 集群升级记录"
-description: "记录一个 5 节点 kubeadm 集群从 Kubernetes v1.27 逐步升级到 v1.37。目前覆盖 v1.27.0 到 v1.30.14，包括 etcd 备份、worker drain、PodDisruptionBudget（PDB）、Calico、升级计划差异和升级后验证。"
+title: "Kubernetes v1.27 到 v1.30：一次 kubeadm 集群升级记录"
+description: "记录一个 5 节点 kubeadm 集群从 Kubernetes v1.27.0 逐步升级到 v1.30.14，包括 etcd 备份、worker drain、PodDisruptionBudget（PDB）、Calico、升级计划差异和升级后验证。"
 pubDate: "2026-10-02"
 category: Kubernetes
 tags:
@@ -48,10 +48,9 @@ Kubernetes 官方发布记录显示，1.27 系列最后一个 patch 版本是 1.
 ~~~text
 1.27.0
 → 1.27.16
-→ 1.28.x
-→ 1.29.x
-→ ...
-→ 1.37.x
+→ 1.28.15
+→ 1.29.14
+→ 1.30.14
 ~~~
 
 1.27.16 并不是升级到 1.28 的硬性前置条件。这里选择它，是为了先把 1.27 系列补到最后一个 patch，再开始跨 minor。
@@ -1612,6 +1611,12 @@ API 返回：
 两个 smoke Pod 都以 `Completed` 结束并随后删除。
 
 至此，v1.29.14 → v1.30.14 这一阶段完成。
+
+### v1.30 之后继续升级
+
+本文到 v1.30.14 为止，不再把后面的每一个 minor 版本继续塞进同一篇文章。后续从 v1.30 升级到更新版本，整体方法仍然沿用前面的流程：按 minor 版本逐级升级，每一跳都先使用目标版本 kubeadm 重新确认 upgrade plan，检查该版本的 API、CNI 和关键组件兼容性，先做 dry-run，再升级 control-plane，逐台 drain 和升级 worker，最后重新做 readiness、DNS、Service/API 和监控验证。
+
+具体的组件目标版本和兼容性变化仍应以每一跳的目标版本文档和实际 `kubeadm upgrade plan` 为准，不能把本文某一跳的版本号直接套到后续版本。
 
 ## 参考资料
 
