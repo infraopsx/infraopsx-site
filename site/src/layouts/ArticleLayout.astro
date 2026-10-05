@@ -9,6 +9,7 @@ const {
   title,
   description,
   pubDate,
+  updatedDate,
   category = 'Uncategorized',
   tags = [],
   locale: frontmatterLocale,
@@ -24,14 +25,19 @@ const locale =
 
 const isZh = locale === 'zh-CN';
 
-const formattedDate = new Intl.DateTimeFormat(
+const dateFormatter = new Intl.DateTimeFormat(
   isZh ? 'zh-CN' : 'en-US',
   {
     year: 'numeric',
     month: isZh ? 'long' : 'short',
     day: 'numeric'
   }
-).format(new Date(pubDate));
+);
+
+const formattedDate = dateFormatter.format(new Date(pubDate));
+const formattedUpdatedDate = updatedDate
+  ? dateFormatter.format(new Date(updatedDate))
+  : null;
 
 const categoryLabels: Record<string, string> = isZh
   ? {
@@ -61,6 +67,11 @@ const datePublished =
   pubDate instanceof Date
     ? pubDate.toISOString().slice(0, 10)
     : String(pubDate);
+const dateModified = updatedDate
+  ? updatedDate instanceof Date
+    ? updatedDate.toISOString().slice(0, 10)
+    : String(updatedDate)
+  : undefined;
 
 const structuredData = {
   '@context': 'https://schema.org',
@@ -70,6 +81,7 @@ const structuredData = {
       headline: title,
       description,
       datePublished,
+      dateModified,
       image: ogImageUrl,
       inLanguage: locale,
       url: canonicalUrl,
@@ -152,7 +164,13 @@ const tocHasExplicitNumbers = tocHeadings.some(
 
       <header class="article-header">
         <div class="article-meta">
-          <span data-pagefind-meta="date">{formattedDate}</span>
+          <span data-pagefind-meta="date">
+            {updatedDate
+              ? isZh
+                ? `发布于 ${formattedDate} · 更新于 ${formattedUpdatedDate}`
+                : `Published ${formattedDate} · Updated ${formattedUpdatedDate}`
+              : formattedDate}
+          </span>
           <span>·</span>
           <span
             data-pagefind-filter={`category:${category}`}
@@ -213,6 +231,7 @@ const tocHasExplicitNumbers = tocHeadings.some(
         <slot />
       </article>
 
+
       <aside class="article-support" data-pagefind-ignore>
         <div>
           <h2>
@@ -246,6 +265,67 @@ const tocHasExplicitNumbers = tocHeadings.some(
   </main>
 
   <Footer locale={isZh ? 'zh' : 'en'} />
+<script is:inline>
+  (() => {
+    const copyText = async (text) => {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      textarea.remove();
+    };
+
+    const initCodeCopyButtons = () => {
+      const isZh = document.documentElement.lang === 'zh-CN';
+
+      document.querySelectorAll('.article-content pre').forEach((pre) => {
+        if (pre.querySelector('.code-copy-button')) return;
+
+        const code = pre.querySelector('code');
+        if (!code) return;
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'code-copy-button';
+        button.textContent = isZh ? '复制' : 'Copy';
+        button.setAttribute('aria-label', isZh ? '复制代码' : 'Copy code');
+
+        button.addEventListener('click', async () => {
+          const original = isZh ? '复制' : 'Copy';
+
+          try {
+            await copyText(code.innerText);
+            button.textContent = isZh ? '已复制' : 'Copied';
+          } catch {
+            button.textContent = isZh ? '复制失败' : 'Copy failed';
+          }
+
+          window.setTimeout(() => {
+            button.textContent = original;
+          }, 1600);
+        });
+
+        pre.appendChild(button);
+      });
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initCodeCopyButtons, { once: true });
+    } else {
+      initCodeCopyButtons();
+    }
+  })();
+</script>
+
 </BaseLayout>
 
 <style>
@@ -258,6 +338,7 @@ const tocHasExplicitNumbers = tocHeadings.some(
   .article-author a:focus-visible {
     color: var(--cyan);
   }
+
 
   .article-support {
     display: grid;
@@ -354,6 +435,7 @@ const tocHasExplicitNumbers = tocHeadings.some(
   }
 
   @media (max-width: 600px) {
+
     .article-support {
       grid-template-columns: 1fr;
       gap: 18px;
