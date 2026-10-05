@@ -1,7 +1,7 @@
 ---
 layout: ../../../layouts/ArticleLayout.astro
 title: "Kubernetes v1.27 to v1.37: A kubeadm Cluster Upgrade Log"
-description: "A real 5-node kubeadm upgrade log from Kubernetes v1.27 toward v1.37. It currently covers v1.27.0 through v1.29.14, including etcd backup, worker drain, PodDisruptionBudget handling, Calico, upgrade-plan differences, and post-upgrade verification."
+description: "A practical kubeadm upgrade log for a 5-node Kubernetes cluster moving from v1.27 toward v1.37. It currently covers v1.27.0 through v1.30.14, including etcd backups, worker drains, PodDisruptionBudgets, Calico, upgrade-plan differences, and post-upgrade verification."
 pubDate: "2026-10-02"
 category: Kubernetes
 tags:
@@ -1305,6 +1305,309 @@ kubectl delete pod api-smoke-test dns-smoke-test
 
 That completes the v1.28.15 → v1.29.14 stage.
 
+
+## v1.29.14 → v1.30.14
+
+This round reused the download, SHA256 verification, and per-node maintenance mechanics already proven earlier. I only expand the differences that actually mattered for v1.30: upgrading Calico first, an etcd patch-level downgrade appearing in the upgrade plan, explicitly leaving etcd unchanged, and the Prometheus PDB that blocked two worker drains.
+
+### Upgrade Calico to v3.28.5 first
+
+At the start of this round the cluster was on Kubernetes v1.29.14 with Calico v3.27.5. Before changing Kubernetes itself, I upgraded Calico to v3.28.5 and preserved the cluster-specific IP autodetection settings:
+
+~~~yaml
+- name: IP
+  value: "autodetect"
+- name: IP_AUTODETECTION_METHOD
+  value: "can-reach=10.10.10.1"
+~~~
+
+I downloaded the v3.28.5 manifest and kept a local customized copy:
+
+~~~bash
+curl -fL \
+  https://raw.githubusercontent.com/projectcalico/calico/v3.28.5/manifests/calico.yaml \
+  -o calico-v3.28.5.yaml
+
+cp calico-v3.28.5.yaml calico-v3.28.5-custom.yaml
+~~~
+
+After preserving the settings above, I applied the manifest and waited for both Calico workloads:
+
+~~~bash
+kubectl apply -f calico-v3.28.5-custom.yaml
+
+kubectl -n kube-system rollout status daemonset/calico-node
+kubectl -n kube-system rollout status deployment/calico-kube-controllers
+~~~
+
+The final state was:
+
+~~~text
+calico-node                 5/5 Ready
+calico-kube-controllers     1/1 Ready
+Calico                      v3.28.5
+~~~
+
+The custom autodetection values were still present:
+
+~~~text
+IP=autodetect
+IP_AUTODETECTION_METHOD=can-reach=10.10.10.1
+~~~
+
+Before moving on to Kubernetes, I also repeated the DNS and Kubernetes API Service smoke tests from an ordinary Pod. Both passed.
+
+### The target-version kubeadm plan exposed an etcd patch downgrade
+
+After updating kubeadm on the control-plane to v1.30.14, I generated the authoritative plan:
+
+~~~bash
+kubeadm upgrade plan v1.30.14
+~~~
+
+The actual plan was:
+
+| Component | Current | Target |
+| --- | --- | --- |
+| kube-apiserver | v1.29.14 | v1.30.14 |
+| kube-controller-manager | v1.29.14 | v1.30.14 |
+| kube-scheduler | v1.29.14 | v1.30.14 |
+| kube-proxy | v1.29.14 | v1.30.14 |
+| CoreDNS | v1.11.1 | v1.11.3 |
+| etcd | 3.5.16-0 | 3.5.15-0 |
+| kubelet | all 5 nodes on v1.29.14 | v1.30.14 |
+
+The unusual part was etcd:
+
+~~~text
+3.5.16-0 → 3.5.15-0
+~~~
+
+The etcd target in this plan was a lower patch release than the version already running in the cluster. For this upgrade I chose not to let kubeadm perform that etcd change and kept the existing 3.5.16-0.
+
+### Dry-run with the etcd upgrade disabled
+
+First:
+
+~~~bash
+kubeadm upgrade apply v1.30.14 \
+  --dry-run \
+  --yes \
+  --etcd-upgrade=false
+~~~
+
+The dry-run ended with:
+
+~~~text
+[upgrade/successful] Finished dryrunning successfully!
+~~~
+
+Reviewing the dry-run output showed new static Pod manifests for kube-apiserver, kube-controller-manager, and kube-scheduler, CoreDNS targeting v1.11.3, and kube-proxy targeting v1.30.14. There was no step writing a new etcd static Pod manifest.
+
+I then applied the real upgrade:
+
+~~~bash
+kubeadm upgrade apply v1.30.14 \
+  --yes \
+  --etcd-upgrade=false
+~~~
+
+It finished with:
+
+~~~text
+[upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.30.14". Enjoy!
+~~~
+
+The running versions after the control-plane upgrade were:
+
+| Component | Running version |
+| --- | --- |
+| kube-apiserver | v1.30.14 |
+| kube-controller-manager | v1.30.14 |
+| kube-scheduler | v1.30.14 |
+| etcd | 3.5.16-0 |
+| CoreDNS | v1.11.3 |
+| kube-proxy | v1.30.14 |
+
+This directly confirmed that etcd remained on 3.5.16-0 instead of moving to the 3.5.15-0 target shown by the plan.
+
+CoreDNS and kube-proxy were still rolling immediately after `kubeadm upgrade apply`, so I waited for both:
+
+~~~bash
+kubectl -n kube-system rollout status deployment/coredns --timeout=10m
+kubectl -n kube-system rollout status daemonset/kube-proxy --timeout=10m
+~~~
+
+They finished at CoreDNS 2/2 and kube-proxy 5/5.
+
+### Update the master kubelet
+
+The master was drained normally:
+
+~~~bash
+kubectl drain master \
+  --ignore-daemonsets \
+  --delete-emptydir-data
+~~~
+
+I then updated kubelet and kubectl to v1.30.14, restarted kubelet, and checked both the installed binary and the process that was actually running:
+
+~~~bash
+kubelet --version
+kubectl version --client
+
+PID=$(pidof kubelet)
+readlink -f /proc/$PID/exe
+/proc/$PID/exe --version
+~~~
+
+Both kubelet checks reported:
+
+~~~text
+Kubernetes v1.30.14
+~~~
+
+Immediately after restarting kubelet, the first kubectl request briefly returned:
+
+~~~text
+The connection to the server 10.10.10.100:6443 was refused
+~~~
+
+I did not change configuration or roll anything back. A follow-up inspection showed port 6443 listening again and etcd, kube-apiserver, kube-controller-manager, and kube-scheduler all Running. The kubelet log showed those static Pods starting again within roughly a dozen seconds.
+
+I then checked:
+
+~~~bash
+kubectl get node master -o wide
+kubectl get --raw='/readyz?verbose'
+~~~
+
+The master was `Ready,SchedulingDisabled / v1.30.14`, and all readyz checks passed. Only then did I uncordon it:
+
+~~~bash
+kubectl uncordon master
+~~~
+
+### Upgrade workers one at a time
+
+The actual worker sequence in this round was:
+
+~~~text
+drain
+→ update kubeadm
+→ kubeadm upgrade node
+→ update kubelet / kubectl
+→ restart kubelet
+→ verify the running kubelet
+→ uncordon
+~~~
+
+node1 and node2 drained without a new blocker.
+
+On node3, `prometheus-k8s-0` hit the PDB during drain:
+
+~~~text
+Cannot evict pod as it would violate the pod's disruption budget.
+~~~
+
+At that point the PDB was:
+
+~~~text
+MIN AVAILABLE        1
+ALLOWED DISRUPTIONS  0
+~~~
+
+I temporarily changed `prometheus-k8s` from `minAvailable: 1` to `minAvailable: 0`, reran the drain, completed the node upgrade, and uncordoned node3. After `prometheus-k8s-0` came back as `2/2 Running` on node4, I restored `minAvailable: 1`.
+
+By the time node4 was drained, the same Prometheus Pod was running there, so the same PDB block occurred again. I used the same handling: temporarily set the PDB to 0, finish the drain and node upgrade, uncordon node4, wait for Prometheus to return to `2/2 Running` on node3, and then restore:
+
+~~~text
+MIN AVAILABLE        1
+ALLOWED DISRUPTIONS  0
+~~~
+
+All four workers eventually returned `Ready / v1.30.14`.
+
+### Final state and functional verification
+
+After all nodes were complete:
+
+~~~text
+NAME     STATUS   ROLES           VERSION
+master   Ready    control-plane   v1.30.14
+node1    Ready    worker          v1.30.14
+node2    Ready    worker          v1.30.14
+node3    Ready    worker          v1.30.14
+node4    Ready    worker          v1.30.14
+~~~
+
+Final key component state:
+
+| Component | Final state |
+| --- | --- |
+| kube-apiserver | v1.30.14 / Running |
+| kube-controller-manager | v1.30.14 / Running |
+| kube-scheduler | v1.30.14 / Running |
+| etcd | 3.5.16-0 / Running |
+| CoreDNS | v1.11.3 / 2/2 Ready |
+| kube-proxy | v1.30.14 / 5/5 Ready |
+| Calico | v3.28.5 / calico-node 5/5 Ready |
+| calico-kube-controllers | 1/1 Ready |
+| Prometheus PDB | minAvailable=1 |
+
+A check for Pods outside the normal Running or Succeeded phases:
+
+~~~bash
+kubectl get pods -A \
+  --field-selector=status.phase!=Running,status.phase!=Succeeded
+~~~
+
+returned:
+
+~~~text
+No resources found
+~~~
+
+API readiness:
+
+~~~bash
+kubectl get --raw='/readyz?verbose'
+~~~
+
+ended with:
+
+~~~text
+readyz check passed
+~~~
+
+In this cluster, `metrics.k8s.io` is still served by `monitoring/prometheus-adapter`. After the upgrade the APIService was `AVAILABLE=True`, and `kubectl top nodes` returned CPU and memory data for all five nodes.
+
+Finally I repeated the DNS and Kubernetes API Service checks from inside Pods.
+
+DNS:
+
+~~~text
+Server:         10.96.0.10
+Address:        10.96.0.10:53
+
+Name:   kubernetes.default.svc.cluster.local
+Address: 10.96.0.1
+~~~
+
+API:
+
+~~~json
+{
+  "major": "1",
+  "minor": "30",
+  "gitVersion": "v1.30.14"
+}
+~~~
+
+Both smoke Pods ended in `Completed` and were then removed.
+
+That completes the v1.29.14 → v1.30.14 stage.
+
 ## References
 
 - <a href="https://kubernetes.io/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27 release</a>
@@ -1316,4 +1619,5 @@ That completes the v1.28.15 → v1.29.14 stage.
 - <a href="https://kubernetes.io/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain</a>
 - <a href="https://kubernetes.io/releases/1.28/" target="_blank" rel="noopener noreferrer">Kubernetes 1.28 release</a>
 - <a href="https://kubernetes.io/releases/1.29/" target="_blank" rel="noopener noreferrer">Kubernetes 1.29 release</a>
+- <a href="https://kubernetes.io/releases/1.30/" target="_blank" rel="noopener noreferrer">Kubernetes 1.30 release</a>
 - <a href="https://docs.tigera.io/calico/latest/getting-started/kubernetes/requirements" target="_blank" rel="noopener noreferrer">Calico Kubernetes system requirements</a>
