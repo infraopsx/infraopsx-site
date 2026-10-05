@@ -181,7 +181,7 @@ test.describe('core site', () => {
 
   test('article code blocks expose working copy controls', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await page.goto('/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/');
+    await page.goto('/blog/kubeadm-kubernetes-v1-27-to-v1-30-upgrade/');
 
     const firstCode = page.locator('.article-content pre').first();
     const copyButton = firstCode.locator('.code-copy-button');
@@ -199,7 +199,7 @@ test.describe('core site', () => {
 
   test('article does not overflow the mobile viewport', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/zh/blog/kubeadm-kubernetes-v1-27-to-v1-37-upgrade/');
+    await page.goto('/zh/blog/kubeadm-kubernetes-v1-27-to-v1-30-upgrade/');
 
     const sizes = await page.evaluate(() => ({
       viewport: window.innerWidth,
