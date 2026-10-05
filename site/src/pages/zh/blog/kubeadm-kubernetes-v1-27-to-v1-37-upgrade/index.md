@@ -1,7 +1,7 @@
 ---
 layout: ../../../../layouts/ArticleLayout.astro
 title: "Kubernetes v1.27 到 v1.37：一次 kubeadm 集群升级记录"
-description: "记录一个 5 节点 kubeadm 集群从 Kubernetes v1.27 逐步升级到 v1.37。目前覆盖 v1.27.0 到 v1.29.14，包括 etcd 备份、worker drain、PodDisruptionBudget（PDB）、Calico、升级计划差异和升级后验证。"
+description: "记录一个 5 节点 kubeadm 集群从 Kubernetes v1.27 逐步升级到 v1.37。目前覆盖 v1.27.0 到 v1.30.14，包括 etcd 备份、worker drain、PodDisruptionBudget（PDB）、Calico、升级计划差异和升级后验证。"
 pubDate: "2026-10-02"
 category: Kubernetes
 tags:
@@ -1310,6 +1310,309 @@ kubectl delete pod api-smoke-test dns-smoke-test
 
 到这里，v1.28.15 → v1.29.14 这一阶段结束。
 
+
+## v1.29.14 → v1.30.14
+
+这一轮继续复用前面已经验证过的下载、SHA256 校验和逐节点维护流程，只记录 v1.30 这次真正出现的新差异：先升级 Calico、upgrade plan 中出现 etcd patch 版本回退、显式跳过 etcd 升级，以及实际 drain 时再次遇到的 Prometheus PDB。
+
+### 先把 Calico 升级到 v3.28.5
+
+开始这一轮时，集群已经是 Kubernetes v1.29.14，Calico 是 v3.27.5。Kubernetes 本身升级前，我先把 Calico 更新到 v3.28.5，并继续保留这个集群原来的 IP 自动探测设置：
+
+~~~yaml
+- name: IP
+  value: "autodetect"
+- name: IP_AUTODETECTION_METHOD
+  value: "can-reach=10.10.10.1"
+~~~
+
+先下载 v3.28.5 manifest，并基于它保留集群自己的配置：
+
+~~~bash
+curl -fL \
+  https://raw.githubusercontent.com/projectcalico/calico/v3.28.5/manifests/calico.yaml \
+  -o calico-v3.28.5.yaml
+
+cp calico-v3.28.5.yaml calico-v3.28.5-custom.yaml
+~~~
+
+应用后等待两个 Calico workload 完成 rollout：
+
+~~~bash
+kubectl apply -f calico-v3.28.5-custom.yaml
+
+kubectl -n kube-system rollout status daemonset/calico-node
+kubectl -n kube-system rollout status deployment/calico-kube-controllers
+~~~
+
+最终状态是：
+
+~~~text
+calico-node                 5/5 Ready
+calico-kube-controllers     1/1 Ready
+Calico                      v3.28.5
+~~~
+
+自定义的 IP autodetection 也仍然存在：
+
+~~~text
+IP=autodetect
+IP_AUTODETECTION_METHOD=can-reach=10.10.10.1
+~~~
+
+在继续 Kubernetes 升级前，我还从普通 Pod 里重新验证了 DNS 和 Kubernetes API Service，两个 smoke test 都通过。
+
+### 目标版本 kubeadm 的 plan 暴露了 etcd patch 回退
+
+control-plane 上的 kubeadm 更新到 v1.30.14 后，重新生成正式 upgrade plan：
+
+~~~bash
+kubeadm upgrade plan v1.30.14
+~~~
+
+实际计划是：
+
+| 组件 | 当前版本 | 目标版本 |
+| --- | --- | --- |
+| kube-apiserver | v1.29.14 | v1.30.14 |
+| kube-controller-manager | v1.29.14 | v1.30.14 |
+| kube-scheduler | v1.29.14 | v1.30.14 |
+| kube-proxy | v1.29.14 | v1.30.14 |
+| CoreDNS | v1.11.1 | v1.11.3 |
+| etcd | 3.5.16-0 | 3.5.15-0 |
+| kubelet | 5 个节点均为 v1.29.14 | v1.30.14 |
+
+这里最值得停下来看的不是 Kubernetes 组件，而是 etcd：
+
+~~~text
+3.5.16-0 → 3.5.15-0
+~~~
+
+也就是说，这次 kubeadm plan 给出的 etcd 目标 patch 比集群当前正在运行的版本更低。本次升级没有让 kubeadm 执行这个 etcd 变更，而是明确保留当前的 3.5.16-0。
+
+### dry-run 时显式跳过 etcd
+
+先执行：
+
+~~~bash
+kubeadm upgrade apply v1.30.14 \
+  --dry-run \
+  --yes \
+  --etcd-upgrade=false
+~~~
+
+dry-run 结束为：
+
+~~~text
+[upgrade/successful] Finished dryrunning successfully!
+~~~
+
+检查 dry-run 输出时，可以看到 kube-apiserver、kube-controller-manager 和 kube-scheduler 的新 static Pod manifest，CoreDNS 目标是 v1.11.3，kube-proxy 目标是 v1.30.14；没有出现写入新 etcd static Pod manifest 的步骤。
+
+确认后执行正式升级：
+
+~~~bash
+kubeadm upgrade apply v1.30.14 \
+  --yes \
+  --etcd-upgrade=false
+~~~
+
+结果：
+
+~~~text
+[upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.30.14". Enjoy!
+~~~
+
+升级后实际运行的关键版本是：
+
+| 组件 | 实际版本 |
+| --- | --- |
+| kube-apiserver | v1.30.14 |
+| kube-controller-manager | v1.30.14 |
+| kube-scheduler | v1.30.14 |
+| etcd | 3.5.16-0 |
+| CoreDNS | v1.11.3 |
+| kube-proxy | v1.30.14 |
+
+这也直接确认了 etcd 没有跟着 plan 回到 3.5.15-0。
+
+CoreDNS 和 kube-proxy 在 apply 结束后的短时间内仍在 rollout。我分别等待：
+
+~~~bash
+kubectl -n kube-system rollout status deployment/coredns --timeout=10m
+kubectl -n kube-system rollout status daemonset/kube-proxy --timeout=10m
+~~~
+
+最终 CoreDNS 为 2/2，kube-proxy 为 5/5。
+
+### 更新 master kubelet
+
+master 先正常 drain：
+
+~~~bash
+kubectl drain master \
+  --ignore-daemonsets \
+  --delete-emptydir-data
+~~~
+
+然后把 kubelet 和 kubectl 更新到 v1.30.14，重启 kubelet，并同时检查磁盘上的二进制和实际运行进程：
+
+~~~bash
+kubelet --version
+kubectl version --client
+
+PID=$(pidof kubelet)
+readlink -f /proc/$PID/exe
+/proc/$PID/exe --version
+~~~
+
+两处 kubelet 都确认是：
+
+~~~text
+Kubernetes v1.30.14
+~~~
+
+这次重启 kubelet 后，紧接着执行的第一次 kubectl 请求短暂返回：
+
+~~~text
+The connection to the server 10.10.10.100:6443 was refused
+~~~
+
+没有立即改配置或回滚。随后检查本机状态时，6443 已经重新监听，etcd、kube-apiserver、kube-controller-manager 和 kube-scheduler 都是 Running。kubelet 日志也显示这些 static Pod 在重启后的十几秒内重新启动完成。
+
+再次检查：
+
+~~~bash
+kubectl get node master -o wide
+kubectl get --raw='/readyz?verbose'
+~~~
+
+master 已经是 `Ready,SchedulingDisabled / v1.30.14`，并且 readyz 全部通过，然后再：
+
+~~~bash
+kubectl uncordon master
+~~~
+
+### 逐台升级 worker
+
+这一轮 worker 的实际顺序是：
+
+~~~text
+drain
+→ update kubeadm
+→ kubeadm upgrade node
+→ update kubelet / kubectl
+→ restart kubelet
+→ verify the running kubelet
+→ uncordon
+~~~
+
+node1 和 node2 都没有出现新的 drain 阻塞。
+
+node3 drain 时，`prometheus-k8s-0` 实际触发了 PDB：
+
+~~~text
+Cannot evict pod as it would violate the pod's disruption budget.
+~~~
+
+当时的 PDB 是：
+
+~~~text
+MIN AVAILABLE        1
+ALLOWED DISRUPTIONS  0
+~~~
+
+因此临时把 `prometheus-k8s` 的 `minAvailable` 从 1 改为 0，重新 drain node3。节点升级完成并 uncordon 后，先等 `prometheus-k8s-0` 在 node4 恢复到 `2/2 Running`，再把 PDB 恢复为 `minAvailable: 1`。
+
+到 node4 时，同一个 Prometheus Pod 已经运行在 node4，所以 drain 又实际遇到了同一个 PDB 阻塞。处理方式相同：临时改为 0，完成 drain 和节点升级，uncordon node4；确认 Prometheus 已经在 node3 重新变成 `2/2 Running` 后，再恢复：
+
+~~~text
+MIN AVAILABLE        1
+ALLOWED DISRUPTIONS  0
+~~~
+
+最终四个 worker 都是 `Ready / v1.30.14`。
+
+### 最终状态和功能验证
+
+全部节点完成后：
+
+~~~text
+NAME     STATUS   ROLES           VERSION
+master   Ready    control-plane   v1.30.14
+node1    Ready    worker          v1.30.14
+node2    Ready    worker          v1.30.14
+node3    Ready    worker          v1.30.14
+node4    Ready    worker          v1.30.14
+~~~
+
+关键组件最终状态：
+
+| 组件 | 最终状态 |
+| --- | --- |
+| kube-apiserver | v1.30.14 / Running |
+| kube-controller-manager | v1.30.14 / Running |
+| kube-scheduler | v1.30.14 / Running |
+| etcd | 3.5.16-0 / Running |
+| CoreDNS | v1.11.3 / 2/2 Ready |
+| kube-proxy | v1.30.14 / 5/5 Ready |
+| Calico | v3.28.5 / calico-node 5/5 Ready |
+| calico-kube-controllers | 1/1 Ready |
+| Prometheus PDB | minAvailable=1 |
+
+检查异常 Pod：
+
+~~~bash
+kubectl get pods -A \
+  --field-selector=status.phase!=Running,status.phase!=Succeeded
+~~~
+
+返回：
+
+~~~text
+No resources found
+~~~
+
+API readiness：
+
+~~~bash
+kubectl get --raw='/readyz?verbose'
+~~~
+
+结束为：
+
+~~~text
+readyz check passed
+~~~
+
+这个集群的 `metrics.k8s.io` 仍由 `monitoring/prometheus-adapter` 提供。升级后 APIService 为 `AVAILABLE=True`，`kubectl top nodes` 也正常返回 5 个节点的 CPU 和内存数据。
+
+最后再次从 Pod 内验证 DNS 和 Kubernetes API Service。
+
+DNS：
+
+~~~text
+Server:         10.96.0.10
+Address:        10.96.0.10:53
+
+Name:   kubernetes.default.svc.cluster.local
+Address: 10.96.0.1
+~~~
+
+API 返回：
+
+~~~json
+{
+  "major": "1",
+  "minor": "30",
+  "gitVersion": "v1.30.14"
+}
+~~~
+
+两个 smoke Pod 都以 `Completed` 结束并随后删除。
+
+至此，v1.29.14 → v1.30.14 这一阶段完成。
+
 ## 参考资料
 
 - <a href="https://kubernetes.io/zh-cn/releases/1.27/" target="_blank" rel="noopener noreferrer">Kubernetes 1.27</a>
@@ -1321,4 +1624,5 @@ kubectl delete pod api-smoke-test dns-smoke-test
 - <a href="https://kubernetes.io/zh-cn/docs/reference/kubectl/generated/kubectl_drain/" target="_blank" rel="noopener noreferrer">kubectl drain 参考</a>
 - <a href="https://kubernetes.io/zh-cn/releases/1.28/" target="_blank" rel="noopener noreferrer">Kubernetes 1.28</a>
 - <a href="https://kubernetes.io/zh-cn/releases/1.29/" target="_blank" rel="noopener noreferrer">Kubernetes 1.29</a>
+- <a href="https://kubernetes.io/zh-cn/releases/1.30/" target="_blank" rel="noopener noreferrer">Kubernetes 1.30</a>
 - <a href="https://docs.tigera.io/calico/latest/getting-started/kubernetes/requirements" target="_blank" rel="noopener noreferrer">Calico Kubernetes 系统要求</a>
