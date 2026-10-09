@@ -106,8 +106,8 @@ const initialSummary = isZh
         <summary>{isZh ? '高级选项：基础放置条件检查（可选）' : 'Advanced: basic placement check (optional)'}</summary>
         <p class="ceph-advanced-help">
           {isZh
-            ? '不确定就保持“不检查”。这里仅检查 OSD / Host 数量，不读取 CRUSH 配置，也无法保证真实数据放置。'
-            : 'Leave this unchecked if unsure. This only checks OSD/host counts, not real CRUSH rules or actual data placement.'}
+            ? '这是面向标准单 Host 一份副本/分片的基础数量检查。特殊 CRUSH 规则可能不同；不确定时选择“不检查”。'
+            : 'This count check assumes standard placement on distinct OSDs/hosts. Custom CRUSH rules can differ; skip the check if unsure.'}
         </p>
         <label class="field">
           <span>{isZh ? 'CRUSH Failure Domain' : 'CRUSH failure domain'}</span>
@@ -296,8 +296,8 @@ const initialSummary = isZh
       if (result.code === 'exceedsOSDs') return isZh ? '副本数或 EC 分片总数不能超过 OSD 数量。' : 'Replicas or EC chunks cannot exceed the OSD count.';
       if (result.code === 'hostsExceedOSDs') return isZh ? 'Host 数量不能超过所填写的 OSD 数量。' : 'Host count cannot exceed the OSD count provided.';
       if (result.code === 'insufficientHosts') return isZh
-        ? 'Host 数量不足：Host failure domain 需要至少与副本数或 EC 分片总数一样多的 Host。'
-        : 'Too few hosts: the host failure domain requires at least as many hosts as replicas or EC chunks.';
+        ? '按标准 Host 独立放置方式，Host 数不足：至少需要与副本数或 EC 分片总数相同数量的 Host。'
+        : 'Too few hosts for standard host-distinct placement: you need at least as many hosts as replicas or EC chunks.';
       if (result.code === 'outOfRange') return isZh ? '容量数值太大或太小，无法可靠计算，请调整输入。' : 'Capacity magnitude is outside the reliable calculation range.';
       return isZh ? '请为 ' + label + ' 输入有效数值。' : 'Enter a valid value for ' + label + '.';
     };
