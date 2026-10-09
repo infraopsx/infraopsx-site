@@ -1,43 +1,28 @@
 ---
+import {
+  CEPH_DEFAULTS,
+  calculateCephCapacity,
+  formatCephCapacity,
+  formatCephNumber,
+  secondaryCephUnit
+} from '../../lib/cephCapacity.mjs';
+
 const { locale = 'en' } = Astro.props;
 const isZh = locale === 'zh';
+const defaults = CEPH_DEFAULTS;
+const initial = calculateCephCapacity(defaults);
+if (!initial.ok) throw new Error('Invalid default Ceph capacity configuration');
 
-const defaults = {
-  osdCount: 6,
-  capacity: 4,
-  unit: 'TB',
-  replication: 3,
-  k: 4,
-  m: 2,
-  reserve: 15
-};
-
-const unitBytes = {
-  GB: 10 ** 9,
-  GiB: 2 ** 30,
-  TB: 10 ** 12,
-  TiB: 2 ** 40
-} as const;
-
-const formatCapacity = (bytes: number, unit: keyof typeof unitBytes) =>
-  (bytes / unitBytes[unit]).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
-
-const capacityText = (bytes: number, unit: keyof typeof unitBytes) =>
-  `${formatCapacity(bytes, unit)} ${unit}`;
-
-const secondaryUnit = (unit: keyof typeof unitBytes) =>
-  ({ GB: 'GiB', GiB: 'GB', TB: 'TiB', TiB: 'TB' } as const)[unit];
-
-const initialRawBytes = defaults.osdCount * defaults.capacity * unitBytes[defaults.unit as keyof typeof unitBytes];
-const initialTheoreticalBytes = initialRawBytes / defaults.replication;
-const initialRecommendedBytes = initialTheoreticalBytes * (1 - defaults.reserve / 100);
-const initialOverheadBytes = initialRawBytes - initialTheoreticalBytes;
-const initialUnit = defaults.unit as keyof typeof unitBytes;
-const initialSecondaryUnit = secondaryUnit(initialUnit);
-
+const unit = defaults.unit;
+const secondary = secondaryCephUnit(unit);
 const initialSummary = isZh
-  ? `这个集群提供 ${capacityText(initialRawBytes, initialUnit)} 的 Raw Capacity。采用 Replication Size ${defaults.replication} 时，Theoretical Usable Capacity 为 ${capacityText(initialTheoreticalBytes, initialUnit)}。保留 ${defaults.reserve}% Reserve 后，Recommended Usable 约为 ${capacityText(initialRecommendedBytes, initialUnit)}。`
-  : `This configuration provides ${capacityText(initialRawBytes, initialUnit)} of raw capacity. With a replication size of ${defaults.replication}, the theoretical usable capacity is ${capacityText(initialTheoreticalBytes, initialUnit)}. Reserving ${defaults.reserve}% leaves approximately ${capacityText(initialRecommendedBytes, initialUnit)} of recommended usable capacity.`;
+  ? '集群原始容量为 ' + formatCephCapacity(initial.rawBytes, unit) +
+    '。采用 3 副本时，理论可用容量为 ' + formatCephCapacity(initial.theoreticalBytes, unit) +
+    '。按 15% 的用户预留比例计算，规划目标为 ' + formatCephCapacity(initial.planningBytes, unit) + '。'
+  : 'The cluster has ' + formatCephCapacity(initial.rawBytes, unit) +
+    ' of raw capacity. With three replicas, theoretical usable capacity is ' +
+    formatCephCapacity(initial.theoreticalBytes, unit) + '. After a 15% user-selected reserve, ' +
+    'the planning target is ' + formatCephCapacity(initial.planningBytes, unit) + '.';
 ---
 
 <section
@@ -116,6 +101,30 @@ const initialSummary = isZh
         </label>
       </div>
 
+
+      <details class="ceph-advanced" data-topology-details>
+        <summary>{isZh ? '高级选项：基础放置条件检查（可选）' : 'Advanced: basic placement check (optional)'}</summary>
+        <p class="ceph-advanced-help">
+          {isZh
+            ? '这是面向标准单 Host 一份副本/分片的基础数量检查。特殊 CRUSH 规则可能不同；不确定时选择“不检查”。'
+            : 'This count check assumes standard placement on distinct OSDs/hosts. Custom CRUSH rules can differ; skip the check if unsure.'}
+        </p>
+        <label class="field">
+          <span>{isZh ? 'CRUSH Failure Domain' : 'CRUSH failure domain'}</span>
+          <select data-input="failureDomain">
+            <option value="unknown" selected>{isZh ? '不清楚 / 不检查' : 'I do not know / skip check'}</option>
+            <option value="host">Host</option>
+            <option value="osd">OSD</option>
+          </select>
+        </label>
+        <div class="field-group ceph-host-field" data-host-count-group hidden>
+          <label class="field">
+            <span>{isZh ? '可用 Host 数量' : 'Number of eligible hosts'}</span>
+            <input data-input="hostCount" type="number" min="1" step="1" placeholder={isZh ? '例如 3' : 'e.g. 3'} />
+          </label>
+        </div>
+      </details>
+
       <div class="calculator-error" data-calculator-error role="alert" hidden></div>
 
       <button class="button primary calculator-submit" type="submit">
@@ -143,40 +152,51 @@ const initialSummary = isZh
           <div class="result-row result-row-primary">
             <dt>Raw Capacity</dt>
             <dd>
-              <strong data-result="raw">{capacityText(initialRawBytes, initialUnit)}</strong>
-              <small data-result-secondary="raw">≈ {capacityText(initialRawBytes, initialSecondaryUnit)}</small>
+              <strong data-result="raw">{formatCephCapacity(initial.rawBytes, unit)}</strong>
+              <small data-result-secondary="raw">≈ {formatCephCapacity(initial.rawBytes, secondary)}</small>
             </dd>
           </div>
 
           <div class="result-row">
             <dt>Theoretical Usable Capacity</dt>
             <dd>
-              <strong data-result="theoretical">{capacityText(initialTheoreticalBytes, initialUnit)}</strong>
-              <small data-result-secondary="theoretical">≈ {capacityText(initialTheoreticalBytes, initialSecondaryUnit)}</small>
+              <strong data-result="theoretical">{formatCephCapacity(initial.theoreticalBytes, unit)}</strong>
+              <small data-result-secondary="theoretical">≈ {formatCephCapacity(initial.theoreticalBytes, secondary)}</small>
             </dd>
           </div>
 
           <div class="result-row result-row-recommended">
-            <dt>Recommended Usable Capacity</dt>
+            <dt>Planning Capacity After Reserve</dt>
             <dd>
-              <strong data-result="recommended">{capacityText(initialRecommendedBytes, initialUnit)}</strong>
-              <small data-result-secondary="recommended">≈ {capacityText(initialRecommendedBytes, initialSecondaryUnit)}</small>
+              <strong data-result="planning">{formatCephCapacity(initial.planningBytes, unit)}</strong>
+              <small data-result-secondary="planning">≈ {formatCephCapacity(initial.planningBytes, secondary)}</small>
             </dd>
           </div>
 
           <div class="result-row">
             <dt>Data Efficiency</dt>
-            <dd><strong data-result="efficiency">33.33%</strong></dd>
+            <dd><strong data-result="efficiency">{formatCephNumber(initial.efficiency * 100)}%</strong></dd>
           </div>
 
           <div class="result-row">
             <dt>Redundancy Overhead</dt>
             <dd>
-              <strong data-result="overhead">{capacityText(initialOverheadBytes, initialUnit)}</strong>
-              <small data-result-secondary="overhead">≈ {capacityText(initialOverheadBytes, initialSecondaryUnit)}</small>
+              <strong data-result="overhead">{formatCephCapacity(initial.overheadBytes, unit)}</strong>
+              <small data-result-secondary="overhead">≈ {formatCephCapacity(initial.overheadBytes, secondary)}</small>
             </dd>
           </div>
         </dl>
+
+        <p class="ceph-result-note" data-placement-status>
+          {isZh
+            ? '未检查 Host / CRUSH 放置条件；目前只核验了 OSD 数量。'
+            : 'Host / CRUSH placement is not checked. Only OSD count has been checked.'}
+        </p>
+        <p class="ceph-result-note">
+          {isZh
+            ? '规划容量不等于 Ceph 的 MAX AVAIL，也不是保证可以安全写入的数据量。'
+            : 'Planning capacity is not Ceph MAX AVAIL or a guarantee of safely writable space.'}
+        </p>
       </div>
     </div>
   </div>
@@ -188,20 +208,31 @@ const initialSummary = isZh
   </p>
 </section>
 
-<script is:inline>
-  (() => {
-    const root = document.querySelector('[data-ceph-calculator]');
-    if (!root) return;
+<script>
+  import {
+    calculateCephCapacity,
+    formatCephCapacity,
+    formatCephNumber,
+    secondaryCephUnit
+  } from '../../lib/cephCapacity.mjs';
 
+  const root = document.querySelector('[data-ceph-calculator]');
+
+  if (root) {
     const isZh = root.dataset.locale === 'zh';
     const form = root.querySelector('[data-calculator-form]');
     const error = root.querySelector('[data-calculator-error]');
+    const details = root.querySelector('[data-topology-details]');
     const modeInputs = [...root.querySelectorAll('input[name^="ceph-mode-"]')];
     const modeOptions = [...root.querySelectorAll('[data-mode-option]')];
     const fields = [...root.querySelectorAll('[data-input]')];
     const replicatedGroup = root.querySelector('[data-field-group="replicated"]');
     const ecGroup = root.querySelector('[data-field-group="ec"]');
+    const hostGroup = root.querySelector('[data-host-count-group]');
     const resultMode = root.querySelector('[data-result-mode]');
+    const summary = root.querySelector('[data-summary]');
+    const placementStatus = root.querySelector('[data-placement-status]');
+
     const resultNodes = Object.fromEntries(
       [...root.querySelectorAll('[data-result]')].map((node) => [node.dataset.result, node])
     );
@@ -209,195 +240,168 @@ const initialSummary = isZh
       [...root.querySelectorAll('[data-result-secondary]')].map((node) => [node.dataset.resultSecondary, node])
     );
 
-    const input = (name) => root.querySelector(`[data-input="${name}"]`);
+    const input = (name) => root.querySelector('[data-input="' + name + '"]');
+    const selectedMode = () => modeInputs.find((item) => item.checked)?.value || 'replicated';
 
-    const numberValue = (name) => Number(input(name).value);
-
-    const formatNumber = (value, decimals = 2) => {
-      if (!Number.isFinite(value)) return '—';
-      return value
-        .toFixed(decimals)
-        .replace(/\.00$/, '')
-        .replace(/(\.\d)0$/, '$1');
-    };
-
-    const unitBytes = Object.freeze({
-      GB: 10 ** 9,
-      GiB: 2 ** 30,
-      TB: 10 ** 12,
-      TiB: 2 ** 40
+    const readValues = () => ({
+      mode: selectedMode(),
+      osdCount: input('osdCount').value,
+      capacity: input('capacity').value,
+      unit: input('unit').value,
+      replication: input('replication').value,
+      k: input('k').value,
+      m: input('m').value,
+      reserve: input('reserve').value,
+      failureDomain: input('failureDomain').value,
+      hostCount: input('hostCount').value
     });
-
-    const secondaryUnit = (unit) => ({
-      GB: 'GiB',
-      GiB: 'GB',
-      TB: 'TiB',
-      TiB: 'TB'
-    })[unit];
-
-    const capacityText = (bytes, unit) =>
-      `${formatNumber(bytes / unitBytes[unit])} ${unit}`;
-
-    const secondaryCapacityText = (bytes, unit) =>
-      `≈ ${capacityText(bytes, secondaryUnit(unit))}`;
 
     const setError = (message = '') => {
       error.textContent = message;
       error.hidden = !message;
     };
 
-    const clearInvalid = () => {
-      fields.forEach((field) => field.removeAttribute('aria-invalid'));
-    };
+    const clearInvalid = () => fields.forEach((field) => field.removeAttribute('aria-invalid'));
 
-    const validate = (mode, values) => {
-      clearInvalid();
-
-      if (!Number.isInteger(values.osdCount) || values.osdCount <= 0) {
-        input('osdCount').setAttribute('aria-invalid', 'true');
-        return isZh ? 'OSD 数量必须是大于 0 的整数。' : 'OSD Count must be a positive integer.';
-      }
-
-      if (!Number.isFinite(values.capacity) || values.capacity <= 0) {
-        input('capacity').setAttribute('aria-invalid', 'true');
-        return isZh ? 'Capacity per OSD 必须大于 0。' : 'Capacity per OSD must be positive.';
-      }
-
-      if (mode === 'replicated') {
-        if (!Number.isInteger(values.replication) || values.replication < 1) {
-          input('replication').setAttribute('aria-invalid', 'true');
-          return isZh ? 'Replication Size 必须是至少为 1 的整数。' : 'Replication Size must be a positive integer.';
-        }
-
-        if (values.replication > values.osdCount) {
-          input('replication').setAttribute('aria-invalid', 'true');
-          return isZh ? 'Replication Size 不能大于 OSD 数量。' : 'Replication Size cannot exceed the OSD Count.';
-        }
-      } else {
-        if (!Number.isInteger(values.k) || values.k <= 0) {
-          input('k').setAttribute('aria-invalid', 'true');
-          return isZh ? 'k 必须是大于 0 的整数。' : 'k must be a positive integer.';
-        }
-
-        if (!Number.isInteger(values.m) || values.m <= 0) {
-          input('m').setAttribute('aria-invalid', 'true');
-          return isZh ? 'm 必须是大于 0 的整数。' : 'm must be a positive integer.';
-        }
-
-        if (values.k + values.m > values.osdCount) {
-          input('m').setAttribute('aria-invalid', 'true');
-          return isZh ? 'k + m 不能大于 OSD 数量。' : 'k + m cannot exceed the OSD Count.';
-        }
-      }
-
-      if (!Number.isFinite(values.reserve) || values.reserve < 0 || values.reserve >= 100) {
-        input('reserve').setAttribute('aria-invalid', 'true');
-        return isZh ? 'Reserve 必须大于等于 0 且小于 100。' : 'Reserve must be at least 0 and less than 100.';
-      }
-
-      return '';
-    };
-
-    const readValues = () => ({
-      osdCount: numberValue('osdCount'),
-      capacity: numberValue('capacity'),
-      unit: input('unit').value,
-      replication: numberValue('replication'),
-      k: numberValue('k'),
-      m: numberValue('m'),
-      reserve: numberValue('reserve')
-    });
-
-    const selectedMode = () => modeInputs.find((item) => item.checked)?.value || 'replicated';
-
-    const updateMode = () => {
+    const updateVisibleControls = () => {
       const mode = selectedMode();
-      const isReplicated = mode === 'replicated';
-      replicatedGroup.hidden = !isReplicated;
-      ecGroup.hidden = isReplicated;
+      replicatedGroup.hidden = mode !== 'replicated';
+      ecGroup.hidden = mode !== 'ec';
+      hostGroup.hidden = input('failureDomain').value !== 'host';
       modeOptions.forEach((option) => option.classList.toggle('is-active', option.dataset.modeOption === mode));
     };
 
-    const updateResults = () => {
-      const mode = selectedMode();
-      const values = readValues();
-      const rawBytes = values.osdCount * values.capacity * unitBytes[values.unit];
-      const theoreticalBytes = mode === 'replicated'
-        ? rawBytes / values.replication
-        : rawBytes * values.k / (values.k + values.m);
-      const recommendedBytes = theoreticalBytes * (1 - values.reserve / 100);
-      const efficiency = mode === 'replicated'
-        ? 1 / values.replication
-        : values.k / (values.k + values.m);
-      const overheadBytes = rawBytes - theoreticalBytes;
+    const staleMessage = isZh
+      ? '输入已更改，请点击“计算容量”查看新结果。'
+      : 'Inputs changed. Select Calculate capacity to update the results.';
 
-      resultMode.textContent = mode === 'replicated'
-        ? 'Replicated'
-        : `EC ${values.k}+${values.m}`;
-
-      [
-        ['raw', rawBytes],
-        ['theoretical', theoreticalBytes],
-        ['recommended', recommendedBytes],
-        ['overhead', overheadBytes]
-      ].forEach(([name, bytes]) => {
-        resultNodes[name].textContent = capacityText(bytes, values.unit);
-        secondaryNodes[name].textContent = secondaryCapacityText(bytes, values.unit);
-      });
-
-      resultNodes.efficiency.textContent = `${formatNumber(efficiency * 100)}%`;
-
-      const summary = root.querySelector('[data-summary]');
-      summary.textContent = isZh
-        ? `这个集群提供 ${capacityText(rawBytes, values.unit)} 的 Raw Capacity。采用 ${mode === 'replicated' ? `Replication Size ${formatNumber(values.replication, 0)}` : `EC ${formatNumber(values.k, 0)}+${formatNumber(values.m, 0)}`} 时，Theoretical Usable Capacity 为 ${capacityText(theoreticalBytes, values.unit)}。保留 ${formatNumber(values.reserve)}% Reserve 后，Recommended Usable 约为 ${capacityText(recommendedBytes, values.unit)}。`
-        : `This configuration provides ${capacityText(rawBytes, values.unit)} of raw capacity. With ${mode === 'replicated' ? `a replication size of ${formatNumber(values.replication, 0)}` : `an EC ${formatNumber(values.k, 0)}+${formatNumber(values.m, 0)} profile`}, the theoretical usable capacity is ${capacityText(theoreticalBytes, values.unit)}. Reserving ${formatNumber(values.reserve)}% leaves approximately ${capacityText(recommendedBytes, values.unit)} of recommended usable capacity.`;
+    const markStale = () => {
+      Object.values(resultNodes).forEach((node) => { node.textContent = '—'; });
+      Object.values(secondaryNodes).forEach((node) => { node.textContent = ''; });
+      resultMode.textContent = '—';
+      summary.textContent = staleMessage;
+      placementStatus.textContent = staleMessage;
     };
 
-    modeInputs.forEach((modeInput) => modeInput.addEventListener('change', () => {
-      updateMode();
+    const fieldLabels = isZh
+      ? { osdCount: 'OSD 数量', capacity: '单个 OSD 容量', unit: '容量单位', replication: 'Replication Size', k: 'k', m: 'm', reserve: 'Reserve', failureDomain: 'Failure Domain', hostCount: 'Host 数量' }
+      : { osdCount: 'OSD count', capacity: 'Capacity per OSD', unit: 'Capacity unit', replication: 'Replication size', k: 'k', m: 'm', reserve: 'Reserve', failureDomain: 'Failure domain', hostCount: 'Host count' };
 
-      const message = validate(selectedMode(), readValues());
+    const explainError = (result) => {
+      const label = fieldLabels[result.field] || result.field;
+      if (result.code === 'required') return isZh ? label + '不能为空。' : label + ' is required.';
+      if (result.code === 'positiveInteger') return isZh ? label + '必须是大于 0 的整数。' : label + ' must be a positive integer.';
+      if (result.code === 'positive') return isZh ? label + '必须大于 0。' : label + ' must be greater than zero.';
+      if (result.code === 'reserveRange') return isZh ? 'Reserve 必须大于等于 0，且小于 100%。' : 'Reserve must be at least 0% and less than 100%.';
+      if (result.code === 'exceedsOSDs') return isZh ? '副本数或 EC 分片总数不能超过 OSD 数量。' : 'Replicas or EC chunks cannot exceed the OSD count.';
+      if (result.code === 'hostsExceedOSDs') return isZh ? 'Host 数量不能超过所填写的 OSD 数量。' : 'Host count cannot exceed the OSD count provided.';
+      if (result.code === 'insufficientHosts') return isZh
+        ? '按标准 Host 独立放置方式，Host 数不足：至少需要与副本数或 EC 分片总数相同数量的 Host。'
+        : 'Too few hosts for standard host-distinct placement: you need at least as many hosts as replicas or EC chunks.';
+      if (result.code === 'outOfRange') return isZh ? '容量数值太大或太小，无法可靠计算，请调整输入。' : 'Capacity magnitude is outside the reliable calculation range.';
+      return isZh ? '请为 ' + label + ' 输入有效数值。' : 'Enter a valid value for ' + label + '.';
+    };
 
-      if (message) {
-        setError(message);
-        return;
+    const displayFailure = (result) => {
+      markStale();
+      clearInvalid();
+      const field = input(result.field);
+      if (field) {
+        field.setAttribute('aria-invalid', 'true');
+        if (result.field === 'hostCount' || result.field === 'failureDomain') details.open = true;
+        field.focus();
+      }
+      setError(explainError(result));
+    };
+
+    const render = (result) => {
+      const unit = result.values.unit;
+      const secondaryUnit = secondaryCephUnit(unit);
+      const values = result.values;
+      resultMode.textContent = values.mode === 'replicated'
+        ? 'Replicated'
+        : 'EC ' + values.k + '+' + values.m;
+
+      for (const [key, bytes] of [
+        ['raw', result.rawBytes],
+        ['theoretical', result.theoreticalBytes],
+        ['planning', result.planningBytes],
+        ['overhead', result.overheadBytes]
+      ]) {
+        resultNodes[key].textContent = formatCephCapacity(bytes, unit);
+        secondaryNodes[key].textContent = '≈ ' + formatCephCapacity(bytes, secondaryUnit);
+      }
+      resultNodes.efficiency.textContent = formatCephNumber(result.efficiency * 100) + '%';
+
+      const modeText = values.mode === 'replicated'
+        ? (isZh ? 'Replication Size ' : 'replication size ') + values.replication
+        : 'EC ' + values.k + '+' + values.m;
+
+      summary.textContent = isZh
+        ? '原始容量 ' + formatCephCapacity(result.rawBytes, unit) +
+          '，采用 ' + modeText + ' 后，理论可用容量 ' +
+          formatCephCapacity(result.theoreticalBytes, unit) +
+          '；按 ' + formatCephNumber(values.reserve) + '% 预留，规划容量为 ' +
+          formatCephCapacity(result.planningBytes, unit) + '。'
+        : 'Raw capacity is ' + formatCephCapacity(result.rawBytes, unit) +
+          '. With ' + modeText + ', theoretical usable capacity is ' +
+          formatCephCapacity(result.theoreticalBytes, unit) +
+          '. After a ' + formatCephNumber(values.reserve) + '% reserve, the planning target is ' +
+          formatCephCapacity(result.planningBytes, unit) + '.';
+
+      if (result.placementCheck === 'not-checked') {
+        placementStatus.textContent = isZh
+          ? '未检查 Host / CRUSH 放置条件；目前只核验了 OSD 数量。'
+          : 'Host / CRUSH placement is not checked. Only OSD count has been checked.';
+      } else {
+        placementStatus.textContent = isZh
+          ? '基础 ' + values.failureDomain.toUpperCase() + ' 数量条件已满足；仍未验证 CRUSH 规则、设备分布和真实容量。'
+          : 'Basic ' + values.failureDomain.toUpperCase() +
+            ' count condition passed. CRUSH rules, placement distribution and actual capacity are not verified.';
+      }
+      if (values.mode === 'replicated' && values.replication === 1) {
+        placementStatus.textContent += isZh ? ' 注意：单副本没有冗余保护。' : ' Warning: size=1 provides no replica redundancy.';
       }
 
+      clearInvalid();
       setError('');
-      updateResults();
-    }));
+    };
 
-    fields.forEach((field) => field.addEventListener('input', () => {
-      setError('');
-      if (field.getAttribute('aria-invalid')) field.removeAttribute('aria-invalid');
-    }));
-
-    input('unit').addEventListener('change', () => {
-      const message = validate(selectedMode(), readValues());
-
-      if (message) {
-        setError(message);
+    const calculate = () => {
+      const result = calculateCephCapacity(readValues());
+      if (!result.ok) {
+        displayFailure(result);
         return;
       }
+      render(result);
+    };
 
+    modeInputs.forEach((radio) => radio.addEventListener('change', () => {
+      updateVisibleControls();
+      calculate();
+    }));
+
+    fields.forEach((field) => {
+      field.addEventListener('input', () => {
+        setError('');
+        clearInvalid();
+        markStale();
+      });
+    });
+
+    input('unit').addEventListener('change', calculate);
+    input('failureDomain').addEventListener('change', () => {
+      updateVisibleControls();
+      markStale();
       setError('');
-      updateResults();
+      clearInvalid();
     });
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
-      const mode = selectedMode();
-      const message = validate(mode, readValues());
-
-      if (message) {
-        setError(message);
-        return;
-      }
-
-      setError('');
-      updateResults();
+      calculate();
     });
 
-    updateMode();
-  })();
+    updateVisibleControls();
+  }
 </script>

@@ -305,3 +305,19 @@ Failure artifacts retain screenshots, video, and traces for debugging.
 ### Why
 
 Docker build success and `nginx -t` cannot detect broken client-side interactions, missing routes, JavaScript regressions, or layout/navigation behavior. Running a small real-browser suite against the production image catches those failures while keeping CI close to the deployed runtime.
+
+---
+
+## ADR-016: Ceph capacity planner must not claim actual safe space
+
+### Decision
+
+The Ceph Capacity Calculator exposes deterministic replicated/erasure-coded **theoretical** capacity, and a separately labeled **planning target after a user-selected reserve**.
+
+Its algorithm uses equal-size OSDs and the standard replicated or k/(k+m) EC ratio. The optional Host/OSD failure-domain check verifies only a necessary count condition; passing it must never be presented as proof of actual CRUSH feasibility.
+
+Neither the planning target nor a passing placement count check is equivalent to Ceph pool MAX AVAIL or guaranteed safely writable capacity. Real placement, utilization, BlueStore overhead, CRUSH rules, fullness thresholds, and recovery headroom require cluster-specific evidence.
+
+### Why
+
+The distinction avoids misleading storage decisions while retaining a simple, browser-local planning workflow. Shared calculation logic and automated boundary tests keep the English and Chinese pages consistent.

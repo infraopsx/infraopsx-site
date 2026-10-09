@@ -1614,6 +1614,57 @@ html[lang="zh-CN"] body {
   font-size: 20px;
 }
 
+/* Ceph capacity input guidance and optional topology count checks. */
+.tool-intro-note {
+  max-width: 770px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.ceph-advanced {
+  margin-top: 17px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-subtle);
+}
+
+.ceph-advanced summary {
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ceph-advanced-help,
+.ceph-result-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.ceph-advanced-help {
+  margin: 11px 0;
+}
+
+.ceph-host-field {
+  margin-top: 14px;
+}
+
+.ceph-result-note {
+  margin: 15px 0 0;
+}
+
+.ceph-result-note + .ceph-result-note {
+  margin-top: 6px;
+}
+
+.ceph-calculator .field select[aria-invalid="true"] {
+  border-color: var(--error-border);
+}
+
 .calculator-privacy {
   margin: 18px 4px 0;
   color: var(--muted);

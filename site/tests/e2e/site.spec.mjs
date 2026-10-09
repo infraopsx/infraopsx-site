@@ -7,7 +7,7 @@ const routes = [
   ['/zh/blog/', '真实问题，实用记录。'],
   ['/tools/', 'Practical infrastructure tools for real-world systems.'],
   ['/zh/tools/', '面向真实基础设施的实用工具。'],
-  ['/tools/ceph-capacity-calculator/', 'Ceph Capacity Calculator'],
+  ['/tools/ceph-capacity-calculator/', 'Ceph Storage Capacity Calculator'],
   ['/tools/kubernetes-resource-calculator/', 'Kubernetes Resource Calculator'],
   ['/tools/kubernetes-quantity-converter/', 'Kubernetes Quantity Converter'],
   ['/blog/rook-ceph-osd-high-memory-osd-memory-target/', /Rook Ceph OSD High Memory Usage/],
@@ -283,7 +283,95 @@ test.describe('interactive tools', () => {
 
     await expect(page.locator('[data-result="raw"]')).toHaveText('36 TB');
     await expect(page.locator('[data-result="theoretical"]')).toHaveText('12 TB');
-    await expect(page.locator('[data-result="recommended"]')).toHaveText('10.2 TB');
+    await expect(page.locator('[data-result="planning"]')).toHaveText('10.2 TB');
+  });
+
+  test('Ceph formula baseline and EC 4+2 update are correct', async ({ page }) => {
+    const errors = collectBrowserErrors(page);
+    await page.goto('/tools/ceph-capacity-calculator/');
+
+    await expect(page.locator('[data-result="raw"]')).toHaveText('24 TB');
+    await expect(page.locator('[data-result="theoretical"]')).toHaveText('8 TB');
+    await expect(page.locator('[data-result="planning"]')).toHaveText('6.8 TB');
+    await expect(page.locator('[data-result="efficiency"]')).toHaveText('33.33%');
+    await expect(page.getByText('Planning Capacity After Reserve')).toBeVisible();
+    await expect(page.locator('.ceph-result-note').last()).toContainText('not Ceph MAX AVAIL');
+
+    await page.locator('[data-mode-option="ec"]').click();
+    await expect(page.locator('[data-result="raw"]')).toHaveText('24 TB');
+    await expect(page.locator('[data-result="theoretical"]')).toHaveText('16 TB');
+    await expect(page.locator('[data-result="planning"]')).toHaveText('13.6 TB');
+    await expect(page.locator('[data-result="overhead"]')).toHaveText('8 TB');
+    await expect(page.locator('[data-result="efficiency"]')).toHaveText('66.67%');
+    expect(errors).toEqual([]);
+  });
+
+  test('Ceph invalid or edited values cannot leave old estimates visible', async ({ page }) => {
+    await page.goto('/tools/ceph-capacity-calculator/');
+    await page.locator('[data-input="reserve"]').fill('');
+    await expect(page.locator('[data-result="raw"]')).toHaveText('—');
+    await page.getByRole('button', { name: 'Calculate capacity' }).click();
+    await expect(page.locator('[data-input="reserve"]')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('[data-calculator-error]')).toContainText('required');
+    await expect(page.locator('[data-result="planning"]')).toHaveText('—');
+
+    await page.locator('[data-input="reserve"]').fill('15');
+    await page.getByRole('button', { name: 'Calculate capacity' }).click();
+    await expect(page.locator('[data-result="planning"]')).toHaveText('6.8 TB');
+
+    await page.locator('[data-input="replication"]').fill('7');
+    await page.getByRole('button', { name: 'Calculate capacity' }).click();
+    await expect(page.locator('[data-calculator-error]')).toContainText('cannot exceed the OSD count');
+    await expect(page.locator('[data-result="theoretical"]')).toHaveText('—');
+  });
+
+  test('Ceph optional host placement check blocks insufficient hosts, but does not claim CRUSH verification', async ({ page }) => {
+    await page.goto('/tools/ceph-capacity-calculator/');
+    await page.locator('[data-topology-details] summary').click();
+    await page.locator('[data-input="failureDomain"]').selectOption('host');
+
+    await page.locator('[data-input="hostCount"]').fill('2');
+    await page.getByRole('button', { name: 'Calculate capacity' }).click();
+    await expect(page.locator('[data-calculator-error]')).toContainText('Too few hosts');
+    await expect(page.locator('[data-result="planning"]')).toHaveText('—');
+
+    await page.locator('[data-input="hostCount"]').fill('3');
+    await page.getByRole('button', { name: 'Calculate capacity' }).click();
+    await expect(page.locator('[data-result="planning"]')).toHaveText('6.8 TB');
+    await expect(page.locator('[data-placement-status]')).toContainText('CRUSH rules');
+    await expect(page.locator('[data-placement-status]')).toContainText('not verified');
+
+    await page.locator('[data-mode-option="ec"]').click();
+    await page.locator('[data-input="hostCount"]').fill('4');
+    await page.getByRole('button', { name: 'Calculate capacity' }).click();
+    await expect(page.locator('[data-calculator-error]')).toContainText('Too few hosts');
+
+    await page.locator('[data-input="hostCount"]').fill('6');
+    await page.getByRole('button', { name: 'Calculate capacity' }).click();
+    await expect(page.locator('[data-result="theoretical"]')).toHaveText('16 TB');
+  });
+
+  test('Ceph Chinese UI is usable without extra inputs on mobile', async ({ page }) => {
+    const errors = collectBrowserErrors(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/zh/tools/ceph-capacity-calculator/');
+
+    await expect(page.getByRole('heading', { name: 'Ceph 存储容量计算器' })).toBeVisible();
+    await expect(page.getByText(/规划容量不等于 Ceph/)).toBeVisible();
+    await expect(page.locator('[data-result="planning"]')).toHaveText('6.8 TB');
+
+    await page.locator('[data-input="osdCount"]').fill('9');
+    await page.getByRole('button', { name: '计算容量' }).click();
+    await expect(page.locator('[data-result="planning"]')).toHaveText('10.2 TB');
+
+    const sizes = await page.evaluate(() => ({
+      viewport: window.innerWidth,
+      document: document.documentElement.scrollWidth,
+      body: document.body.scrollWidth
+    }));
+    expect(sizes.document).toBeLessThanOrEqual(sizes.viewport + 1);
+    expect(sizes.body).toBeLessThanOrEqual(sizes.viewport + 1);
+    expect(errors).toEqual([]);
   });
 
   test('Kubernetes resource calculator recalculates node requirements', async ({ page }) => {
