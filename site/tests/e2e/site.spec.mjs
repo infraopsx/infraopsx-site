@@ -7,7 +7,7 @@ const routes = [
   ['/zh/blog/', '真实问题，实用记录。'],
   ['/tools/', 'Practical infrastructure tools for real-world systems.'],
   ['/zh/tools/', '面向真实基础设施的实用工具。'],
-  ['/tools/ceph-capacity-calculator/', 'Ceph Capacity Calculator'],
+  ['/tools/ceph-capacity-calculator/', 'Ceph Storage Capacity Calculator'],
   ['/tools/kubernetes-resource-calculator/', 'Kubernetes Resource Calculator'],
   ['/tools/kubernetes-quantity-converter/', 'Kubernetes Quantity Converter'],
   ['/blog/rook-ceph-osd-high-memory-osd-memory-target/', /Rook Ceph OSD High Memory Usage/],
@@ -295,7 +295,7 @@ test.describe('interactive tools', () => {
     await expect(page.locator('[data-result="planning"]')).toHaveText('6.8 TB');
     await expect(page.locator('[data-result="efficiency"]')).toHaveText('33.33%');
     await expect(page.getByText('Planning Capacity After Reserve')).toBeVisible();
-    await expect(page.getByText(/not Ceph MAX AVAIL/)).toBeVisible();
+    await expect(page.locator('.ceph-result-note').last()).toContainText('not Ceph MAX AVAIL');
 
     await page.locator('[data-mode-option="ec"]').click();
     await expect(page.locator('[data-result="raw"]')).toHaveText('24 TB');
