@@ -16,6 +16,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Build builder image
+        run: docker build --target builder -t infraopsx-site:builder .
+
+      - name: Verify Ceph capacity model
+        run: docker run --rm infraopsx-site:builder npm run test:ceph
+
       - name: Build Docker image
         run: docker build -t infraopsx-site:ci .
 
