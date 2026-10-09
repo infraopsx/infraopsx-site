@@ -165,6 +165,29 @@ test.describe('SEO regression', () => {
     }
   });
 
+  test('Ceph calculator SEO metadata describes theoretical and planning capacity', async ({ page }) => {
+    const pages = [
+      {
+        path: '/tools/ceph-capacity-calculator/',
+        title: 'Ceph Storage Capacity Calculator (EC & Replication) | InfraOpsX',
+        description: 'Estimate Ceph raw and theoretical usable storage for replication and erasure coding (EC), plus efficiency, overhead, and reserve-based planning capacity—not MAX AVAIL.'
+      },
+      {
+        path: '/zh/tools/ceph-capacity-calculator/',
+        title: 'Ceph 存储容量计算器（副本与 EC 纠删码）| InfraOpsX',
+        description: '估算 Ceph 副本与 EC 纠删码布局的原始容量、理论可用容量、存储效率、冗余开销和按预留比例计算的规划容量；结果不等于实际 MAX AVAIL。'
+      }
+    ];
+
+    for (const entry of pages) {
+      const response = await page.goto(entry.path);
+      expect(response?.ok()).toBeTruthy();
+      await expect(page).toHaveTitle(entry.title);
+      await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', entry.description);
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', productionUrl(entry.path));
+    }
+  });
+
   test('search pages stay noindex and outside the sitemap', async ({
     page,
     request
