@@ -28,8 +28,9 @@ import CephCapacityCalculator from '../../../components/tools/CephCapacityCalcul
 
       <header class="tool-detail-header">
         <span class="section-label">CEPH · CAPACITY PLANNING</span>
-        <h1>Ceph Capacity Calculator</h1>
-        <p>Estimate raw capacity, theoretical usable capacity, and reserve headroom for a Ceph cluster.</p>
+        <h1>Ceph Storage Capacity Calculator</h1>
+        <p>Estimate raw, theoretical usable, and planning capacity for replicated and erasure-coded (EC) Ceph storage.</p>
+        <p class="tool-intro-note">Enter your OSD count, capacity per OSD, and protection layout. If you do not know your CRUSH failure domain, leave the optional Advanced check closed.</p>
       </header>
 
       <section class="tool-section" aria-labelledby="calculator-heading">
@@ -46,13 +47,13 @@ import CephCapacityCalculator from '../../../components/tools/CephCapacityCalcul
         <article class="tool-info-card">
           <span class="section-label">HOW IT WORKS</span>
           <h2>Use the layout that matches your data protection model.</h2>
-          <p>For replicated storage, theoretical usable capacity is the raw capacity divided by the replication size. For erasure-coded storage, usable capacity is based on the data-to-total-shard ratio <code>k / (k + m)</code>. Recommended usable capacity is calculated after applying the configured reserve percentage.</p>
+          <p>Raw capacity is OSD count × capacity per OSD (assuming equal-size OSDs). For replication, theoretical usable = raw / replication size; for EC, theoretical usable = raw × k / (k + m). Planning capacity is theoretical usable × (1 − your chosen Reserve %). See the <a href="https://docs.ceph.com/en/squid/rados/operations/erasure-code/" target="_blank" rel="noopener noreferrer">Ceph erasure-code documentation</a> for the k/m overhead model.</p>
         </article>
 
         <article class="tool-info-card">
           <span class="section-label">IMPORTANT CONSIDERATIONS</span>
           <h2>Capacity planning is an estimate.</h2>
-          <p>Actual available space can also be affected by BlueStore overhead, metadata, uneven OSD sizes, CRUSH rules and failure domains, recovery and backfill headroom, and current cluster utilization. This estimate is not the same as the capacity reported by Ceph <code>df</code>.</p>
+          <p>This calculator assumes all included OSDs have the same capacity and are eligible for the selected pool. It does not know OSD utilization, BlueStore/metadata overhead, uneven placement, CRUSH rules, device classes, or recovery requirements. The optional Host/OSD check tests only the basic count required for placement; passing it does <strong>not</strong> verify actual CRUSH placement. Planning capacity is <strong>not</strong> Ceph <code>df</code> <code>MAX AVAIL</code> and does not guarantee safely writable space. For actual pool capacity, inspect <code>ceph df</code> and <code>ceph osd df tree</code>. See <a href="https://docs.ceph.com/en/squid/rados/operations/monitoring/" target="_blank" rel="noopener noreferrer">Ceph monitoring documentation</a>.</p>
         </article>
       </section>
 
@@ -64,8 +65,20 @@ import CephCapacityCalculator from '../../../components/tools/CephCapacityCalcul
           <p>TB uses decimal units: 1 TB = 10<sup>12</sup> bytes. TiB uses binary units: 1 TiB = 2<sup>40</sup> bytes. The calculator keeps your selected unit as the primary display and shows the corresponding decimal or binary unit as a reference.</p>
         </details>
         <details>
-          <summary>Does the recommended usable capacity equal the available capacity reported by Ceph?</summary>
-          <p>No. It is a planning estimate that applies your reserve percentage to theoretical usable capacity. BlueStore, metadata, topology, recovery behavior and utilization can make the actual Ceph result different.</p>
+          <summary>Does the planning capacity equal Ceph MAX AVAIL?</summary>
+          <p>No. It subtracts only your chosen planning reserve from theoretical usable capacity. It does not account for current usage, CRUSH distribution, fullness thresholds, BlueStore overhead or recovery headroom. It must not be used as a guarantee of safe available space.</p>
+        </details>
+        <details>
+          <summary>How do I estimate usable storage for three replicas?</summary>
+          <p>With identical OSDs, multiply OSD count by capacity per OSD to get raw capacity, then divide by 3. For example, six 4 TB OSDs yield 24 TB raw and 8 TB theoretical usable. A 15% planning reserve gives 6.8 TB as a planning target, not Ceph MAX AVAIL.</p>
+        </details>
+        <details>
+          <summary>How is Ceph erasure coding (EC) capacity calculated?</summary>
+          <p>Use the standard k data chunks and m parity chunks: theoretical usable = raw × k / (k + m). With EC 4+2 and 24 TB raw, theoretical usable is 16 TB. The placement rule must be able to place all six chunks; this tool does not verify the actual CRUSH rule.</p>
+        </details>
+        <details>
+          <summary>What if I have fewer hosts than replicas or EC chunks?</summary>
+          <p>Open Advanced, choose Host as the CRUSH failure domain, and enter the number of eligible hosts. The calculator will stop if that count is below the replication size or EC k+m. Passing the count check is only a necessary condition, not proof that the real layout works.</p>
         </details>
       </section>
 
