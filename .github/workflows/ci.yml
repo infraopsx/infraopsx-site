@@ -46,6 +46,15 @@ jobs:
         run: |
           docker run --rm             --network host             -e CI=true             -e BASE_URL=http://127.0.0.1:8080             -v "$PWD:/work"             -w /work/site             mcr.microsoft.com/playwright:v1.55.0-noble             sh -lc 'npm install --ignore-scripts && npm run test:e2e'
 
+      - name: Inspect live production DNS and HTTPS
+        run: |
+          getent ahostsv4 infra.oeax.de || true
+          curl -fsSL --connect-timeout 10 --max-time 25 -o /dev/null -w 'Live HTTPS: %{http_code} %{url_effective}\n' https://infra.oeax.de/tools/ceph-capacity-calculator/ || true
+
+      - name: Test actual production website in Chromium
+        run: |
+          docker run --rm --network host -e CI=true -v "$PWD:/work" -w /work/site mcr.microsoft.com/playwright:v1.55.0-noble sh -lc 'npm install --ignore-scripts && node scripts/live-ceph-acceptance.mjs'
+
       - name: Upload Playwright artifacts
         if: always()
         uses: actions/upload-artifact@v4
