@@ -102,10 +102,13 @@ Current capabilities:
 - TiB
 - Raw Capacity
 - Theoretical Usable Capacity
-- Recommended Usable Capacity
+- Planning Capacity After Reserve (user-selected planning reserve, not Ceph MAX AVAIL)
 - Data Efficiency
 - Redundancy Overhead
 - configurable Reserve
+- deterministic, unit-tested Replicated and EC capacity model
+- optional basic OSD/Host failure-domain count check (necessary condition only; not actual CRUSH validation)
+- explicit validation of blank, non-finite and out-of-range inputs
 - client-side input validation
 - bilingual interface
 - local browser calculation
@@ -113,6 +116,8 @@ Current capabilities:
 All calculator inputs are processed locally in the browser.
 
 No calculator input is uploaded to a server.
+
+Ceph capacity outputs assume equal-capacity OSDs and omit cluster utilization, CRUSH placement, BlueStore/metadata overhead, device class restrictions and recovery headroom. The tool does not calculate Ceph `df` `MAX AVAIL` or assert safe writable space.
 
 #### Kubernetes Resource Calculator
 
