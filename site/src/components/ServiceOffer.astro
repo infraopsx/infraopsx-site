@@ -1,0 +1,207 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from './Header.astro';
+import Footer from './Footer.astro';
+
+const { locale = 'en' } = Astro.props;
+const isZh = locale === 'zh';
+const canonicalPath = isZh ? '/zh/services/docker-compose-nginx-audit/' : '/services/docker-compose-nginx-audit/';
+const enPath = '/services/docker-compose-nginx-audit/';
+const zhPath = '/zh/services/docker-compose-nginx-audit/';
+const switchHref = isZh ? enPath : zhPath;
+
+const content = isZh ? {
+  title: 'Docker Compose / Nginx 配置检查 | InfraOpsX',
+  description: '49 美元起的 Docker Compose 与 Nginx 书面配置检查：风险排查、修复建议、验证命令，无需英文电话或生产环境 SSH 权限。',
+  eyebrow: '固定范围 · 异步文字服务',
+  heading: 'Docker Compose 与 Nginx 配置检查',
+  intro: '有容器启动失败、反向代理错误或 HTTPS 配置疑问？先检查配置和日志，找出值得修正的风险，再决定是否修改服务器。',
+  priceNote: '一次书面检查的试售价格',
+  scope: '适用于一套 Docker Compose 配置、一份 Nginx 站点配置，以及相关的少量脱敏日志。复杂架构会先评估范围，再单独报价。',
+  request: '邮件申请检查',
+  processLabel: '交付内容',
+  deliverables: [
+    '按优先级整理的配置与故障线索清单',
+    '针对发现的问题给出可审阅的修改建议',
+    '提供用于确认修复效果的验证命令',
+    '一份英文书面报告，以及交付后一轮文字澄清'
+  ],
+  requirementsLabel: '需要提供什么',
+  requirements: [
+    '1 份 docker-compose.yml / compose.yaml',
+    '最多 1 份相关 Nginx 站点配置',
+    '与本次问题有关的脱敏错误日志与期望行为',
+    '操作系统、Docker 版本，以及生产/测试环境说明'
+  ],
+  boundaryLabel: '范围和安全说明',
+  boundaries: [
+    '无需提供 SSH、密码、API Key 或私钥；请在发送前删除敏感信息。',
+    '报价确认、收到资料后预计 5 个工作日内交付；紧急故障与 7×24 值守不属于此服务。',
+    '仅提供静态检查和建议，不保证仅凭配置文件就能找出运行时故障的根因。',
+    '不包含直接修改生产环境、漏洞扫描认证、恶意软件清理或完整基础设施审计。',
+    '如果资料不够充分，会先说明局限，不擅自猜测或承诺修复。'
+  ],
+  proofLabel: '查看真实技术工作',
+  proofIntro: '可以先查看 InfraOpsX 已公开的故障分析与技术案例：',
+  proofLinks: [
+    { text: 'Rook Ceph RBD 挂载故障恢复案例', href: '/case-studies/' },
+    { text: 'Linux / Kubernetes 技术文章', href: '/blog/' }
+  ],
+  nextLabel: '流程',
+  steps: [
+    '邮件描述问题并发送脱敏配置（请先不要付款）。',
+    '我们确认是否在固定范围内，并通过邮件确定价格与交付内容。',
+    '使用双方确认的收款方式支付后开始检查。',
+    '收到书面报告、验证命令并完成一次文字澄清。'
+  ],
+  ending: '先确定范围，再决定是否购买。只通过文字交流，不需要英文电话。',
+  contactSubject: 'Docker Compose / Nginx audit inquiry',
+  contactBody: 'Environment:\n\nWhat is not working:\n\nExpected outcome:\n\nI will remove credentials and private data before sending any files.'
+} : {
+  title: 'Docker Compose & Nginx Configuration Review | InfraOpsX',
+  description: 'A $49 fixed-scope Docker Compose and Nginx configuration review, delivered in writing with prioritized findings, safe change suggestions and verification commands.',
+  eyebrow: 'Fixed scope · Written delivery · No calls required',
+  heading: 'Docker Compose & Nginx configuration review',
+  intro: 'Container startup issues, reverse proxy errors or uncertain HTTPS settings? Get an independent review of the relevant files before making changes to your server.',
+  priceNote: 'Introductory price per written review',
+  scope: 'Covers one Docker Compose configuration, one related Nginx site configuration and a small relevant set of redacted log excerpts. Complex setups require a separate quote.',
+  request: 'Request a review by email',
+  processLabel: 'What you receive',
+  deliverables: [
+    'A prioritized list of configuration risks and likely failure points',
+    'Suggested, reviewable changes for issues found',
+    'Verification commands to check the outcome safely',
+    'An English findings report and one round of written clarification'
+  ],
+  requirementsLabel: 'What to send',
+  requirements: [
+    'One docker-compose.yml or compose.yaml',
+    'Up to one related Nginx site configuration',
+    'Relevant redacted error logs and the expected behavior',
+    'Operating system, Docker version and whether this is production or staging'
+  ],
+  boundaryLabel: 'Scope and safety',
+  boundaries: [
+    'No SSH access, passwords, API keys or private keys are needed. Remove secrets before sending files.',
+    'Typical delivery is within five business days after scope and inputs are confirmed. This is not emergency response or 24/7 support.',
+    'This is a static file review, not a promise to identify every runtime root cause.',
+    'Live production changes, penetration testing, incident response and full infrastructure audits are not included.',
+    'If the supplied evidence is insufficient, the report will state the limitations instead of guessing at a fix.'
+  ],
+  proofLabel: 'See the technical work',
+  proofIntro: 'Review real troubleshooting write-ups and infrastructure case studies:',
+  proofLinks: [
+    { text: 'Kubernetes and Ceph incident case studies', href: '/case-studies/' },
+    { text: 'Linux / Kubernetes technical articles', href: '/blog/' }
+  ],
+  nextLabel: 'How it works',
+  steps: [
+    'Email a brief description and redacted configuration files. Do not pay yet.',
+    'We confirm whether the files fit the fixed scope and agree on the exact deliverables.',
+    'Payment is arranged via an agreed payment method before work begins.',
+    'Receive the written findings, verification steps and one follow-up clarification.'
+  ],
+  ending: 'Scope first, payment second. Written communication only; no meeting required.',
+  contactSubject: 'Docker Compose / Nginx review request',
+  contactBody: 'Environment:\n\nProblem:\n\nExpected result:\n\nI will remove all secrets before sending configuration files.'
+};
+
+const emailHref = 'mailto:hello@oeax.de?subject='
+  + encodeURIComponent(content.contactSubject)
+  + '&body=' + encodeURIComponent(content.contactBody);
+---
+
+<BaseLayout
+  title={content.title}
+  description={content.description}
+  lang={isZh ? 'zh-CN' : 'en'}
+  canonicalPath={canonicalPath}
+  enPath={enPath}
+  zhPath={zhPath}
+>
+  <Header locale={locale} switchHref={switchHref} />
+  <main>
+    <section class="review-hero">
+      <div class="container review-hero-layout">
+        <div>
+          <a class="review-breadcrumb" href={isZh ? '/zh/' : '/'}>InfraOpsX</a>
+          <p class="review-eyebrow">{content.eyebrow}</p>
+          <h1>{content.heading}</h1>
+          <p class="review-intro">{content.intro}</p>
+          <a class="button primary" href={emailHref}>{content.request}</a>
+        </div>
+        <aside class="review-price-card" aria-label={content.priceNote}>
+          <div class="review-price">US$49</div>
+          <p class="review-price-label">{content.priceNote}</p>
+          <p>{content.scope}</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="review-section">
+      <div class="container review-grid">
+        <article class="review-panel">
+          <h2>{content.processLabel}</h2>
+          <ul>{content.deliverables.map((item) => <li>{item}</li>)}</ul>
+        </article>
+        <article class="review-panel">
+          <h2>{content.requirementsLabel}</h2>
+          <ul>{content.requirements.map((item) => <li>{item}</li>)}</ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="review-section review-muted">
+      <div class="container review-single">
+        <h2>{content.boundaryLabel}</h2>
+        <ul>{content.boundaries.map((item) => <li>{item}</li>)}</ul>
+      </div>
+    </section>
+
+    <section class="review-section">
+      <div class="container review-single">
+        <h2>{content.proofLabel}</h2>
+        <p>{content.proofIntro}</p>
+        <ul class="review-proof-links">
+          {content.proofLinks.map((item) => <li><a href={item.href}>{item.text}</a></li>)}
+        </ul>
+        <h2 class="review-steps-heading">{content.nextLabel}</h2>
+        <ol>{content.steps.map((item) => <li>{item}</li>)}</ol>
+        <div class="review-end">
+          <p>{content.ending}</p>
+          <a class="button primary" href={emailHref}>{content.request}</a>
+        </div>
+      </div>
+    </section>
+  </main>
+  <Footer locale={locale} />
+</BaseLayout>
+
+<style>
+  .review-hero { padding: 100px 0 78px; background: radial-gradient(circle at 80% 10%, rgba(var(--cyan-rgb),.12),transparent 38%),var(--bg); border-bottom: 1px solid var(--line); }
+  .review-hero-layout { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(260px,1fr); align-items: center; gap: 52px; }
+  .review-breadcrumb { color: var(--muted); font-size: 13px; }
+  .review-breadcrumb:hover, .review-proof-links a:hover { color: var(--cyan); }
+  .review-eyebrow { color: var(--cyan); letter-spacing: .07em; font-size: 13px; font-weight: 700; margin: 28px 0 10px; }
+  h1 { font-size: clamp(38px,5.3vw,67px); line-height: 1.09; letter-spacing: -.04em; margin: 0 0 23px; }
+  .review-intro { max-width: 700px; color: var(--body-copy); font-size: 18px; margin-bottom: 29px; }
+  .review-price-card { padding: 32px; border: 1px solid var(--accent-border); border-radius: 18px; background: var(--accent-card-gradient); }
+  .review-price { font-size: clamp(45px,6vw,70px); font-weight: 800; line-height: 1.1; color: var(--strong-text); letter-spacing: -.04em; }
+  .review-price-label { color: var(--accent-text); font-weight: 650; margin: 10px 0 20px; }
+  .review-price-card p:last-child { color: var(--body-copy); font-size: 15px; }
+  .review-section { padding: 65px 0; }
+  .review-muted { background: var(--bg-soft); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .review-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
+  .review-panel { border: 1px solid var(--line); border-radius: 15px; background: var(--card-gradient); padding: 30px; }
+  .review-single { max-width: 860px; }
+  h2 { font-size: clamp(25px,3vw,32px); line-height: 1.2; margin: 0 0 22px; }
+  ul, ol { padding-left: 24px; color: var(--body-copy); }
+  li { padding-left: 5px; margin: 13px 0; }
+  .review-single > p { color: var(--body-copy); }
+  .review-proof-links a { text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--line); }
+  .review-steps-heading { margin-top: 48px; }
+  .review-end { border: 1px solid var(--accent-border); padding: 28px; border-radius: 15px; background: var(--accent-card-gradient); margin-top: 40px; }
+  .review-end p { margin: 0 0 20px; color: var(--text); }
+  @media (max-width: 820px) { .review-hero { padding: 76px 0 58px; } .review-hero-layout, .review-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 520px) { .review-price-card, .review-panel, .review-end { padding: 22px; } .review-section { padding: 48px 0; } }
+</style>
