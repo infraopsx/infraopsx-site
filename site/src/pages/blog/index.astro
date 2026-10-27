@@ -23,7 +23,7 @@ const posts = Object.values(modules)
 ---
 
 <BaseLayout
-  title="Technical Articles | InfraOpsX"
+  title="Infrastructure Troubleshooting Guides | InfraOpsX"
   description="Practical technical notes about Linux, Docker, Kubernetes and infrastructure troubleshooting."
   lang="en"
   canonicalPath="/blog/"
@@ -50,6 +50,30 @@ const posts = Object.values(modules)
           Troubleshooting notes, deployment guides and anonymized infrastructure
           case studies from Linux, Docker, Kubernetes, networking and storage.
         </p>
+      </div>
+    </section>
+
+    <section class="section" data-seo-entry-links aria-labelledby="blog-paths-heading">
+      <div class="container">
+        <div class="section-heading">
+          <span class="section-label">FIND YOUR SYMPTOM</span>
+          <h2 id="blog-paths-heading">Start with the failure you can observe.</h2>
+          <p>These guides distinguish observations from assumptions and include the commands used to narrow the issue.</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3><a href="/blog/kubernetes-pod-pending/">Pod Pending and FailedScheduling →</a></h3>
+            <p>Read scheduler events and distinguish resource pressure from affinity or node-selection constraints.</p>
+          </article>
+          <article class="card">
+            <h3><a href="/blog/kubernetes-ceph-rbd-high-iowait-latency/">High iowait with low disk throughput →</a></h3>
+            <p>Trace blocked tasks from a Kubernetes node through RBD devices and Ceph OSD latency without assuming a physical root cause.</p>
+          </article>
+          <article class="card">
+            <h3><a href="/blog/postgresql-pg-wal-growth-patroni-replication-lag/">PostgreSQL pg_wal keeps growing →</a></h3>
+            <p>Check replication lag, slot retention and archiving before changing WAL settings or deleting files.</p>
+          </article>
+        </div>
       </div>
     </section>
 
