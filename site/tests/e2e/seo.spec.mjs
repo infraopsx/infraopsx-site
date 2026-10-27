@@ -162,6 +162,35 @@ test.describe('SEO regression', () => {
       ).toBeTruthy();
 
       await expectSeoMetadata(page, path);
+
+      // Each published article must have useful, server-rendered links to
+      // related articles in the same language, not generic or broken URLs.
+      if (/^\/(?:zh\/)?blog\/[^/]+\/$/.test(path)) {
+        const links = await page.locator('[data-related-articles] a[href]').evaluateAll((nodes) =>
+          nodes.map((node) => ({
+            href: node.getAttribute('href'),
+            text: node.textContent?.trim() ?? ''
+          }))
+        );
+
+        expect(links.length, 'No related reading on ' + path).toBeGreaterThanOrEqual(1);
+        expect(links.length, 'Too many related links on ' + path).toBeLessThanOrEqual(3);
+
+        const seen = new Set();
+        for (const link of links) {
+          expect(link.href, 'Not a local article URL on ' + path)
+            .toMatch(/^\/(?:zh\/)?blog\/[^/]+\/$/);
+          expect(link.href, 'Self-link in related reading on ' + path).not.toBe(path);
+          expect(link.text.length, 'Empty related-link text on ' + path).toBeGreaterThan(5);
+          expect(seen.has(link.href), 'Duplicate related link on ' + path).toBeFalsy();
+          expect(pathSet.has(link.href), 'Related target absent from sitemap: ' + link.href).toBeTruthy();
+          expect(
+            link.href.startsWith('/zh/') === path.startsWith('/zh/'),
+            'Wrong-language related link on ' + path
+          ).toBeTruthy();
+          seen.add(link.href);
+        }
+      }
     }
   });
 

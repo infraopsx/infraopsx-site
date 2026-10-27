@@ -2,6 +2,7 @@
 import BaseLayout from './BaseLayout.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import { relatedArticlesForPath } from '../data/articleRelations';
 
 const { frontmatter, headings = [] } = Astro.props;
 
@@ -24,6 +25,7 @@ const locale =
   (currentPath.startsWith('/zh/') ? 'zh-CN' : 'en');
 
 const isZh = locale === 'zh-CN';
+const relatedArticles = relatedArticlesForPath(currentPath, isZh ? 'zh' : 'en');
 
 const dateFormatter = new Intl.DateTimeFormat(
   isZh ? 'zh-CN' : 'en-US',
@@ -231,6 +233,23 @@ const tocHasExplicitNumbers = tocHeadings.some(
         <slot />
       </article>
 
+      {relatedArticles.length > 0 && (
+        <nav
+          class="article-related"
+          aria-label={isZh ? '相关技术文章' : 'Related technical articles'}
+          data-related-articles
+          data-pagefind-ignore
+        >
+          <h2>{isZh ? '延伸阅读' : 'Related troubleshooting guides'}</h2>
+          <ul>
+            {relatedArticles.map((related) => (
+              <li>
+                <a href={related.href}>{related.title}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
 
       <aside class="article-support" data-pagefind-ignore>
         <div>
@@ -339,6 +358,39 @@ const tocHasExplicitNumbers = tocHeadings.some(
     color: var(--cyan);
   }
 
+
+  .article-related {
+    margin-top: 46px;
+    padding-top: 26px;
+    border-top: 1px solid var(--line);
+  }
+
+  .article-related h2 {
+    margin: 0 0 14px;
+    color: var(--text);
+    font-size: 20px;
+    line-height: 1.35;
+  }
+
+  .article-related ul {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding-left: 20px;
+  }
+
+  .article-related a {
+    color: var(--accent-text);
+    font-size: 15px;
+    line-height: 1.65;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .article-related a:hover,
+  .article-related a:focus-visible {
+    color: var(--cyan);
+  }
 
   .article-support {
     display: grid;
