@@ -165,7 +165,7 @@ test.describe('SEO regression', () => {
 
       // Each published article must have useful, server-rendered links to
       // related articles in the same language, not generic or broken URLs.
-      if (/^\\/(?:zh\\/)?blog\\/[^/]+\\/$/.test(path)) {
+      if (/^\/(?:zh\/)?blog\/[^/]+\/$/.test(path)) {
         const links = await page.locator('[data-related-articles] a[href]').evaluateAll((nodes) =>
           nodes.map((node) => ({
             href: node.getAttribute('href'),
@@ -179,7 +179,7 @@ test.describe('SEO regression', () => {
         const seen = new Set();
         for (const link of links) {
           expect(link.href, 'Not a local article URL on ' + path)
-            .toMatch(/^\\/(?:zh\\/)?blog\\/[^/]+\\/$/);
+            .toMatch(/^\/(?:zh\/)?blog\/[^/]+\/$/);
           expect(link.href, 'Self-link in related reading on ' + path).not.toBe(path);
           expect(link.text.length, 'Empty related-link text on ' + path).toBeGreaterThan(5);
           expect(seen.has(link.href), 'Duplicate related link on ' + path).toBeFalsy();
