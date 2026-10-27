@@ -4,12 +4,18 @@ const isZh = locale === 'zh';
 
 const links = isZh
   ? [
+      { label: '技术文章', href: '/zh/blog/' },
+      { label: '工具', href: '/zh/tools/' },
+      { label: '案例', href: '/zh/case-studies/' },
       { label: '关于', href: '/zh/about/' },
       { label: '联系', href: '/zh/contact/' },
       { label: '支持', href: 'https://www.patreon.com/infraopsx', external: true },
       { label: '隐私政策', href: '/zh/privacy/' }
     ]
   : [
+      { label: 'Articles', href: '/blog/' },
+      { label: 'Tools', href: '/tools/' },
+      { label: 'Case Studies', href: '/case-studies/' },
       { label: 'About', href: '/about/' },
       { label: 'Contact', href: '/contact/' },
       { label: 'Support', href: 'https://www.patreon.com/infraopsx', external: true },

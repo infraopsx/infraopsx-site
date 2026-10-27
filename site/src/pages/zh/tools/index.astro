@@ -6,7 +6,7 @@ import ToolsExplorer from '../../../components/tools/ToolsExplorer.astro';
 ---
 
 <BaseLayout
-  title="基础设施工具 | InfraOpsX"
+  title="Ceph 与 Kubernetes 计算器及换算工具 | InfraOpsX"
   description="面向 Ceph、Kubernetes 和基础设施容量规划的实用浏览器工具。"
   lang="zh-CN"
   canonicalPath="/zh/tools/"
@@ -27,6 +27,30 @@ import ToolsExplorer from '../../../components/tools/ToolsExplorer.astro';
         <span class="section-label">INFRAOPSX 工具</span>
         <h1>面向真实基础设施的实用工具。</h1>
         <p>面向 Kubernetes、存储和日常运维场景的浏览器工具。</p>
+      </div>
+    </section>
+
+    <section class="section" data-seo-entry-links aria-labelledby="tool-pick-heading">
+      <div class="container">
+        <div class="section-heading">
+          <span class="section-label">按任务选工具</span>
+          <h2 id="tool-pick-heading">遇到什么规划或单位换算问题？</h2>
+          <p>已上线的三个工具都在浏览器本地运行。计算结果用于辅助规划，生产决策仍需结合真实集群状态核实。</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3><a href="/zh/tools/ceph-capacity-calculator/">Ceph 存储容量计算器 →</a></h3>
+            <p>估算等容量 OSD 的副本或 EC 方案，区分原始容量、理论可用容量及考虑预留比例后的规划容量。</p>
+          </article>
+          <article class="card">
+            <h3><a href="/zh/tools/kubernetes-resource-calculator/">Kubernetes 资源计算器 →</a></h3>
+            <p>规划 CPU、内存 Requests/Limits、节点池承载能力与需要预留的资源余量。</p>
+          </article>
+          <article class="card">
+            <h3><a href="/zh/tools/kubernetes-quantity-converter/">Kubernetes Quantity 换算器 →</a></h3>
+            <p>解析 YAML 中 CPU 毫核与内存 SI/二进制单位，并识别容易写错的数量格式。</p>
+          </article>
+        </div>
       </div>
     </section>
 

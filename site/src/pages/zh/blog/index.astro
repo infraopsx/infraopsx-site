@@ -23,7 +23,7 @@ const posts = Object.values(modules)
 ---
 
 <BaseLayout
-  title="技术文章 | InfraOpsX"
+  title="基础设施故障排查与实战记录 | InfraOpsX"
   description="Linux、Docker、Kubernetes 与基础设施故障排查相关的实用技术记录。"
   lang="zh-CN"
   canonicalPath="/zh/blog/"
@@ -50,6 +50,30 @@ const posts = Object.values(modules)
           记录 Linux、Docker、Kubernetes、网络、存储和生产环境中的
           故障排查、部署实践以及匿名化案例。
         </p>
+      </div>
+    </section>
+
+    <section class="section" data-seo-entry-links aria-labelledby="blog-paths-heading">
+      <div class="container">
+        <div class="section-heading">
+          <span class="section-label">按故障现象查找</span>
+          <h2 id="blog-paths-heading">从能观察到的症状开始排查。</h2>
+          <p>这些技术记录区分已确认的现场证据与尚未验证的推断，并列出定位问题时使用的命令。</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3><a href="/zh/blog/kubernetes-pod-pending/">Pod Pending 与 FailedScheduling →</a></h3>
+            <p>阅读调度事件，区分资源不足、亲和性规则与节点选择条件导致的调度失败。</p>
+          </article>
+          <article class="card">
+            <h3><a href="/zh/blog/kubernetes-ceph-rbd-high-iowait-latency/">iowait 高，但本地磁盘吞吐不高 →</a></h3>
+            <p>从 Kubernetes 节点阻塞任务追踪到 RBD 与 Ceph OSD 延迟，同时明确尚未证实的底层原因。</p>
+          </article>
+          <article class="card">
+            <h3><a href="/zh/blog/postgresql-pg-wal-growth-patroni-replication-lag/">PostgreSQL pg_wal 持续增长 →</a></h3>
+            <p>先核实副本延迟、复制槽与归档状态，再考虑修改 WAL 配置，避免直接删除 WAL 文件。</p>
+          </article>
+        </div>
       </div>
     </section>
 

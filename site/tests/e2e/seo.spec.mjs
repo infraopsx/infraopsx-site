@@ -217,6 +217,41 @@ test.describe('SEO regression', () => {
     }
   });
 
+  test('bilingual entry pages expose real published destinations in static HTML', async ({
+    page,
+    request
+  }) => {
+    const published = new Set(await sitemapPaths(request));
+    const examples = [
+      ['/', ['/tools/ceph-capacity-calculator/', '/case-studies/kubernetes-pod-pending/']],
+      ['/zh/', ['/zh/tools/ceph-capacity-calculator/', '/zh/case-studies/kubernetes-pod-pending/']],
+      ['/blog/', ['/blog/kubernetes-pod-pending/', '/blog/postgresql-pg-wal-growth-patroni-replication-lag/']],
+      ['/zh/blog/', ['/zh/blog/kubernetes-pod-pending/', '/zh/blog/postgresql-pg-wal-growth-patroni-replication-lag/']],
+      ['/tools/', ['/tools/ceph-capacity-calculator/', '/tools/kubernetes-resource-calculator/', '/tools/kubernetes-quantity-converter/']],
+      ['/zh/tools/', ['/zh/tools/ceph-capacity-calculator/', '/zh/tools/kubernetes-resource-calculator/', '/zh/tools/kubernetes-quantity-converter/']],
+      ['/case-studies/', ['/case-studies/kubernetes-pod-pending/', '/case-studies/rook-ceph-rbd-failedmount/', '/blog/postgresql-pg-wal-growth-patroni-replication-lag/', '/blog/kubernetes-ceph-rbd-high-iowait-latency/']],
+      ['/zh/case-studies/', ['/zh/case-studies/kubernetes-pod-pending/', '/zh/case-studies/rook-ceph-rbd-failedmount/', '/zh/blog/postgresql-pg-wal-growth-patroni-replication-lag/', '/zh/blog/kubernetes-ceph-rbd-high-iowait-latency/']]
+    ];
+
+    for (const [path, expected] of examples) {
+      const response = await page.goto(path, { waitUntil: 'domcontentloaded' });
+      expect(response?.ok(), 'Cannot open entry page ' + path).toBeTruthy();
+
+      const links = await page.locator('[data-seo-entry-links] a[href]').evaluateAll((items) =>
+        items.map((item) => item.getAttribute('href'))
+      );
+
+      for (const href of expected) {
+        expect(links, 'Missing direct path from ' + path + ' to ' + href).toContain(href);
+      }
+
+      for (const href of links) {
+        expect(href, 'Nonlocal entry link on ' + path).toMatch(/^\/(?!\/)/);
+        expect(published.has(href), 'Unpublished destination ' + href + ' linked from ' + path).toBeTruthy();
+      }
+    }
+  });
+
   test('search pages stay noindex and outside the sitemap', async ({
     page,
     request

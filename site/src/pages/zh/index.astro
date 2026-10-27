@@ -223,6 +223,34 @@ const skills = [
       </div>
     </section>
 
+    <section class="section" data-seo-entry-links aria-labelledby="home-start-heading">
+      <div class="container">
+        <div class="section-heading">
+          <span class="section-label">从具体问题开始</span>
+          <h2 id="home-start-heading">选择工具，或查看有现场证据的排障案例。</h2>
+          <p>容量规划可使用完全在浏览器运行的计算器；遇到实际故障时，可参考保留关键命令与排查证据的技术记录。</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3><a href="/zh/tools/ceph-capacity-calculator/">估算 Ceph 副本与 EC 容量 →</a></h3>
+            <p>对比理论可用容量与按预留比例计算的规划目标；结果不等于集群真实的 MAX AVAIL。</p>
+          </article>
+          <article class="card">
+            <h3><a href="/zh/tools/kubernetes-resource-calculator/">规划 Kubernetes CPU 与内存 Requests →</a></h3>
+            <p>估算同规格节点池能否承载工作负载，识别 CPU、内存或 Pod 数量等资源瓶颈。</p>
+          </article>
+          <article class="card">
+            <h3><a href="/zh/case-studies/kubernetes-pod-pending/">排查一直 Pending 的 Pod →</a></h3>
+            <p>查看如何从 Scheduler Events 找出六节点集群中的 Affinity 和 CPU Requests 调度约束。</p>
+          </article>
+          <article class="card">
+            <h3><a href="/zh/case-studies/rook-ceph-rbd-failedmount/">追踪 Rook Ceph RBD FailedMount →</a></h3>
+            <p>参考记录中的 CSI 与 RBD 映射检查，理解卷被报告为仍在使用时的定位过程。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <section class="cta">
       <div class="container">
         <div class="cta-box">

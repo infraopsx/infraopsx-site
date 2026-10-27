@@ -21,24 +21,26 @@ const cases = [
     href: '/case-studies/rook-ceph-rbd-failedmount/'
   },
   {
-    title: 'PostgreSQL WAL Growth Investigation',
-    area: 'PostgreSQL · Storage',
-    problem: 'The PostgreSQL data directory showed unexpectedly high disk consumption concentrated in pg_wal.',
-    diagnosis: 'The investigation focused on WAL retention, replication state and the factors that can prevent WAL recycling.',
-    outcome: 'The storage problem was isolated to the WAL lifecycle instead of being treated as a generic disk-capacity issue.'
+    title: 'Patroni Replica Lag and PostgreSQL WAL Retention',
+    area: 'PostgreSQL · Patroni · Replication',
+    problem: 'A Patroni replica lagged by roughly 230 GiB while pg_wal usage remained high.',
+    diagnosis: 'The investigation distinguishes the observed replica lag from the retention mechanisms to verify: replication slots, archiving and WAL settings.',
+    outcome: 'The guide documents checks for an actionable decision without claiming replica lag alone proves why WAL remains on disk.',
+    href: '/blog/postgresql-pg-wal-growth-patroni-replication-lag/'
   },
   {
-    title: 'Ceph Recovery Bottleneck Analysis',
-    area: 'Ceph · Storage',
-    problem: 'Recovery work was queued while cluster recovery progress appeared slower than expected.',
-    diagnosis: 'Recovery reservations, OSD state and queue behavior were inspected to understand where recovery was constrained.',
-    outcome: 'The recovery path was narrowed to specific reservation and scheduling behavior instead of blindly increasing recovery parameters.'
+    title: 'Kubernetes iowait Traced Through Ceph RBD',
+    area: 'Kubernetes · Ceph RBD · Performance',
+    problem: 'A Kubernetes node showed high iowait while local disk throughput appeared modest.',
+    diagnosis: 'D-state threads, CSI mappings, iostat and OSD metrics traced the latency into the RBD-to-OSD storage path.',
+    outcome: 'Ceph-side latency was demonstrated, but the underlying hypervisor or physical storage root cause was not established.',
+    href: '/blog/kubernetes-ceph-rbd-high-iowait-latency/'
   }
 ];
 ---
 
 <BaseLayout
-  title="Case Studies | InfraOpsX"
+  title="Kubernetes, Ceph & PostgreSQL Case Studies | InfraOpsX"
   description="Anonymized infrastructure troubleshooting case studies across Kubernetes, PostgreSQL, Ceph, Docker and Linux."
   lang="en"
   canonicalPath="/case-studies/"
@@ -51,16 +53,16 @@ const cases = [
     <section class="showcase-hero">
       <div class="container">
         <span class="section-label">CASE STUDIES</span>
-        <h1>How problems were narrowed down and solved.</h1>
+        <h1>How infrastructure incidents were investigated.</h1>
         <p>
           Anonymized examples from real infrastructure work. The focus is not on
-          the company or environment name, but on the diagnosis process, root cause
-          and technical outcome.
+          the company or environment name, but on evidence, diagnosis steps,
+          confirmed findings and the limits of what could be established.
         </p>
       </div>
     </section>
 
-    <section class="showcase-section">
+    <section class="showcase-section" data-seo-entry-links>
       <div class="container showcase-grid">
         {cases.map((item, index) => (
           <article class={`showcase-card ${item.href ? 'showcase-card-linked' : ''}`}>
@@ -84,7 +86,7 @@ const cases = [
 
             {item.href && (
               <a class="case-read-more" href={item.href}>
-                Read full case study →
+                Read the detailed investigation →
               </a>
             )}
           </article>

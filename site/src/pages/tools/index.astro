@@ -6,7 +6,7 @@ import ToolsExplorer from '../../components/tools/ToolsExplorer.astro';
 ---
 
 <BaseLayout
-  title="Infrastructure Tools | InfraOpsX"
+  title="Ceph & Kubernetes Calculators and Converters | InfraOpsX"
   description="Practical browser-based tools for Ceph, Kubernetes and infrastructure planning."
   lang="en"
   canonicalPath="/tools/"
@@ -27,6 +27,30 @@ import ToolsExplorer from '../../components/tools/ToolsExplorer.astro';
         <span class="section-label">INFRAOPSX TOOLS</span>
         <h1>Practical infrastructure tools for real-world systems.</h1>
         <p>Browser-based tools for Kubernetes, storage, and everyday infrastructure work.</p>
+      </div>
+    </section>
+
+    <section class="section" data-seo-entry-links aria-labelledby="tool-pick-heading">
+      <div class="container">
+        <div class="section-heading">
+          <span class="section-label">CHOOSE BY TASK</span>
+          <h2 id="tool-pick-heading">Which infrastructure tool do you need?</h2>
+          <p>All three available tools run in your browser. Use their results as planning aids and verify production decisions against the real cluster.</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3><a href="/tools/ceph-capacity-calculator/">Ceph storage capacity calculator →</a></h3>
+            <p>Use for equal-size OSD replication or erasure-coding estimates. Separate raw, theoretical usable and reserve-based planning capacity.</p>
+          </article>
+          <article class="card">
+            <h3><a href="/tools/kubernetes-resource-calculator/">Kubernetes resource calculator →</a></h3>
+            <p>Use for CPU and memory requests, limits and node-pool fit estimates, with explicit planning headroom.</p>
+          </article>
+          <article class="card">
+            <h3><a href="/tools/kubernetes-quantity-converter/">Kubernetes quantity converter →</a></h3>
+            <p>Use when YAML CPU or memory units are unclear: convert millicores and SI/binary memory quantities and catch suspicious values.</p>
+          </article>
+        </div>
       </div>
     </section>
 
